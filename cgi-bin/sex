@@ -1,0 +1,234 @@
+#!/usr/bin/perl -wT
+
+# CGI for stream exchange
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+
+use Fcntl 	qw':flock :seek :mode';
+use POSIX	qw'mkfifo';
+use Digest::MD5 qw'md5_hex';
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+$| = 1;
+
+# import from fex.pp
+our ($tmpdir,$logdir,$timeout,$fra,$bs);
+
+# load common code, local config: $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+chdir $spooldir or error(500,"$spooldir - $!");
+
+my $debuglog = "$tmpdir/sex.log";
+my $ra = $ENV{REMOTE_ADDR}||0;
+$fra .= '/'.$ENV{HTTP_X_FORWARDED_FOR} if $ENV{HTTP_X_FORWARDED_FOR};
+$timeout *= 10;
+
+# normal / public :
+# in normal mode the recipient needs authentification, not the sender
+# in public mode the sender needs authentification, not the recipient
+
+$user = $id = $pmode = $type = '';
+$stream = 'STDSTR';
+$mode = $ENV{REQUEST_METHOD} eq 'POST' ? 'PUSH' : 'POP';
+
+# parse HTTP QUERY_STRING
+if (my $qs = $ENV{QUERY_STRING}) {
+  $qs = decode_b64($qs) if $qs =~ /^\w+=*$/;
+  foreach (split '&',$qs) { setparam(split '=',"$_=") };
+}
+
+unless ($user) { error(400,"Missing user") }
+if ($mdomain and $user !~ /@/) { $user .= '@'.$mdomain }
+if ($user =~ /^anonymous/) {
+  if (@anonymous_upload and ipin($ra,@anonymous_upload)) {
+    mkdirp($user);
+  } else {
+    error(403,"Forbidden");
+  }
+} else {
+  unless (-f "$user/@") { error(404,"Unknown user $user") }
+}
+chdir $user or error(500,"$user - $!");
+
+$stream = "STREAM/$stream";
+
+if ($mode eq 'PUSH') {
+  if ($pmode eq 'PUBLIC') {
+    &authentificate;
+    $stream =~ s:/STDSTR:/PUBLIC:;
+  }
+  mkdirp($stream);
+  my $fifo = "$stream/fifo";
+  unless (-p $fifo) {
+    mkfifo($fifo,0600) or error(503,"Cannot create $fifo : $!");
+  }
+  
+  my $lock = "$stream/lock";
+  open $lock,'>>',$lock or error(503,"Cannot open $lock : $!");
+  flock $lock,LOCK_EX|LOCK_NB or error(409,"$stream already in use");
+  
+  chmod 0600,$fifo;
+  unlink "$stream/mode";
+  unlink "$stream/type";
+  symlink $pmode,"$stream/mode" if $pmode;
+  symlink $type, "$stream/type" if $type;
+
+  $SIG{PIPE} = sub { 
+    sleep 1; 
+    rmrf($stream); 
+    exit; 
+  };
+  $SIG{ALRM} = sub { 
+    syswrite STDOUT,"."; 
+    exit if $!; 
+    $ALARM = 1; 
+  };
+  syswrite STDOUT,"HTTP/1.9 199 Hold on"; 
+  for (my $i=0;$i<$timeout;$i++) {
+    alarm(1);
+    $ALARM = 0;
+    # will hang until $stream is opend for reading by another process
+    open $fifo,'>',$fifo and last;
+    unless ($ALARM) { error(503,"Cannot open $fifo : $!") }
+  }
+  alarm(0);
+  syswrite STDOUT,"\r\n"; 
+  
+  unless (fileno $fifo) { 
+    rmrf($stream);
+    error(504,"Timeout");
+  }
+  
+  header('200 OK');
+  sexlog($mode);
+
+  $SIG{PIPE} = sub { sleep 1; rmrf($stream); exit; };
+  # syswrite $fifo,$data if $data;
+  while (sysread(STDIN,$_,$bs)) {
+    syswrite $fifo,$_;
+  }
+  
+  rmrf($stream);
+  exit;
+
+}
+elsif ($mode eq 'POP') {
+  $stream =~ s:/STDSTR:/PUBLIC: if $id eq 'public';
+  unless ($id eq 'public' and (readlink "$stream/mode"||'') eq 'PUBLIC' 
+          or $user =~ /^anonymous/) {
+    &authentificate;
+  }
+  error(503,"No $stream for $user") unless -d $stream;
+  $type = readlink "$stream/type" || '';
+  $SIG{ALRM} = sub { error(504,"Timeout") };
+  alarm($timeout);
+  my $fifo = "$stream/fifo";
+  if (-e $fifo and not -r $fifo) { error(503,"$stream already in use") }
+  open $fifo,'<',$fifo or error(503,"Cannot open $fifo : $!");
+  chmod 0,$fifo;
+  alarm(0);
+  header('200 OK',$type);
+  sexlog($mode);
+  
+  while (sysread($fifo,$_,$bs)) {
+    syswrite STDOUT,$_;
+  }
+  exit;
+  
+} 
+else {
+  error(405,"Unknown Request");
+}
+
+exit;
+
+
+sub setparam {
+  my ($v,$vv) = @_;
+  
+  $v = uc(despace($v));
+  $vv = untaint(normalize($vv));
+  # $param{$v} = $vv;
+  if    ($v eq 'USER') { $user	= lc(despace($vv)) } 
+  elsif ($v eq 'ID') { $id = despace($vv) } 
+  elsif ($v eq 'MODE') { $pmode = uc(despace($vv)) } 
+  elsif ($v eq 'TYPE') { $type = uc(despace($vv)) } 
+  elsif ($v eq 'STREAM') { $stream = normalize_filename($vv) }
+  elsif ($v eq 'BS' and $vv =~ /(\d+)/) { $bs = $1 } 
+  elsif ($v eq 'TIMEOUT' and $vv =~ /(\d+)/) { $timeout	= $1 }
+  elsif ($v eq 'ANONYMOUS') { $id = $user ='anonymous'; $stream = $vv; }
+}
+
+sub sexlog {
+  if (open my $log,'>>',"$logdir/sex.log") {
+    flock $log,LOCK_EX;
+    seek $log,0,SEEK_END;
+    printf {$log} "%s [%s_%s] %s (%s) %s\n",
+                  isodate(time),$$,$ENV{REQUESTCOUNT},$user,$fra,"@_";
+    close $log;
+  }
+}
+
+sub sigdie {
+  local $_ = shift;
+  chomp;
+  sigexit('DIE',$_);
+}
+
+sub sigexit {
+  my ($sig) = @_;
+  if (open my $log,'>>',"$logdir/sex.log") {
+    printf {$log} "%s %s (%s) caught SIGNAL %s\n",
+                  isodate(time),$user||'-',$fra||'-',"@_";
+    close $log;
+  }
+  if ($sig eq 'DIE') {
+    shift;
+    die "@_\n";
+  } else {
+    die "SIGNAL @_\n";
+  }
+}
+
+sub error {
+  nvt_print("HTTP/1.1 @_");
+  exit;
+}
+
+sub header {
+  my ($status,$type) = @_;
+
+  return if $HTTP_HEADER;
+  $HTTP_HEADER = $status;
+
+  nvt_print("HTTP/1.1 $status");
+  if ($mode eq 'POP') {
+    nvt_print("Server: sexsrv");
+    if ($type eq 'GZIP') {
+      nvt_print("Content-Type: application/gzip");
+    } else {
+      nvt_print("Content-Type: application/binary");
+    }
+    nvt_print("Expires: 0");
+    nvt_print("Cache-Control: no-cache");
+    nvt_print("Connection: close");
+  }
+  nvt_print("");
+}
+
+sub authentificate {
+  my $rid;
+
+  error(400,"Missing auth-ID") unless $id;
+  open $id,'<','@' or error(401,"$user/@ - $!");
+  chomp($rid = <$id>||'');
+  close $id;
+  if ($rid and $sid and $id =~ /^(MD5H:)/) {
+    $rid = $1 . md5_hex($rid.$sid);
+  }
+  error(401,"Wrong auth-ID") if $rid ne $id;
+}

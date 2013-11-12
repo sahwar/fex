@@ -1,0 +1,11 @@
+New release on http://fex.rus.uni-stuttgart.de/fex.html
+
+Important changes:
+
+- security update: new fac -D option to disable a user
+
+- new fex.ph variable $usage_conditions adds a "terms of usage" text
+  to the registration e-mail
+
+- new fex.ph variable $notify_newrelease checks for new release and informs
+  the admin by e-mail

@@ -1,0 +1,174 @@
+#!/usr/bin/perl -w
+
+# client for anonymous FEX or SEX
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+# Copyright: Perl Artistic
+
+$fexserver = '';
+
+$0 =~ s:.*/::;;
+
+$u = $ENV{AFEX} || $fexserver || &guessserver;
+$u = "http://$u" if $u !~ /^http/;
+
+if (@ARGV and $ARGV[0] eq '-h' or not @ARGV and -t STDIN) { &usage }
+
+$opt_v = (@ARGV and $ARGV[0] eq '-v') ? shift @ARGV : '';
+
+if ($0 eq 'asex') {
+  $a = "$u/anonymous";
+  if (@ARGV and $ARGV[0] =~ /^\d+$/) {
+    $id = shift;
+    if ("@ARGV" eq '-') {
+      exec "sexget $opt_v $a $id | tar xvf -";
+    } else {
+      exec ws("sexget $opt_v $a $id");
+    }
+  } else {
+    if (@ARGV and $ARGV[0] =~ /^-(\d)/) {
+      $id = sprintf("%0$1d",rand(10**$1));
+      shift @ARGV;
+    } else {
+      $id = sprintf("%06d",rand(1000000));
+    }
+    print "# commands for SEX recipient:\n";
+    if (@ARGV) {
+      print "wget -qO- $u/sex?anonymous=$id | tar xvf -\n";
+      print "asex $id -\n";
+      print "# streaming files and waiting for SEX recipient:\n";
+      exec "tar cvf - @ARGV | sexsend -q $opt_v $a $id";
+    } else {
+      print "wget -qO- $u/sex?anonymous=$id\n";
+      print "asex $id\n";
+      exec ws("sexsend -q $opt_v $a $id");
+    }
+  }
+  exit;
+}
+
+if ($0 eq 'afex') {
+  
+  if ("@ARGV" =~/^-(\d+)$/) {
+    $n = $1;
+    $cmd = "wget -qO/dev/null $u/fop/anonymous/anonymous/afex_$n.tar?DELETE";
+    print "$cmd\n" if $opt_v;
+    system ws($cmd);
+    print "not " if $?;
+    print "deleted\n";
+    exit;
+  }
+
+  # download
+  if ("@ARGV" =~ /^(\d+)( -)?$/) {
+    $id = $1;
+    $nq = $2;
+    $u .= "/fop/anonymous/anonymous/afex_$id.tar";
+    if ($nq) {
+      exec "fexget $opt_v -s- $u | tar xvf -";
+    } else {
+      $aft = "/tmp/afex_$id.tar";
+      $cmd = "fexget $opt_v -s- $u >$aft";
+      print "$cmd\n" if $opt_v;
+      system $cmd;
+      if (`file $aft` =~ /tar archive/) {
+        print "Files in archive:\n";
+        $cmd = "tar tvf $aft";
+        print "$cmd\n" if $opt_v;
+        system ws($cmd);
+        print "extract these files (Y/n)? ";
+        if ((<STDIN>||'y') =~ /^[Yy\n]/) {
+          $cmd = "tar xvf $aft";
+          print "$cmd\n" if $opt_v;
+          system ws($cmd);
+          unlink $aft;
+        } else {
+          print "keeping $aft\n";
+        }
+      } else {
+        open $aft,$aft or die "$0: cannot open $aft = $!\n";
+        unlink $aft;
+        print while read($aft,$_,65536);
+      }
+    }
+    exit;
+  }
+
+  # upload
+  else {
+    if (@ARGV and $ARGV[0] =~ /^-(\d)/) {
+      $id = sprintf("%0$1d",rand(10**$1));
+      shift @ARGV;
+    } else {
+      $id = sprintf("%06d",rand(1000000));
+    }
+    $aft = "afex_$id.tar";
+    @fexsend = ws("fexsend $opt_v -K -k 1");
+    if (@ARGV) {
+      print "@fexsend -a $aft @ARGV $u/anonymous\n" if $opt_v;
+      system @fexsend,'-a',$aft,@ARGV,"$u/anonymous";
+      exit $? if $?;
+    } elsif (not -t STDIN) {
+      $aft = "/tmp/$aft";
+      open $aft,'>',$aft or die "$0: cannot write $aft - $!\n";
+      print {$aft} $_ while read(STDIN,$_,65536);
+      close $aft;
+      print "@fexsend $aft $u/anonymous\n" if $opt_v;
+      $s = system @fexsend,$aft,"$u/anonymous";
+      unlink $aft;
+      exit $s if $s;
+    } else {
+      die "say captain, say WHOT?!";
+    }
+    print "For download use:\n";
+    print "$u//$aft\n" if -t STDIN;
+    print "afex $id\n";
+  }
+  exit;
+}
+
+&usage;
+
+sub guessserver {
+  my $fexserver = '';
+  my $rc = '/etc/resolv.conf';
+  local $_;
+  
+  open $rc,$rc or die "$0: cannot open $rc - $!\n";
+  while (<$rc>) {
+    if (/^\s*domain\s+([\w.-]+)/) {
+      $fexserver = "http://fex.$1";
+      last;
+    }
+    if (/^\s*search\s+([\w.-]+)/) {
+      $fexserver = "http://fex.$1";
+    }
+  }
+  close $rc;
+  return $fexserver;
+}
+
+sub ws {
+  local $_ = shift;
+  return split;
+}
+
+sub usage {
+  if ($0 eq 'afex') {
+    print "file input usage:  $0 files...\n";
+    print "file output usage: $0 ID [-]\n";
+    print "pipe input usage:  ... | $0\n";
+    print "pipe output usage: $0 ID | ...\n";
+    print "delete usage:      $0 -ID\n";
+    exit;
+  }
+  if ($0 eq 'asex') {
+    print "file input usage:  $0 files...\n";
+    print "file output usage: $0 ID [-]\n";
+    print "pipe input usage:  ... | $0\n";
+    print "pipe output usage: $0 ID | ...\n";
+    exit;
+  }
+  die "program name must be a afex or asex, not $0\n";
+}

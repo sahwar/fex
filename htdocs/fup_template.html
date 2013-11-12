@@ -1,0 +1,52 @@
+<html>
+<head>
+  <meta http-equiv="expires" content="0">
+  <title>F*EX upload template</title>
+</head>
+<body>
+<h1><a href="/">F*EX</a> upload template</h1>
+<p><hr><p>
+<script type="text/javascript">
+  function showstatus() {
+    var file = document.forms["upload"].elements["file"].value;
+    if (file != "") {
+      window.open(
+        '$PROTO$://$HTTP_HOST$/fup?showstatus=$RANDOM$',
+        'fup_status',
+        'width=700,height=500'
+      );
+      return true;
+    } else {
+      return false;
+    }
+  }
+</script>
+<form name="upload"
+      action="/fup"
+      method="post" 
+      accept-charset="UTF-8" 
+      enctype="multipart/form-data" 
+      onsubmit="return showstatus();">
+  <input type="hidden" name="uid" value="$RANDOM$">
+  <table>
+    <tr><td>sender:      <td><input type="text"     name="from"    size="80" value="">(e-mail address)</tr>
+    <tr><td>auth-ID:     <td><input type="password" name="id"      size="16" value=""></tr>
+    <tr><td>recipient(s):<td><input type="text"     name="to"      size="80" value="">(e-mail address)</tr>
+    <tr><td>comment:     <td><input type="text"     name="comment" size="80" value="">(optional)</tr>
+    <tr><td>file name:   <td><input type="file"     name="file"    size="80" value=""></tr>
+  </table> 
+  <p>
+  <input type="submit" value="submit">
+</form>
+<p>
+<p><hr><p>
+After "submit" you will see an upload progress bar 
+(if you have javascript enabled and popups allowed).
+<p>
+<em>NOTE: Most web browsers cannot upload files > 2 GB!</em><br>
+If your file is greater you have to use a special <a href="tools.html">F*EX client</a>.<br>
+You also need one for resuming interrupted uploads. Your web browser cannot do this.
+<p><hr><p>
+<address>Contact: <a href="mailto:$SERVER_ADMIN$">fexmaster</a></address>
+</body>
+</html>

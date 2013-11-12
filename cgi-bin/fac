@@ -1,0 +1,834 @@
+#!/usr/bin/perl -w
+
+# F*EX CGI for administration
+#
+# Author: Andre Hafner <andrehafner@gmx.net>
+#
+
+use CGI			qw(:standard);
+use CGI::Carp		qw(fatalsToBrowser);
+
+$| = 1;
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "no \$FEXLIB\n" unless -d $FEXLIB;
+
+# import from fex.pp and fex.ph
+our ($FEXHOME,$spooldir,$logdir,$docdir,$durl,$mdomain);
+our ($bs,$hostname,$keep_default,$recipient_quota,$sender_quota,$autodelete);
+our ($admin,$admin_pw,$admin_hosts);
+our ($sendmail,$bcc);
+our $error = 'FAC error';
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or http_die("cannot load $FEXLIB/fex.pp - $!\n");
+
+my @http_auth = ();
+my $ra = $ENV{REMOTE_ADDR}||0;
+
+$admin    or http_die("\$admin not configured in $FEXLIB/fex.ph\n");
+$admin_pw or http_die("\$admin_pw not configured in $FEXLIB/fex.ph\n");
+
+if (@admin_hosts and not ipin($ra,@admin_hosts)) {
+  html_error($error,"Administration from your host ($ra) is not allowed.");
+}
+
+# redirect to https if configured
+if (0 and open my $x,'/etc/xinetd.d/fexs') {
+  while (<$x>) {
+    if (/^\s*disable\s*=\s*no/) {
+      nvt_print(
+        "HTTP/1.1 301 Moved Permanently",
+        "Location: https://$hostname$ENV{REQUEST_URI}",
+        'Content-Length: 0',
+        ''
+      );
+      exit;
+    }
+  }
+  close $x;
+}
+
+# authentication
+&require_auth;
+
+chdir $spooldir or http_die("$spooldir - $!");
+
+my $fup = $durl;
+$fup =~ s:/fop:/fup:;
+
+my $http_client = $ENV{HTTP_USER_AGENT} || '';
+
+# here is chosen which files to save with backup function
+my @backup_files = qw(
+  htdocs/index.html
+  lib/fex.ph
+  lib/fup.pl
+  spool/*@*/@*
+);
+
+# backup goes first
+if (defined param("action") and param("action") eq "backup") { &backup }
+
+http_header('200 OK');
+print html_header("F*EX Admin Control for $hostname");
+
+my $nav_user = 
+  li("<a href=\"?action=create\">Create new user</a>") . "\n" .
+  li("<a href=\"?action=change-auth\">Change user auth-ID</a>") . "\n" .
+  li("<a href=\"?action=edit\">Edit user restrictions file</a>") . "\n" .
+  li("<a href=\"?action=delete\">Delete existing user</a>") . "\n" .
+  li("<a href=\"?action=quota\">Manage disk quota</a>") . "\n";
+
+my $nav_log = 
+  li("<a href=\"?action=fup.log\">Get fup.log</a>") . "\n" .
+  li("<a href=\"?action=fop.log\">Get fop.log</a>") . "\n" .
+  li("<a href=\"?action=error.log\">Get error.log</a>") . "\n";
+
+if (-f 'fexsrv.log') {
+  $nav_log =
+    li("<a href=\"?action=watch\">Watch logfile</a>") . "\n" .
+    li("<a href=\"?action=fexsrv.log\">Get fexsrv.log</a>") . "\n" .
+  $nav_log;
+}
+
+my $nav_backup = 
+  li("<a href=\"?action=backup\">Download backup<br>(config only)</a>") . "\n" .
+  li("<a href=\"?action=restore\">Restore backup</a>") . "\n";
+
+my $nav_show =
+  li("<a href=\"?action=list\">List spooled files</a>") . "\n" .
+  li("<a href=\"?action=showquota\">Show quotas (sender/recipient)</a>") . "\n" .
+  li("<a href=\"?action=showconfig\">Show server config</a>") . "\n" .
+  li("<a href=\"?action=userconfig\">Show user config</a>") . "\n";
+  
+my $nav_edit =  
+  li("<a href=\"?action=editconfig\">Edit config</a>") . "\n" .
+  li("<a href=\"?action=editindex\">Edit index.html</a>") . "\n";
+
+#print table({-border=>"0"},Tr({-valign=>"top"},[td([ul($nav_user), ul($nav_log), ul($nav_backup), ul($nav_other)])])), "\n";
+#print "\n", hr, "\n" ;
+print table({-border=>"0"},
+	th({},["manage user","show","log files","edit","backup"]),
+	Tr({-valign=>"top"},[td([
+		ul($nav_user),
+		ul($nav_show),
+		ul($nav_log),
+		ul($nav_edit),
+		ul($nav_backup)
+])])), "\n";
+print "<hr>\n";
+
+my @user_items = &userList;
+if (my $action = param("action")) {
+    if    ($action eq "create")      { &createUserForm } 
+    elsif ($action eq "change-auth") { &changeAuthForm } 
+    elsif ($action eq "edit")        { &editRestrictionsForm } 
+    elsif ($action eq "delete")      { &deleteUserForm } 
+    elsif ($action eq "quota")       { &changeQuotaForm } 
+    elsif ($action eq "list")        { &listFiles }
+    elsif ($action eq "showquota")   { &showQuota } 
+    elsif ($action eq "showconfig")  { &showConfig } 
+    elsif ($action eq "userconfig")  { &userConfigForm } 
+    elsif ($action eq "watch")       { &watchLog } 
+    elsif ($action eq "fexsrv.log")  { &getlog("fexsrv.log") } 
+    elsif ($action eq "fup.log")     { &getlog("fup.log") }
+    elsif ($action eq "fop.log")     { &getlog("fop.log") } 
+    elsif ($action eq "error.log")   { &getlog("error.log") } 
+    elsif ($action eq "editconfig")  { &editFile("$FEXLIB/fex.ph") } 
+    elsif ($action eq "editindex")   { &editFile("$docdir/index.html") } 
+    elsif ($action eq "backup")      { &backup } 
+    elsif ($action eq "restore")     { &restoreForm } 
+    else                             { http_die("STOP TRYING TO CHEAT ME!\n") }
+}
+
+if (defined param("createUser")) {
+    createUser(param("createUser"), param("authID"));
+
+} elsif (defined param("changeAuthUser")) {
+    if (param("changeAuthUser") =~ /^#.*/) {
+	&changeAuthForm;
+    } else {
+	changeUser(param("changeAuthUser"), param("authID"));
+    }
+
+} elsif (defined param("showUserConfig")) {
+    if (param("showUserConfig") =~ /^#.*/) {
+	&userConfigForm;
+    } else {
+	showUserConfig(param("showUserConfig"));
+    }
+
+} elsif (defined param("deleteUser")) {
+    if (param("deleteUser") =~ /^#.*/) {
+	&deleteUserForm;
+    } else {
+	deleteUser(param("deleteUser"));
+    }
+
+} elsif (defined param("userQuota")) {
+    if (param("userQuota") =~ /^#.*/) {
+	&changeQuotaForm;
+    } else {
+	if (defined param("remove quota")) {
+	    $user = param("userQuota");
+	    deleteFiles("$spooldir/$user/\@QUOTA");
+	} else {
+	    alterQuota(param("userQuota"), param("recipientQuota"), param("senderQuota"));
+	}
+    }
+
+} elsif (defined param("editUser")) {
+    if (param("editUser") =~ /^#.*/) {
+	&editRestrictionsForm;
+    } else {
+	if (defined param("delete file")) {
+	    $user = param("editUser");
+	    deleteFiles("$spooldir/$user/\@ALLOWED_RECIPIENTS");
+	} else {
+	    editUser(param("editUser"));
+	}
+    }
+
+} elsif (defined param("contentBox") && defined param("ar")) {
+    saveFile(param("contentBox"), param("ar"));
+
+} elsif (defined param("upload_archive")) {
+    restore(param("upload_archive"));
+}
+
+print end_html();
+exit;
+
+
+#######
+# declaration of formular functions
+#######
+
+# formular for creating new users
+# required arguments: -
+sub createUserForm {
+    my $nameRow = "\n" . td(["user:", textfield(-size=>80, -name=>"createUser")]);
+    my $authRow = "\n" . td(["auth-ID:", textfield(-size=>80, -name=>"authID")]);
+    print "\n", h3("Create new user");
+    print "\n", start_form(-name=>"create", -method=>"POST");
+    print "\n", table(Tr([$nameRow, $authRow]));
+    print "\n", submit('create user'), br;
+    print "\n", end_form;
+}
+
+# formular for changing auth-id of an user
+# required arguments: -
+sub changeAuthForm {
+    my $nameRow = "\n" . td(["user:", popup_menu(-name=>"changeAuthUser", -values=>\@user_items)]);
+    my $authRow = "\n" . td(["new auth-ID:", textfield(-size=>80, -name=>"authID")]);
+    print "\n", h3("change auth-ID");
+    print "\n", start_form(-name=>"change-auth", -method=>"POST");
+    print "\n", table(Tr([$nameRow, $authRow]));
+    print "\n", submit('change'), br;
+    print "\n", end_form;
+}
+
+# formular choosing user, whose config files shall be shown
+# required arguments: -
+sub userConfigForm {
+    my $nameRow = "\n". td(["user:", popup_menu(-name=>"showUserConfig", -values=>\@user_items)]);
+    print "\n", h3("Show user config files");
+    print "\n", start_form(-name=>"showUserConfig", -method=>"POST");
+    print "\n", table(Tr([$nameRow]));
+    print "\n", submit('show config files'), br;
+    print "\n", end_form;
+}
+
+# formular for choosing user, whose restriction file shall be edited
+# required arguments: -
+sub editRestrictionsForm {
+    my $nameRow = "\n" . td(["user:", popup_menu(-name=>"editUser", -values=>\@user_items)]);
+    print "\n", h3("Edit user restriction file");
+    print "\n", start_form(-name=>"edit", -method=>"POST");
+    print "\n", table(Tr([$nameRow]));
+    print "\n", submit('edit file');
+    print "\n", submit('delete file'), br;
+    print "\n", end_form;
+}
+
+# formular for choosing user, who shall be removed
+# required arguments: - 
+sub deleteUserForm {
+    my $nameRow = "\n". td(["user:", popup_menu(-name=>"deleteUser", -values=>\@user_items)]);
+    print "\n", h3("Delete existing user");
+    print "\n", start_form(-name=>"deleteUser", -method=>"POST");
+    print "\n", table(Tr([$nameRow]));
+    print "\n", submit('delete user'), br;
+
+    print "\n", end_form;
+}
+
+# formular for changing an user's quota file
+# required arguments: -
+sub changeQuotaForm {
+    my ($rquota,$squota) = '';
+    $rquota = param("rquota") if defined param("rquota");
+    $squota = param("squota") if defined param("squota");
+    my $dropdownMenu;
+    if (defined param("user")) {
+	$dropdownMenu = "<select name=\"userQuota\">\n";
+	foreach (@user_items) {
+	    if ($_ eq param("user")) {
+		$dropdownMenu .= "<option value=\"$_\" selected>$_</option>";
+	    } else {
+		$dropdownMenu .= "<option value=\"$_\">$_</option>";
+	    }
+	}
+	$dropdownMenu .= "</select>\n";
+    } else {
+	$dropdownMenu = popup_menu(-name=>"userQuota", -values=>\@user_items);
+    }
+    my $nameRow = "\n" . td(["user:", $dropdownMenu]);
+    my $recipientRow = "\n" . td(["new quota for recipient:", textfield(-size=>20, -name=>"recipientQuota", -value=>$rquota). " MB (optional)"]);
+    my $senderRow = "\n" . td (["new quota for sender:", textfield(-size=>20, -name=>"senderQuota", -value=>$squota). " MB (optional)"]);
+    print "\n", h3("Manage disk quota");
+    print "\n", start_form(-name=>"manageQuota", -method=>"POST");
+    print "\n", table(Tr([$nameRow, $recipientRow, $senderRow]));
+    print "\n", submit('change quota');
+    print "\n", submit('remove quota'), br;
+    print "\n", end_form;
+}
+
+# formular for choosing backup file to restore
+# required arguments: -
+sub restoreForm {
+    print h2("restore config");
+    print "please specify the backup-archive you want to restore:";
+    print "\n", start_form(-name=>"restoreFile", -method=>"POST");
+    print "\n", filefield(-name=>"upload_archive", -size=>"80"), br;
+    print "\n", submit('restore');
+    print "\n", end_form;
+}
+
+
+#######
+# declaration user functions
+#######
+
+# function for creating new users
+# required arguments: username, auth-id
+sub createUser {
+    my ($user,$id) = @_;
+    my $idf;
+  
+    $id or http_die("not enough arguments in createUser");
+  
+    $user = lc $user;
+    $user =~ s:/::g;
+    $user =~ s:^[.@]+::;
+    $user =~ s:@+$::;
+
+    if ($user !~ /@/) {
+        if ($mdomain) {
+            $user .= '@'.$mdomain;
+        } else {
+            error("Missing domain part in user address");
+        }
+    }
+  
+    unless (-d "$spooldir/$user") {
+        mkdir "$spooldir/$user",0755 
+          or http_die("cannot mkdir $spooldir/$user - $!\n");
+    }
+  
+    $idf = "$spooldir/$user/@";
+
+    if (-f $idf) {
+	error("There is already an user $user!");	
+    }
+  
+    open $idf,'>',$idf or http_die("cannot write $idf - $!\n");
+    print {$idf} $id,"\n";
+    close $idf or http_die("cannot write $idf - $!\n");
+    print "<tt>\n";
+    printf "%s?from=%s&ID=%s<br>\n",$fup,$user,$id;
+    printf "%s/%s<p>\n",$fup,b64("from=$user&id=$id");
+    print "</tt>\n";
+    notifyUser($user,$id);
+    print "An information e-mail to $user has been sent.\n";
+}
+
+# function for changing an user's auth-ID
+# required arguments: username, auth-id
+sub changeUser {
+    my ($user,$id) = @_;
+    defined($id) or http_die("not enough arguments in changeUser.\n");
+
+    $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+    my $idf = "$spooldir/$user/@";
+    print "<tt>\n";
+    print "$idf<p>";
+
+    open $idf,'>',$idf or http_die("cannot write $idf - $!\n");
+    print {$idf} $id,"\n";
+    close $idf or http_die("cannot write $idf - $!\n");
+    printf "%s?from=%s&ID=%s<br>\n",$fup,$user,$id;
+    printf "%s/%s\n",$fup,b64("from=$user&id=$id");
+    print "</tt><p>\n";
+    notifyUser($user,$id,"change-auth");
+    print "An information e-mail to $user has been sent.\n";
+}
+
+# function for showing an user's config files
+# required arguments: username
+sub showUserConfig {
+    http_die("not enough arguments in showUserConfig!\n") unless (my $user = $_[0]);
+   
+    chdir "$spooldir/$user" or http_die("could not change directory $spooldir/$user - $!");
+    print h2("Config files of <tt>$user</tt>");
+
+    foreach my $file (glob('.auto @* @GROUP/*')) {
+	if (-f $file and not -l $file and $file !~ /.*~$/) {
+	    print h3($file), "\n";
+	    open $file,'<',$file or http_die("cannot open $file - $!");
+            # print "<table border=1><tr><td>\n";
+            dumpfile($file);
+            # print "</tr></table>\n";
+	    close $file;
+	}
+    }
+}
+
+# function for editing an user's recipient/sender restrictions
+# required arguments: username
+sub editUser {
+    http_die("not enough arguments in editUser.\n") unless (my $user = $_[0]);
+    my @content;
+    http_die("no user $user") unless -d "$spooldir/$user";
+    my $ar = "$spooldir/$user/\@ALLOWED_RECIPIENTS";
+    unless (-f $ar) {
+	print "yeah!";
+        open F,">$ar" or http_die("cannot open $ar - $!");
+        print F<<EOD;
+# Restrict allowed recipients. Only those listed here are allowed.
+# Make this file COMPLETLY empty if you want to disable the restriction.
+# An allowed recipient is an e-mail address, you can use * as wildcard.
+# Example: *\@flupp.org
+EOD
+        close F;
+    }
+    open my $file,'<',$ar or http_die("cannot open $ar - $!");
+    while (<$file>) {
+        push @content, $_;
+    }
+    close $file or http_die("cannot write $file - $!\n");
+    print "\nedit file:", br;
+    print "\n", start_form(-name=>"editRestrictions", -method=>"POST");
+    print "\n", textarea(-name=>'contentBox', -default=>join('',@content), -rows=>10, -columns=>80), br;
+    print "\n", hidden(-name=>'ar', -default=>"$ar",);
+    print "\n", submit('save changes');
+    print "\n", end_form;
+}
+
+# function for deleting files
+# required arguments: list of Files
+sub deleteFiles {
+    http_die("not enough arguments in deleteFiles.\n") unless (my @files = @_);
+    
+    foreach (@files) {
+	if (-e $_) {
+	    if (unlink $_) {
+		print "file has been deleted: $_\n", br;
+	    } else {
+		print "file could not be deleted: $_ - $!\n", br;
+	    }
+	} else {
+	    print "file does not exists: $_\n", br;
+	}
+    }
+}
+
+# function for saving a single file
+# required arguments: content, location
+sub saveFile {
+    http_die("not enough arguments in saveFile.\n") unless (my ($rf,$ar) = @_);
+
+    if ($ar eq "$FEXLIB/fex.ph") {
+        open my $conf,">${ar}_new" or http_die("cannot open ${ar}_new - $!");
+        print {$conf} $rf;
+        close $conf or http_die("cannot write $conf - $!\n");;
+        my $status = `perl -c $FEXLIB/fex.ph_new 2>&1`;
+        if ($status =~ /syntax OK/ ) {
+             unlink "${ar}_new";
+        } else {
+            pq(qq(
+              'No valid syntax in configuration file:'
+              '<p>'
+              '<pre>$status</pre>'
+            ));
+            &editFile("$FEXLIB/fex.ph_new");
+            exit;
+        }
+    }
+    open my $file,">$ar" or http_die("cannot open $ar - $!");
+    print {$file} $rf;
+    close $file or http_die("cannot write $file - $!\n");;
+    print "The following data has been saved:\n<p>\n";
+    open $file,'<',$ar or http_die("cannot open $ar - $!");
+    if ($ar =~ /\.html$/) {
+	print while <$file>;
+    } else {
+        print "<pre>\n";
+	print while <$file>;
+    }
+    close $file or http_die("cannot write $file - $!\n");;
+}
+
+# function for deleting existing user
+# required arguments: username
+sub deleteUser {
+    http_die("not enough arguments in createUser.\n") unless (my $user = $_[0]);
+
+    $idf = "$spooldir/$user/\@";
+    http_die("no such user $user\n") unless -f $idf;
+    unlink $idf or http_die("cannot remove $idf - $!\n");
+    unlink "$spooldir/$user/\@ALLOWED_RECIPIENTS";
+    print "$user deleted\n";
+}
+
+# function for saving quota information for one single user
+# required arguments: username, recipient-quota, sender-quota
+sub alterQuota {
+    http_die("not enough arguments in createUser.\n") unless (my ($user,$rq,$sq) = @_);
+
+    $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+    unless (-d "$spooldir/$user") {
+        http_die("$user is not a regular FEX user\n");
+    }
+
+    $rquota = $squota = '';
+    $qf = "$spooldir/$user/\@QUOTA";
+    if (open $qf,'<',$qf) {
+        while (<$qf>) {
+            s/#.*//;
+            $rquota = $1 if /recipient.*?(\d+)/i;
+            $squota = $1 if /sender.*?(\d+)/i;
+        }
+        close $qf or http_die("cannot write $qf - $!\n");
+    }
+
+    open $qf,'>',$qf or http_die("cannot open $qf - $!\n");
+    if(defined($rq) && $rq ne "") {
+        $rquota = $1 if $rq =~ /(\d+)/i;
+    }
+    if(defined($sq) && $sq ne "") {
+        $squota = $1 if $sq =~ /(\d+)/i;
+    }    
+    print {$qf} "recipient:$rquota\n" if $rquota =~ /\d/;
+    print {$qf} "sender:$squota\n" if $squota =~ /\d/;
+    close $qf or http_die("cannot write $qf - $!\n");
+
+    $rquota = $recipient_quota if $rquota !~ /\d/;
+    $squota = $sender_quota    if $squota !~ /\d/;
+    print h3("New quotas for $user");
+    print "recipient quota: $rquota MB\n", br;
+    print "sender quota:   $squota MB\n", br;
+}
+
+# function for listing f*exed files
+# required arguments: -
+sub listFiles {
+    print h3("List current files"),"\n";
+    my ($file,$dkey);
+    chdir $spooldir or http_die("$spooldir - $!\n");
+    print "<tt>\n";
+    foreach $file (glob "*/*/*") {
+        if (-s "$file/data" and  $dkey = readlink("$file/dkey") and -l ".dkeys/$dkey") {
+          ($to,$from,$file) = split "/",$file;
+          $file = html_quote($file);
+          print "$from --> $to : $durl/$dkey/$file<br>\n";
+        }
+    }
+    print "</tt>\n";
+}
+
+# function for watching the fex-logfile
+# required arguments: -
+sub watchLog {
+  if (-f 'fexsrv.log') {
+    print h2("polling fexsrv.log"),"\n";
+    open my $log,"$FEXHOME/bin/logwatch|" 
+      or http_die("cannot run $FEXHOME/bin/logwatch - $!\n");
+    dumpfile($log);
+  } else {
+    print h2("no fexsrv.log"),"\n";
+  }
+}
+
+# function for showing logfiles
+# required arguments: logfile-name
+sub getlog {
+    my $log = shift or http_die("not enough arguments in getLog");
+
+    print h2("show $log"),"\n";
+    if (open $log,"$logdir/$log") {
+        dumpfile($log);
+        close $log;
+    } else {
+        http_die("cannot open $logdir/$log - $!\n");
+    }
+}
+
+# function for creating a new backup file
+# required arguments: -
+sub backup {
+    my @d = localtime time;
+    my $date = sprintf('%d%02d%02d',$d[5]+1900,$d[4]+1,$d[3]);
+    my $backup = "backup/config-$date.tar";
+    my $http_client = $ENV{HTTP_USER_AGENT} || '';
+    my $size;
+
+    my $home = $FEXHOME;
+    $home = $1 if $ENV{VHOST} and $ENV{VHOST} =~ /:(.+)/;
+  
+    chdir $home or http_die("$home - $!\n");
+
+    unless (-d "backup") {
+	mkdir "backup",0700 or http_die("cannot mkdir backup - $!\n");
+    }
+
+    system "tar -cf $backup @backup_files 2>/dev/null";
+
+    $size = -s $backup or http_die("backup file empty\n");
+
+    open $backup,'<',$backup or http_die("cannot open $backup - $!\n");
+
+    nvt_print(
+        'HTTP/1.1 200 OK',
+        "Content-Length: $size",
+        "Content-Type: application/octet-stream; filename=fex-backup-$date.tar",
+        "Content-Disposition: attachment; filename=\"fex-backup-$date.tar\"",
+	"",
+	);
+ 
+    while (read($backup,my $b,$bs)) {
+	print $b or last;
+    }
+
+    exit;
+}
+
+# function for restoring an old configuration file
+# required arguments: uploaded archive
+sub restore {
+    http_die("not enough arguments in restore!\n") unless (my $archive_file = $_[0]);
+    my $restore = "backup.tar";
+
+    my $home = $FEXHOME;
+    $home = $1 if $ENV{VHOST} and $ENV{VHOST} =~ /:(.+)/;
+
+    chdir $home or http_die("$home - $!\n");
+
+    open $restore,'>',$restore or http_die("cannot open $restore - $!");
+
+    my $data;
+    while(read $archive_file,$data,$bs) {
+	print {$restore} $data;
+    }
+    close $restore or http_die("cannot write $restore - $!");
+    if (-s $restore) {
+	print "file upload successful, saving actual config in $home/backup/failsave.tar\n", br;
+	system "tar -cf $home/backup/failsave.tar @backup_files 2>/dev/null";
+	print "starting restore:\n<p><pre>\n";
+        system "tar -xvf $restore";
+        unlink $restore;
+    } else {
+	http_die("upload error - no file data received\n");
+    }
+}
+
+# function for editing a text-file
+# required arguments: filepath, filename
+sub editFile {
+    my $ar = shift;
+    my $file;
+    local $/;
+  
+    open $ar,'<',$ar or http_die("cannot open $ar - $!");
+    $file = <$ar>;
+    close $ar;
+
+    print start_form(-name=>"editFile", -method=>"POST"),"\n";
+    print textarea(-name=>'contentBox', -default=>$file, -rows=>26, -columns=>80), br,"\n";
+    print hidden(-name=>'ar', -default=>"$ar"),"\n";
+    print submit('save changes'),"\n";
+    print end_form(),"\n";
+}
+
+# function for showing all users' quotas
+# required arguments: -
+sub showQuota {
+    my @table_content;
+    my $table_head;
+
+    print h2("Show quotas (domain sorted, values in MB)");
+    foreach (@user_items) {
+	if (s/###\s*//g) {
+	    $table_head = th({}, ["\@$_","sender","sender (used)","recipient","recipient (used)"]);
+	    if (@table_content) {
+		print table({-border=>1},Tr([@table_content])), "\n<p>\n";
+		@table_content = '';
+	    }
+	    push @table_content, $table_head;
+	} else {
+	    my $rquota = $recipient_quota;
+	    my $squota = $sender_quota;
+	    my $rquota_used = 0;
+	    my $squota_used = 0;
+	    my $user = $_;
+	    ($squota,$squota_used) = check_sender_quota($user);
+	    ($rquota,$rquota_used) = check_recipient_quota($user);
+	    s/\@.*//;
+	    push @table_content, 
+              "<td><a href=\"?action=quota&user=$user&rquota=$rquota&squota=$squota\">$_</a></td>".
+              "<td align=\"right\">$squota</td>".
+              "<td align=\"right\">$squota_used</td>".
+              "<td align=\"right\">$rquota</td>".
+              "<td align=\"right\">$rquota_used</td>";
+	}
+    }
+    print table({-border=>1},Tr([@table_content])), "\n";
+}
+
+# function for showing fex-server configuration
+# required arguments: -
+sub showConfig {
+    print h3("Show config");
+    print table({},Tr([
+		    td(["spooldir:",        $spooldir       ]),
+		    td(["logdir:",          $logdir         ]),
+		    td(["docdir:",          $docdir         ]),
+		    td(["durl:",            $durl           ]),
+		    td(["mdomain:",         $mdomain||''    ]),
+		    td(["autodelete:",      $autodelete     ]),
+		    td(["keep:",            $keep_default   ]),
+		    td(["recipient_quota:", $recipient_quota]),
+		    td(["sender_quota:",    $sender_quota   ]),
+		    td(["admin:",           $admin          ])
+    ]));
+}
+
+# function for checking authentication
+# required arguments: -
+sub require_auth {
+  if ($ENV{HTTP_AUTHORIZATION} and $ENV{HTTP_AUTHORIZATION} =~ /Basic\s+(.+)/) 
+  { @http_auth = split(':',decode_b64($1)) }
+  if (
+    @http_auth != 2 
+    or $http_auth[0] !~ /^(fexmaster|admin|\Q$admin\E)$/
+    or $http_auth[1] ne $admin_pw
+  ) {
+    http_header(
+      '401 Authorization Required',
+      "WWW-Authenticate: Basic realm=$admin F*EX admin authentification",
+      'Content-Length: 0',
+    );
+    # control back to fexsrv for further HTTP handling
+    exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  }
+}
+
+# function for sending notification mails to an user
+# required arguments: username, auth-id, message-type
+sub notifyUser {
+    http_die("not enough arguments in createUser.\n") unless (my ($user,$id) = @_);
+    my $type = $_[2];
+    my $message = 'A F*EX account has been created for you. Use';
+
+    if (defined($type) and $type eq "change-auth") {
+	$message = 'New auth-ID for your F*EX account has been set. Use'
+    }
+
+    $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+    open my $mail,"|$sendmail -f '$admin' '$user' '$bcc'"
+	or http_die("cannot start sendmail - $!\n");
+    pq($mail,qq(
+        'From: $admin'
+        'To: $user'
+        'Subject: your F*EX account on $hostname'
+        'X-Mailer: F*EX'
+        ''
+        '$message'
+        ''
+        '$ENV{PROTO}://$ENV{HTTP_HOST}/fup?from=$user'
+        'auth-ID: $id'
+        ''
+        'See http://$ENV{HTTP_HOST}/index.html for more information about F*EX.'
+        ''
+        'Questions? ==> F*EX admin: $admin'
+    ));
+    close $mail
+	or http_die("cannot send notification e-mail (sendmail error $!)\n");
+}
+
+# sort key is the (inverse) domain
+# required arguments: list of usernames (e-mail addresses)
+sub domainsort {
+#    http_die("not enough arguments in domainsort.\n") unless (my @d = @_);
+    my @d = @_;
+    local $_;
+
+    foreach (@d) {
+	s/ //g;
+	s/^/ /;
+	s/\./,/ while /\..*@/;
+	s/@/@./;
+	$_ = join('.',reverse(split /\./));
+    }
+
+    @d = sort { lc $a cmp lc $b } @d;
+
+    foreach (@d) {
+	$_ = join('.',reverse(split /\./));
+	s/,/./g;
+	s/@\./@/;
+    }
+
+    return @d;
+}
+
+# function for creating a sorted list of all users
+# required arguments: -
+sub userList {
+    my @u;
+    my $d = '';
+
+    foreach (domainsort(grep { s:/@:: } glob('*@*/@'))) {
+	s/ //g;
+        /@(.+)/;
+        if ($1 ne $d) {
+            push @u,"### $1 ###";
+	}
+	push @u,$_;
+        $d = $1;
+    }
+    return @u;
+}
+
+
+sub dumpfile {
+  my $file = shift;
+  
+  print "<pre>\n";
+  while (<$file>) {
+    s/&/&amp;/g;
+    s/</&lt;/g;
+    print or exit;
+  }
+  print "\n</pre>\n";
+}
+
+
+sub error {
+    print join("\n",@_),"\n";
+    print end_html();
+    exit;
+}

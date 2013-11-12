@@ -1,0 +1,89 @@
+<h2>Admin questions</h2>
+
+Q: I cannot install a web server like fexsrv, because I have no root permissions. Is there a pure-CGI-version of F*EX which runs with an apache web server?
+A: F*EX is hard bound to fexsrv for several reasons (performance, file size limit, session concept, etc) and cannot be run as CGI under apache. But you might have a look at
+
+   * http://gpl.univ-avignon.fr/filez/
+   * http://freshmeat.net/projects/eventh/
+   * http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html (German only!) 
+
+   which implement a file exchange as pure CGIs, but with a 2 GB file size limit, which F*EX does not have.
+
+Q: I have already a webserver (apache) running. How can I install F*EX parallel?
+A: You have to use another port or ip for F*EX, because you cannot run two services on the same ip:port combination.
+   For example port 88, use "./install -p 88"
+   For another ip you can create a new virtual interface or use a virtual machine.
+   See the documentation of your UNIX.
+
+Q: F*EX is not working at all! I cannot connect to it with my web browser!
+A: Check your routing, ipfilters and firewall setup.
+   Also check whether your xinetd is linked with tcp-wrapper and configure it correctly (hosts.allow).
+   F*EX needs port 80/tcp for HTTP and optional port 443/tcp for HTTPS.
+
+Q: How can I integrate F*EX in the existing user management at my site?
+A: F*EX has several authentification modules: local, RADIUS, LDAP, mailman and POP.
+   For the last 4 please contact <framstag@rus.uni-stuttgart.de>
+
+Q: I want that all of my local users can use F*EX. How?
+A: Let them register themselves with http://YOURFEXSERVER/fur
+
+   You have to edit /home/fex/lib/fex.ph and set (example):
+   <pre>
+     @local_hosts = qw(127.0.0.1 10.10.100.0-10.10.255.255);\
+     @local_domains = qw(flupp.org ulm.sub.net);\
+   </pre>
+   Or you can allow anonymous upload for your LAN users with fex.ph variable @anonymous_upload
+   Example:
+   <pre>
+     @anonymous_upload = qw(10.10.100.0-10.10.200.255 129.69.1.11);
+   </pre>
+   (Of course you have to use your real local hosts/networks!)
+
+Q: I want that external users can fex to my local users. How?
+A: Let them register themselves with http://YOURFEXSERVER/fur
+
+   You have to edit /home/fex/lib/fex.ph and set (example):
+   <pre>
+     # your local receiving domains\
+     @local_rdomains = qw(flupp.org *.flupp.org);\
+	     \
+     # your local receiving hosts\
+     @local_rhosts = qw(127.0.0.1 129.69.0.0-129.69.255.255 176.9.84.26);\
+   </pre>
+   
+   Or you can manually create a restricted external user with (example):
+   <pre>
+     fac -u framstag@rus.uni-stuttgart.de hoppla\
+     fac -R framstag@rus.uni-stuttgart.de\
+   </pre>
+
+Q: I want the Bcc mails to fex (admin user) to be sent to another address.
+A: Set variable $bcc in /home/fex/lib/fex.ph
+
+Q: I need more security! How can I enable HTTPS?
+A: Read doc/SSL and also look for "fop_auth" in doc/concept
+
+Q: I need a corporate identity look. How can I configure F*EX in this way?
+A: * See variable @H1_extra in /home/fex/lib/fex.ph and you can add HTML code to /home/fex/htdocs/header.html
+   * See /home/fex/htdocs/fup_template.html, modify it to your needs and use it as your start-page.
+   * Contact <fex@nepustil.net> http://www.nepustil.net/ if you need more customization.
+
+Q: F*EX is too complicated for my tie users. I need a simplified upload form.
+A: See /home/fex/htdocs/fup_template.html and /home/fex/htdocs/sup.html 
+   or use public upload, see http://fex.rus.uni-stuttgart.de/usecases/foreign.html
+
+Q: F*EX is still too complicated! I need something more simplified.
+A: Try http://www.home.unix-ag.org/simon/woof.html
+
+Q: Can I integrate F*EX in my users MUAs (thunderbird, outlook, etc)?
+A: See http://fex.rus.uni-stuttgart.de/usecases/BIGMAIL.html
+
+Q: Can I get a localized version in my native languange?
+A: With your help, yes. Please contact <framstag@rus.uni-stuttgart.de>
+
+Q: I need ACLs for group access, a file browser and integration in my
+   native file system.
+A: This is beyond the scope of F*EX, which is designed for file transfer.
+
+Q: Feature/design XY is missing.
+A: Contact the author <framstag@rus.uni-stuttgart.de>

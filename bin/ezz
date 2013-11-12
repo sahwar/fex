@@ -1,0 +1,56 @@
+#!/bin/sh
+
+ZZ=${ZZ:-$HOME/.zz}
+
+usage() {
+  exec cat<<EOD
+ezz is the edit helper program for the generic zz clip board program.
+The clip board is \$ZZ (default: \$HOME/.zz). Options and modes are:
+
+"ezz"                  edit \$ZZ
+"... | ezz"            write STDIN from pipe to \$ZZ and call editor
+"... | ezz +"          add STDIN from pipe to \$ZZ and call editor
+"ezz 'perl-script'"    run perl-script on \$ZZ
+"ezz - 'perl-script'"  run perl-script on \$ZZ and write result to STDOUT
+"ezz filter [args]"    run filter [with args] on \$ZZ
+"ezz - filter [args]"  run filter [with args] on \$ZZ and write result to STDOUT
+"ezz -r"               restore \$ZZ from last ezz operation (\$ZZ~)
+
+Examples:
+
+  ls -l | ezz
+  ezz "s/ /_/g"
+  ezz head -3
+  ezz - head -3
+
+Limitation: zz does not work across different accounts!  
+EOD
+}
+
+JEDINIT="SAVE_STATE=0"; export JEDINIT
+
+if [ ! -t 0 ]; then
+  if [ x"$1"x = x+x ]; then
+    shift
+    cat >>$ZZ
+  else
+    cat >$ZZ
+  fi
+fi
+
+test -z "$1" && exec ${EDITOR:-vi} $ZZ
+
+case "X$*" in
+  X-h) usage;;
+  X-r) exec mv $ZZ~ $ZZ;;
+esac
+
+OUT="$1"
+test "X$OUT" = X- && shift
+test -z "$1" && exec cat $ZZ
+mv $ZZ $ZZ~
+case `type "$1" 2>&1` in
+  *not\ found) perl -pe "$@" <$ZZ~>$ZZ || mv $ZZ~ $ZZ;;
+            *) "$@"          <$ZZ~>$ZZ || mv $ZZ~ $ZZ;;
+esac
+test "X$OUT" = X- && exec cat $ZZ

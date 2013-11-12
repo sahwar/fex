@@ -1,0 +1,2857 @@
+#!/usr/bin/perl -wT
+
+# F*EX CGI for upload
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+# Contribs:
+#	Sebastian Zaiser <szcode@arcor.de> (upload status)
+#
+
+use Encode;
+use Fcntl 		qw':flock :seek :mode';
+use IO::Handle;
+use Digest::MD5		qw'md5_hex';
+use CGI::Carp		qw'fatalsToBrowser';
+use Cwd			qw'abs_path';
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+$| = 1;
+
+our $debug;
+our $ndata = 0;
+our $error = 'F*EX upload ERROR';
+our $head = "$ENV{SERVER_NAME} F*EX upload";
+our $autodelete = 'YES';
+our $locale;
+
+# import from fex.ph
+our (@locales,@throttle,$bcc,$keep_max,$nomail,$nostore,$overwrite);
+our (@local_domains,@local_rdomains,@local_hosts,@local_rhosts,);
+our (@registration_hosts,@demo,@file_link_dirs);
+
+# import from fex.pp
+our ($FEXHOME);
+our ($spooldir,$durl,$tmpdir,$logdir,$docdir,$hostname,$admin,$fra);
+our ($keep_default,$recipient_quota,$sender_quota);
+our ($sendmail,$mdomain,$fop_auth,$faillog);
+our ($dkeydir,$ukeydir,$akeydir,$skeydir,$gkeydir,$xkeydir);
+our $akey = '';
+our $dkey = '';
+our $skey = '';
+our $gkey = '';
+
+our $seek = 0;		# already sent bytes (from previous upload)
+our $filesize = 0;	# total file size
+our $fpsize = 0;	# file part size (MIME-part)
+
+my $data;
+my $boundary;
+my $rb = 0;		# read bytes, totally
+my $rid = '';		# real ID
+my @header;		# HTTP entity header
+my $fileid;		# file ID
+my $captive;
+
+# load common code, local config: $FEXLIB/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+# load fup local config
+our ($info_1,$info_2,$info_login);
+
+$locale = $ENV{LOCALE} || 'english';
+foreach my $pl (
+  "/var/lib/fex/locale/$locale/lib/fup.pl", 
+  "$FEXLIB/fup.pl",
+) {
+  if (-f $pl) {
+    require $pl or die "$0: cannot load $FEXLIB/fup.pl - $!\n";
+    last;
+  }
+}
+
+&check_camel unless $sid;
+
+chdir $spooldir or http_die("$spooldir - $!\n");
+
+my $log = "$logdir/fup.log";
+
+my $http_client = $ENV{HTTP_USER_AGENT} || '';
+my $cl = $ENV{X_CONTENT_LENGTH} || $ENV{CONTENT_LENGTH} || 0;
+
+$fra .= '/'.$ENV{HTTP_X_FORWARDED_FOR} if $ENV{HTTP_X_FORWARDED_FOR};
+
+$from = $to = $id = $file = $fkey = $comment = $command = $bwlimit = '';
+$filename = $okey = $addto = $replyto = $submit = '';
+@to = ();
+$data = '';
+$locale = untaint($ENV{LOCALE}||'');
+
+my $ra = $ENV{REMOTE_ADDR}||0;
+if (@upload_hosts and not ipin($ra,@upload_hosts)) {
+  http_die(
+    "Uploads from your host ($ra) are not allowed.",
+    "Contact $ENV{SERVER_ADMIN} for details."
+  );
+}
+
+&check_maint;
+
+&parse_request; # showstatus will not come back!
+
+if ($addto) {
+  my %to;
+  foreach $to (@to) { $to{$to} = 1 }
+  push @to,$addto unless $to{$addto};
+  if ($submit and @to == 1) { $addto = '' }
+}
+
+$to = join(',',@to);
+
+$uid = randstring(8) unless $uid; # upload ID
+
+# user requests for forgotten ID
+$id_forgotten = $id if $id =~ /^"?\?"?/;
+if ($from and $id_forgotten and not $fop_auth and not $nomail) {
+  &check_status($from);
+  &id_forgotten;
+  exit;
+}
+
+# public recipients? (needs no auth-ID for sender)
+if ($to and $id and $id eq 'PUBLIC' and @public_recipients) {
+  
+  unless ($from) {
+    http_die("missing sender e-mail address");
+  }
+  # must use $param{FROM} for checking because $from is expanded with $mdomain
+  unless (checkaddress(despace($param{FROM}))) {
+    http_die("<tt>$param{FROM}</tt> is not a valid e-mail address");
+  }
+  foreach my $to (@to) {
+    unless (grep /^\Q$to\E$/i,@public_recipients) {
+      http_die("<tt>$to</tt> is not a valid recipient");
+    }
+  }
+  $public = $rid = $id;
+}
+
+# anonymous upload from enabled IP?
+if (($from eq 'anonymous' or $mdomain and $from eq 'anonymous@'.$mdomain) and
+    @anonymous_upload and ipin($ra,@anonymous_upload)) {
+  $id = $rid = $anonymous = 'anonymous';
+  if ($to =~ /^anonymous/) {
+    @to = ($to);
+    $autodelete{$to} = $autodelete = 'NO'; 
+  }
+  $nomail = $anonymous;
+}
+
+if ($to and (readlink "$to/\@NOTIFICATION"||'') =~ /^no/i) {
+  $nomail = 'recipient';
+}
+
+$comment = 'NOMAIL' if $nomail and not $comment;
+
+# one time token
+if ($okey) {
+  $to = "@to" or http_die("no recipient");
+  $from = readlink "$to/\@OKEY/$okey" 
+    or http_die("no upload key \"<tt>$okey</tt>\" - ".
+                "request another one from <tt>$to</tt>");
+  $from = untaint($from);
+}
+
+&check_status($from) if $from;
+
+# look for regular sender ID
+if ($id and $from and not ($public or $anonymous or $okey)) {
+  if (open $from,'<',"$from/\@") {
+    # chomp($rid = <$from> || '');
+    $rid = getline($from);
+    close $from;
+    $rid = sidhash($rid,$id);
+    # set time mark for successfull access
+    if ($id eq $rid) {
+      my $time = untaint(time);
+      utime $time,$time,$from;
+    }
+  } else {
+    my $error = $!;
+    # if recipient (to) is specified, we have to look for subusers later, too
+    unless (@to) {
+      fuplog("ERROR: $spooldir/$from/\@ $error");
+      debuglog("cannot open $spooldir/$from/\@ : $error");
+      faillog("user $from, id $id");
+      http_die("Wrong user or auth-ID");
+    }
+  }
+}
+
+# check regular ID
+if ($from and $id and not ($gkey or $skey or $public or $okey)) {
+  if ($rid and $rid eq $id) {
+    # set akey link for HTTP sessions
+    # (need original id for consistant non-moving akey)
+    if (-d $akeydir and open $idf,'<',"$from/@" and my $id = getline($idf)) {
+      $akey = untaint(md5_hex("$from:$id"));
+      mksymlink("$akeydir/$akey","../$from");
+      # show URL from fexsend
+      if ($from eq $to and $comment eq '*') {
+        mksymlink("$akeydir/$akey","../$from");
+      }
+    }
+    $captive = -e "$from/\@CAPTIVE";
+  } else {
+    fuplog("ERROR: wrong auth-ID for $from");
+    debuglog("id sent by user $from=$id, real id=$rid");
+    faillog("user $from, id $id");
+    http_die("Wrong user or auth-ID");
+  }
+}
+
+# forward a copy of a file to another recipient
+if ($akey and $dkey and $command eq 'FORWARD') {
+  my $file = untaint(readlink "$dkeydir/$dkey"||'');
+  http_die("unknown dkey <tt>$dkey></tt>") unless $file;
+  $file =~ s:^\.\./::;
+  forward($file);
+  exit;
+}
+
+# modify file parameter
+if ($akey and $dkey and $command eq 'MODIFY') {
+  my $file = untaint(readlink "$dkeydir/$dkey"||'');
+  http_die("unknown dkey <tt>$dkey</tt>") unless $file;
+  $file =~ s:^\.\./::;
+  modify($file);
+  exit;
+}
+
+# copy file from incoming to outgoing spool
+if ($akey and $dkey and $command eq 'COPY') {
+  unless ($file = readlink "$dkeydir/$dkey") {
+    http_die("No such file with DKEY=$dkey");
+  }
+  if ($file =~ m:../(.+)/(.+)/(.+):) {
+    ($to,$from,$file) = ($1,$2,$3);
+  } else {
+    http_die("Bad DKEY $dkey -> $file");
+  }
+  unless (-f "$to/$from/$file/data") {
+    http_die("File not found");
+  }
+  if (-e "$to/$to/$file/data") {
+    http_die("File $file already exists in your outgoing spool") 
+      if (readlink("$to/$to/$file/id")||$to) ne 
+         (readlink("$to/$from/$file/id")||$from);
+  } else {
+    mkdirp("$to/$to/$file");
+    link "$to/$from/$file/data","$to/$to/$file/data" 
+      or http_die("cannot link to $to/$to/$file/data - $!\n");
+    copy("$to/$from/$file/filename","$to/$to/$file/filename");
+    copy("$to/$from/$file/id","$to/$to/$file/id");
+    open $file,'>',"$to/$to/$file/notify";
+    close $file;
+    open $file,'>',"$to/$to/$file/download";
+    print {$file} "$to\n";
+    close $file;
+    $dkey = randstring(8);
+    unlink "$to/$to/$file/dkey","$to/$to/$file/keep","$dkeydir/$dkey";
+    symlink "../$to/$to/$file","$dkeydir/$dkey";
+    symlink $dkey,"$to/$to/$file/dkey";
+  }
+  nvt_print(
+    "HTTP/1.1 302 Found",
+    "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/rup?akey=$akey&oto=$to&file=$file",
+    'Content-Length: 0',
+    ''
+  );
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+# delete file without download
+if ($akey and $dkey and $command eq 'DELETE') {
+  $del = untaint(readlink "$dkeydir/$dkey"||'');
+  http_die("unknown dkey <tt>$dkey</tt>") unless $del;
+  $del =~ s:^\.\./::;
+  $filename = filename($del);
+  if (unlink("$del/data") or unlink("$del/upload")) {
+    if (open F,'>',"$del/error") {
+      printf F "%s has been deleted by %s at %s\n",
+               $filename,$ENV{REMOTE_ADDR},isodate(time);
+      close F;
+    }
+    # http_header('200 OK');
+    # print html_header($head);
+    # print "<h3>$filename deleted</h3>\n";
+    nvt_print(
+      "HTTP/1.1 302 Found",
+      "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/fup?akey=$akey&command=LISTRECEIVED",
+      'Content-Length: 0',
+      ""
+    );
+    exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  } else { 
+    my $s = $!;
+    http_header('404 Not Found');
+    print html_header($head);
+    print "<h3>$filename not deleted ($s)</h3>\n";
+    print "<a href=\"/fup?akey=$akey&command=LISTRECEIVED\">continue</a>\n" if $akey;
+    print "</body></html>\n";
+  }
+  exit;
+}
+
+# special commands
+if (($from and $id and $rid eq $id or $gkey or $skey) and $command) {
+                                                                     
+  if ($command eq 'CHECKQUOTA') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    my ($quota,$du);
+    nvt_print('HTTP/1.1 204 OK');
+    # nvt_print("X-SID: $ENV{SID}") if $ENV{SID};
+    ($quota,$du) = check_sender_quota($from);
+    nvt_print("X-Sender-Quota: $quota $du")    if $quota;
+    ($quota,$du) = check_recipient_quota($from);
+    nvt_print("X-Recipient-Quota: $quota $du") if $quota;
+    nvt_print('');
+    exit;
+  }
+      
+  if ($command =~ /^LIST(RECEIVED)?$/) {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    # list sent files
+    if ($to and $param{'TO'} eq '*') {
+      http_header('200 OK');
+      print html_header($head);
+#            "(Format: [size] [rest keep time] [filename] [comment])<p>\n",
+      print "<h3>Files from $from:</h3>\n",
+            "<pre>\n";
+      foreach $file (glob "*/$from/*") {
+        next if $file =~ m:/STDFEX$:;
+        next if $file =~ m:(.+?)/: and -l $1;
+        $size = -s "$file/data";
+        next unless $size;
+        $size = int($size/1024/1024+0.5);
+        $filename = $comment = '';
+        my $rto = $file;
+        $rto =~ s:/.*::;
+        if ($dkey = readlink "$file/dkey") {
+          if ($rto ne $to) {
+            $to = $rto;
+            print "\nto $to :\n";
+          }
+          if (open $file,'<',"$file/filename") {
+            $filename = <$file>;
+            close $file;
+          }
+          if ($filename and length $filename) { 
+            $filename = html_quote($filename);
+          } else { 
+            $filename = '???';
+          }
+          if (open $file,'<',"$file/comment") {
+            $comment = untaint(html_quote(getline($file)));
+            close $file;
+          }
+          my $rkeep = (readlink "$file/keep"||$keep_default) 
+                      - int((time-mtime("$file/filename"))/24/3600);
+          printf "%8s MB [%s d] <a href=\"%s\">%s</a>%s\n",
+                 $size,
+                 $rkeep,
+                 untaint("/fup?akey=$akey&dkey=$dkey&command=FORWARD"),
+                 $filename,
+                 $comment?qq( "$comment"):'';
+        }
+      }
+      pq(qq(
+        '</pre>'
+        '<p><a href="javascript:history.back()">back to F*EX operation control</a>'
+        '</body></html>'
+      ));
+    } 
+    # list received files
+    else {
+      $to = $from;
+      http_header('200 OK');
+      print html_header($head);
+#            "(Format: [size] [rest keep time] [URL] [comment])<p>\n",
+      print "<h3>Files for $to (*):</h3>\n",
+            "<pre>\n";
+      foreach $from (glob "$to/*") {
+        next if $from =~ /[A-Z]/;
+        $from =~ s:.*/::;
+        $url = '';
+        foreach $file (glob "$to/$from/*") {
+          next if $file =~ /\/STDFEX$/;
+          $filename = $comment = '';
+          $size = -s "$file/data";
+          next unless $size;
+          $size = int($size/1024/1024+0.5);
+          if ($dkey = readlink "$file/dkey") {
+            print "\nfrom $from :\n" unless $url;
+            $file =~ m:.*/(.+):;
+            $url = "$durl/$dkey/$1";
+            unless (-l "$dkeydir/$dkey") {
+              symlink untaint("../$file"),untaint("$dkeydir/$dkey");
+            }
+            if (open $file,'<',"$file/filename") {
+              $filename = <$file>;
+              close $file;
+            }
+            if ($filename and length $filename) { 
+              $filename = html_quote($filename);
+            } else { 
+              $filename = '???';
+            }
+            if (open $file,'<',"$file/comment") {
+              $comment = untaint(html_quote(getline($file)));
+              $comment = ' "'.$comment.'"';
+              close $file;
+            }
+            my $rkeep = (readlink "$file/keep"||$keep_default) 
+                        - int((time-mtime("$file/filename"))/24/3600);
+            printf "[<a href=\"/fup?akey=%s&dkey=%s&command=DELETE\">delete</a>] ",
+                   $akey,$dkey;
+            printf "[<a href=\"/fup?akey=%s&dkey=%s&command=COPY\">forward</a>] ",
+                   $akey,$dkey;
+            printf "%8s MB (%s d) <a href=\"%s\">%s</a>%s\n",
+                   $size,$rkeep,$url,$filename,$comment;
+          }
+        }
+      }
+      pq(qq(
+        '</pre>'
+        '(*) Files for other e-mail addresses you own will not be listed here!<p>'
+        '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+        '</body></html>'
+      ));
+    }
+    exit;
+  } 
+      
+  if ($command eq 'LISTSENT') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    # show download URLs 
+    http_header('200 OK');
+    print html_header($head);
+    print "<h2>Download URLs of files you have sent\n";
+    foreach $to (glob "*/$from") {
+      if (@files = glob "$to/*/data") {
+        $to =~ s:/.*::;
+        print "<h3>to <tt>$to</tt> :</h3>\n";
+        print "<pre>\n";
+        foreach $file (@files) {
+          $file =~ s:/data::;
+          next if $file =~ /\/STDFEX$/;
+          $dkey = readlink "$file/dkey" or next;
+          $file =~ s:.*/::;
+          print "$ENV{PROTO}://$ENV{HTTP_HOST}/fop/$dkey/$file\n";
+        }
+        print "</pre>\n";
+      }
+    }
+    pq(qq(
+      '</pre>'
+      '<p><a href="javascript:history.back()">back to F*EX operation control</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+      
+  if ($command eq 'FOPLOG') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    if (open my $log,"$logdir/fop.log") {
+      http_header('200 OK');
+      while (<$log>) {
+        next if /\/STDFEX\s/;
+        if (s:^([^/]+)/$from/:$1 :) {
+          if (s:(\d+)/(\d+)$:$1: and $1 and $1 == $2) {
+            s/ \[[\d_]+\]//;
+            print;
+          }
+        }
+      }
+    }
+    exit;
+  }
+  
+  if ($command eq 'RECEIVEDLOG') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    if (open my $fuplog,"$logdir/fup.log") {
+      http_header('200 OK');
+      while (<$fuplog>) {
+        next if /\sSTDFEX\s/;
+        if (/\d+$/) { 
+          my @F = split;
+          if ($F[5] eq $to) {
+            s/ \[[\d_]+\]//;
+            print;
+          }
+        }
+      }
+    }
+    exit;
+  }
+
+  if ($command eq 'SENDLOG') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    if (open my $fuplog,"$logdir/fup.log") {
+      http_header('200 OK');
+      while (<$fuplog>) {
+        next if /\sSTDFEX\s/;
+        if (/(\S+\@\S+)/ and $1 eq $from) { 
+          s/ \[[\d_]+\]//;
+          print;
+        }
+      }
+    }
+    exit;
+  }
+
+  if (@to and $command eq 'CHECKRECIPIENT') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    nvt_print('HTTP/1.1 204 OK');
+    nvt_print("X-SID: $sid") if $sid;
+    foreach my $to (@group?@group:@to) {
+      # my $options = sprintf "(autodelete=%s,keep=%s,locale=%s)",
+      # readlink "$to/\@LOCALE"||$locale||$locale{$to}||$default_locale;
+      my $options = sprintf "(autodelete=%s,keep=%s)",
+                    $autodelete{$to}||$autodelete,
+                    $keep{$to}||$keep_default;
+      nvt_print("X-Recipient: $to $options");
+    }
+    nvt_print('');
+    # control back to fexsrv for further HTTP handling
+    exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  }
+
+  if ($file and @to and $command eq 'DELETE') {
+    http_die("illegal command \"$command\"") if $public or $anonymous;
+    foreach $to (@group?@group:@to) {
+      $to =~ s/:\w+=.*//; # remove options from address
+      $del = "$to/$from/$fkey";
+      $del =~ s:^/+::;
+      if ($del =~ /\/\./) {
+        http_die("illegal parameter <tt>$del</tt>");
+      }
+      $del = untaint($del);
+      
+      if (unlink("$del/data") or unlink("$del/upload")) {
+        if (open F,'>',"$del/error") {
+          print F "$file has been deleted by $from\n";
+          close F;
+        }
+        http_header('200 OK',"X-File: $del");
+        print html_header($head);
+        print "<h3>$file deleted</h3>\n";
+      } else { 
+        http_header("404 Not Found");
+        print html_header($head);
+        print "<h3>$file not deleted</h3>\n";
+      }
+      if ($akey) {
+        printf "<a href=\"/fup?akey=%s&to=%s&command=LISTRECEIVED\">continue</a>\n",
+               $akey,$to;
+      }
+      print "</body></html>\n";
+    }
+    exit;
+  }
+
+}
+
+# ip restrictions
+if ($from and $id and $rid eq $id and open my $ipr,"$from/\@UPLOAD_HOSTS") {
+  my @hosts;
+  while (<$ipr>) {
+    chomp;
+    s/#.*//;
+    push @hosts,$_ if /\w/;
+  }
+  close $ipr;
+  unless (@hosts and ipin($ra,@hosts)) {
+    http_die("<tt>$from</tt> is not allowed to upload from IP $ra");
+  }
+}
+
+# quotas 
+if ($from and $id and $rid eq $id and @to and not $flink) {
+  my ($quota,$du);
+  
+  # check sender quota
+  ($quota,$du) = check_sender_quota($from);
+  if ($quota and $du+$cl/1024/1024 > $quota) {
+    http_die("you are overquota");
+  }
+  
+  # check recipient quota
+  foreach my $to (@to) {
+    ($quota,$du) = check_recipient_quota($to);
+    if ($quota and $du+$cl/1024/1024 > $quota) {
+      http_die("$to cannot receive files: is overquota");
+    }
+  }
+
+}
+
+# check recipients restriction
+if ($id and $id eq $rid and $from and @to and not $public) {
+  check_rr($from,@to);
+}
+
+# on secure mode "fop authorization" also check if recipient(s) exists
+# (= has a F*EX ID)
+if (not $addto and $fop_auth and $id and $id eq $rid and $from and @to) {
+  my ($to_reg,$idf,$subuser);
+  foreach my $to (@to) {
+    $to =~ s/:\w+=.*//; # remove options from address
+    $to_reg = 0;
+    # full user?
+    if (open $idf,'<',"$to/@") {
+      $to_reg = getline($idf);
+      close $idf;
+    } 
+    # sub user?
+    elsif (open $idf,'<',"$from/\@SUBUSER") {
+      while (<$idf>) {
+        s/#.*//;
+        next unless /:/;
+        chomp;
+        ($subuser) = split ':';
+        if ($subuser eq $to or $subuser eq '*@*'
+            or $subuser =~ /^\*\@(.+)/ and $to =~ /\@\Q$1\E$/i
+            or $subuser =~ /(.+)\@\*$/ and $to =~ /^\Q$1\E\@/i) {
+          $to_reg = $_;
+          last;
+        }
+      }
+      close $idf;
+    }
+    unless ($to_reg) {
+      http_die("recipient <tt>$to</tt> is not a registered F*EX full or sub user");
+    }
+  }
+}
+
+$to = join(',',@to);
+  
+if ($to =~ /^@(.+)/) {
+  if ($nomail) {
+    http_die("server runs in NOMAIL mode - groups ($to) are not allowed");
+  }
+  my $gf = "$from/\@GROUP/$1";
+  if (open $gf,'<',$gf) {
+    while (<$gf>) {
+      s/#.*//;
+      push @group,$1 if /(.+@.+):/;
+    }
+  }
+  close $gf;
+  $group = $to;
+}
+
+if ($redirect) {
+  nvt_print(
+    "HTTP/1.1 302 Found",
+    "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/$redirect?akey=$akey",
+    'Content-Length: 0',
+    ""
+  );
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+if ($from and $id and $id eq $rid and $faillog) {
+  unlink $faillog;
+}
+
+# display HTML form and request user data
+unless ($file) {
+
+  if ($test) { $cgi = $test } 
+  else       { $cgi = $ENV{SCRIPT_NAME} }
+  $cgi = 'fup';
+  
+  # delete old cookies on logout referer
+  my @cookies;
+  if ($logout and my $cookie = $ENV{HTTP_COOKIE}) {
+    while ($cookie =~ s/(\w+key)=\w+//) {
+      push @cookies,"Set-Cookie: $1=; Max-Age=0; Discard";
+    }
+  }
+  
+  # save default locale for this user
+  if (($akey or $skey or $gkey) and $from and -d $from) {
+    if (not $locale and ($ENV{HTTP_COOKIE}||'') =~ /\blocale=(\w+)/) {
+      $locale = $1;
+    }
+    mksymlink("$from/\@LOCALE",$locale) if $locale;
+  }
+
+  http_header('200 OK',@cookies);
+  # print html_header($head,'<img src="/fex_small.gif">');
+  print html_header($head);
+  
+  if ($http_client =~ /(Konqueror|w3m)/) {
+    pq(qq(
+      '<p><hr><p>'
+      '<center>'
+      '<h3>Your client seems to be "$1" which is incompatible with F*EX and will probably not work!</h3>'
+      'We recommend firefox.'
+      '</center>'
+      '<p><hr><p>'
+    ));
+  }
+
+  # default "fex yourself" setting?
+  if ($from and $id and $id eq $rid and not $addto 
+      and not ($gkey or $skey or $okey or $public or $anonymous)
+      and (not @to or "@to" eq $from)
+      and -f "$from/\@FEXYOURSELF")
+  { 
+    @to = ($from);
+    $nomail = 'fexyourself';
+  }
+
+  # ask for recipient address(es)
+  elsif ($from and $id and $id eq $rid and ($addto or not $submit or not @to)
+         and not ($gkey or $skey or $okey or $public or $anonymous))
+  {
+    @ab = ("<option></option>");
+    
+    # select menu from server address book
+    if (open my $ab,'<',"$from/\@ADDRESS_BOOK") {
+      while (<$ab>) {
+        s/#.*//g;
+        if (/(\S+)[=\s]+(\S+@[\w.-]+\S*)/) {
+          $_ = "$1 &lt;$2>";
+          s/,.*/,.../g;
+          push @ab,"<option>$_</option>";
+        }
+      }
+      close $ab;
+    }
+    
+    unless (@to) {
+      unless ($nomail) {
+        foreach (glob "$from/\@GROUP/*") {
+          s:.*/::;
+          push @ab,"<option>\@$_</option>" unless /~$/;
+        }
+      }
+    }
+    
+    my $ab64 = b64("from=$from&id=$id");
+#     '<form class="uploadform" name="upload"'
+    pq(qq(
+      '<form name="upload"'
+      '      action="/fup"'
+      '      method="post"'
+      '      accept-charset="UTF-8"'
+      '      enctype="multipart/form-data">'
+      '  <input type="hidden" name="from" value="$from">'
+      '  <input type="hidden" name="id"   value="$id">'
+      '  <table border="1">'
+      '    <tr><td>sender:   <td><a href="/fup/$ab64">$from</a></tr>'
+      '    <tr title="e-mail address or alias"><td>recipient(s):'
+      '        <td><input type="text" name="to" size="96" value="$to"><br>'
+    ));
+    if (grep /@/,@ab) {
+      pq(qq(
+        '        or select from your address book:'
+        '        <select name="addto" size="1">@ab</select>'
+        '        and'
+        '        <input type="submit" name="addsubmit" value="add to recipients list">'
+      ));
+    }
+    pq(qq(
+      '    </tr>'
+      '  </table>'
+      '  <p>'
+    ));
+    my $rr = "$from/\@ALLOWED_RECIPIENTS";
+    if (-s $rr and open $rr,'<',$rr) {
+      pq(qq(
+        'You are a restricted user and may only fex to these recipients:<p>'
+        '<pre>'
+      ));
+      while (<$rr>) {
+        chomp;
+        s/#.*//;
+        s/\s//g;
+        next unless $_;
+        if (/^\@LOCAL_RDOMAINS/) {
+          foreach my $rd (@local_rdomains) {
+            print "*\@$rd\n";
+          }
+        } else {
+          print "$_\n";
+        }
+      }
+      print "</pre><p>\n";
+      close $rr;
+    }
+    pq(qq(
+      '  <input type="submit" name="submit" value="check recipient(s) and continue">'
+      '  or <input type="submit" name="fexyourself" value="fex yourself">'
+      '</form>'
+      '<p>'
+    ));
+    if ($akey and -f "$from/\@" and not $captive ) {
+      pq(qq(
+        '<a href="/foc?akey=$akey">user config & operation control</a>'
+      ));
+    }
+    
+    if (0 and -f "$FEXHOME/htdocs/FIX.jar") {
+      print "<p>\n";
+      if    ($public) { print "<a href=\"/fix?from=$from&id=$public&to=$to\">" }
+      elsif ($skey)   { print "<a href=\"/fix?skey=$skey&to=$to\">" }
+      elsif ($gkey)   { print "<a href=\"/fix?gkey=$gkey&to=$to\">" }
+      else            { print "<a href=\"/fix?akey=$akey\">" }
+      print "Alternate Java client</a> (for files > 2 GB or sending of more than one file)\n";
+    }
+    print &logout;
+    if (-x "$FEXHOME/cgi-bin/login") {
+      print $info_login||$info_1;
+    }
+    print "</body></html>\n";
+    exit;
+  } 
+  
+  # ask for filename
+  if ($from and ($id or $okey)) {
+    $to = $group if $group;
+    present_locales($ENV{REQUEST_URI}) if $skey or $gkey or $okey;
+    pq(qq(
+      '<script type="text/javascript">'
+      '  function showstatus() {'
+      '    var file  = document.forms["upload"].elements["file"].value;'
+      '    if (file != "") {'
+      '      window.open('
+      "        '$ENV{PROTO}://$ENV{HTTP_HOST}/$cgi?showstatus=$uid',"
+      "        'fup_status',"
+      "        'width=700,height=500'"
+      '      );'
+      '      return true;'
+      '    }'
+      '    return false;'
+      '  }'
+      '</script>'
+      '<script type="text/javascript">'
+      '  function reportsize() {'
+      '    var form = document.forms["upload"];'
+      '    var filesize = form.file.files[0].size;'
+      '    // alert(filesize + " bytes");'
+      '    form.elements["filesize"].value = filesize;'
+      '    filesize = filesize.toString();'
+      '    filesize = filesize.replace(/(\\d)(?=(\\d\\d\\d)+(?!\\d))/g,"\$1,");'
+      '    document.getElementById("filesize").innerHTML = filesize + " bytes";'
+      '  }'
+      '</script>'
+    ));
+    pq(qq(
+      '<form name="upload"'
+      '      action="/fup"'
+      '      method="post"'
+      '      accept-charset="UTF-8"'
+      '      enctype="multipart/form-data"'
+      '      onsubmit="return showstatus();">'
+      '  <input type="hidden" name="uid"      value="$uid">'
+      '  <input type="hidden" name="from"     value="$from">'
+      '  <input type="hidden" name="filesize" value="">'
+    ));
+    
+    if ($public) {
+      my $toh = join('<br>',@to);
+      pq(qq(
+        '  <input type="hidden" name="id" value="$public">'
+        '  <input type="hidden" name="to" value="$to">'
+        '  <table border="1">'
+        '    <tr><td>sender:   <td><tt>$from</tt></tr>'
+        '    <tr><td>recipient:<td><tt>$toh</tt></tr>'
+      ));
+    } elsif ($okey) {
+      pq(qq(
+        '  <input type="hidden" name="okey" value="$okey">'
+        '  <input type="hidden" name="to" value="$to">'
+        '  <table border="1">'
+        '    <tr><td>sender:   <td>$from</tr>'
+        '    <tr><td>recipient:<td>$to</tr>'
+      ));
+    } elsif ($skey) {
+      pq(qq(
+        '  <input type="hidden" name="skey" value="$skey">'
+        '  <table border="1">'
+        '    <tr><td>sender:   <td>$from</tr>'
+        '    <tr><td>recipient:<td>$to</tr>'
+      ));
+    } elsif (@group) {
+      if ($gkey) {
+        pq(qq(
+          '  <input type="hidden" name="gkey" value="$gkey">'
+        ));
+      }
+      my $toh = "group $group:<ul>";
+      foreach my $gm (@group) { $toh .= "<li>$gm" }
+      $toh .= "</ul>";
+      pq(qq(
+        '  <input type="hidden" name="id" value="$id">'
+        '  <table border="1">'
+        '    <tr><td>sender:<td>$from</tr>'
+        '    <tr><td>recipient(s):<td>$toh</tr>'
+      ));
+    } else {
+      my $toc = join(',',@to);
+      my $toh = join('<br>',@to);
+      pq(qq(
+        '  <input type="hidden" name="akey" value="$akey">'
+        '  <table border="1">'
+        '    <tr><td>sender:<td>$from</tr>'
+      ));
+      if ($anonymous) {
+        pq(qq(
+          '    <tr><td>recipient:'
+          '        <td><input type="hidden" name="to" value="$toc">$toh</tr>'
+        ));
+      } else {
+        pq(qq(
+          '    <tr><td><a href="/fup?akey=$akey&to=$toc">recipient(s)</a>:'
+          '        <td><input type="hidden" name="to" value="$toc">$toh</tr>'
+        ));
+      }
+    }
+    
+    $autodelete = lc $autodelete;
+    $keep = $keep_default unless $keep;
+    my ($quota,$du) = check_sender_quota($from);
+    $quota = $quota 
+           ? "<tr><td>sender quota (used):<td>$quota ($du) MB</tr>" 
+           : '';
+    
+    $bwl = qq'<td><input type="text" name="bwlimit" size="8" value="$bwlimit"> kB/s';
+    if (@throttle) {
+      foreach (@throttle) {
+        if (/\[?(.+?)\]?:(\d+)$/) {
+          my $throttle = $1;
+          my $limit = $2;
+          # throttle ip address?
+          if ($throttle =~ /^[\w:.-]+$/) {
+            if (ipin($ra,$throttle)) {
+              $bwl = qq'<td><input type="hidden" name="bwlimit" value="$limit"> $limit kB/s';
+              last;
+            }
+          } 
+          # throttle e-mail address?
+          else {
+            # allow wildcard *, but not regexps
+            $throttle =~ quotemeta $throttle;
+            $throttle =~ s/\*/.*/g;
+            if ($from =~ /^$throttle$/i) {
+              $bwl = qq'<td><input type="hidden" name="bwlimit" value="$limit"> $limit kB/s';
+              last;
+            }
+          }
+        }
+      }
+    }
+    
+    $autodelete = $autodelete{$to} if $autodelete{$to};
+    
+    my $adt = '';
+    if ($autodelete =~ /yes/i) {
+      $adt = 'delete file after download';
+    } elsif ($autodelete =~ /no/i) {
+      $adt = 'do not delete file after download';
+    } elsif ($autodelete =~ /delay/i) {
+      $adt = 'delete file after download with delay',
+    } elsif ($autodelete =~ /^\d+$/) {
+      $adt = "delete file $autodelete days after download",
+    }
+
+    my $ctr = my $ktr = '';
+    if ($nomail) {
+      $ctr = qq'<td><input type="hidden" name="comment" value="$comment">'
+            .qq'<em>no notification e-mail will be send</em>';
+      $ktr = qq'<input type="text" name="keep" size="2" value="$keep"> days</tr>';
+      $ktr = qq'$keep days<input type="hidden" name="keep" value="$keep"></tr>';
+    } else {
+      $ctr = qq'<td><input type="text" name="comment" size="80" value="$comment">';
+      $ktr = qq'$keep days<input type="hidden" name="keep" value="$keep"></tr>';
+    }
+    if ($captive) {
+      $ktr = qq'$keep days<input type="hidden" name="keep" value="$keep"></tr>';
+    }
+    
+    pq(qq(
+      '    <tr title="$adt"><td>autodelete:<td>$adt</tr>'
+      '    <input type="hidden" name="autodelete" value="$autodelete">'
+      '    <tr title="keep file max $keep days, then delete it"><td>keep:<td>'
+      '    $ktr'
+      '    $quota'
+      '    <tr title="optional, full speed if empty"><td>bandwith limit:'
+      '      $bwl'
+      '    </tr>'
+      '    <tr title="optional, will be included in notification e-mail"><td>comment:'
+      '      $ctr'
+      '    </tr>'
+      '    <tr title="If you want to send more than one file, then put them in a zip or tar archive">'
+      '        <td>file:'
+      '        <td><input type="file" name="file"    size="80" value="$file" onchange="reportsize();">'
+      '    </tr>'
+      '    <tr><td>file size:<td id="filesize"></td></tr>'
+      '  </table>'
+      '  <p><input type="submit" value="upload">'
+      '<p>'
+      '</form>'
+    ));
+    if ($akey and -f "$from/\@" and not $captive) {
+      print "<p>\n",
+            "<a href=\"/foc?akey=$akey\">user config & operation control</a>\n";
+    }
+    if (0 and -f "$FEXHOME/htdocs/FIX.jar" and not $okey) {
+      print "<p>\n";
+      if    ($public) { print "<a href=\"/fix?from=$from&id=$public&to=$to\">" }
+      elsif ($skey)   { print "<a href=\"/fix?skey=$skey&to=$to\">" }
+      elsif ($gkey)   { print "<a href=\"/fix?gkey=$gkey&to=$to\">" }
+      else            { print "<a href=\"/fix?akey=$akey&to=$to\">" }
+      print "Alternate Java client</a> (for files > 2 GB or sending of more than one file)\n";
+    }
+    print &logout;
+    print $info_2;
+    # printf "<hr><pre>%s</pre>\n",$ENV{HTTP_HEADER};
+    print "</body></html>\n";
+    exit;
+  }
+
+  present_locales('fup');
+
+  if ($ENV{REQUEST_METHOD} eq 'POST') {
+    pq(qq(
+      '<font color="red"><h3>'
+      '  You have to fill out this form completely to continue.'
+      '</h3></font>'
+    ));
+  }
+  
+  pq(qq(
+    '<form action="/fup" '
+    '      method="post" '
+    '      accept-charset="ISO-8859-1" '
+    '      enctype="multipart/form-data">'
+    '  <table>'
+    '    <tr><td>sender:'
+    '        <td><input type="text"     name="from" size="40" value="$from"></tr>'
+    '    <tr><td>auth-ID:       '
+    '        <td><input type="password" name="id"   size="16" value="$id" autocomplete="off"></tr>'
+    '  </table> '
+  ));
+  unless ($fop_auth or $nomail) {
+#    pq(qq(
+#      'If you have lost your auth-ID use "?"'
+#      'and your auth-ID will be sent by e-mail to you.'
+#      '<p>'
+#    ));
+    pq(qq(
+      '  <input type="checkbox" name="ID_forgotten" value="ID_forgotten">'
+      '  I have lost my auth-ID! Send it to me by e-mail! '
+      '  (you must fill out sender field above)'
+    ));
+  }
+  pq(qq(
+    '  <p><input type="submit" value="check ID and continue"><p>'
+  ));
+  if (not $nomail and (
+    @local_domains and @local_hosts and ipin($ra,@local_hosts)
+    or @local_rdomains and @local_rhosts and
+       (not @registration_hosts or ipin($ra,@registration_hosts)) 
+    or @demo
+  )) {
+    pq(qq(
+      'You can <a href="/fur">register yourself</a> '
+      'if you do not have a F*EX account yet.<p>'
+    ));
+  }
+  if (@anonymous_upload and ipin($ra,@anonymous_upload)) {
+    my $a = 'anonymous'.int(rand(999999));
+    pq(qq(
+      'You may also use <a href="/fup?from=anonymous&to=$a">anonymous upload</a>'
+    ));
+  }
+  print "</form>\n";
+    
+  print $info_1;
+
+  if ($debug and $debug>1) {
+    print "<hr>\n<pre>\n";
+    foreach $v (sort keys %ENV) {
+      print "$v = $ENV{$v}\n";
+    }
+    print "</pre>\n";
+  }
+  
+  print "</body></html>\n";
+  exit;
+}
+
+if ($from and $file and not @to) {
+  check_rr($from,$from);
+  @to = ($from);
+  $sup = 'fexyourself';
+}
+
+# all these variables should be defined here, but just to be sure...
+http_die("no file specified")	    unless $file;
+http_die("no sender specified")     unless $from;
+http_die("no recipient specified")  unless @to;
+unless ($okey and -l "$to/\@OKEY/$okey") {
+  http_die("no auth-ID specified") unless $id;
+  unless ($rid eq $id or $gkey or $skey) {
+    faillog("user $from, id $id");
+    http_die("wrong auth-ID specified");
+  }
+}
+
+&check_status($from);
+
+if (@throttle) {
+  foreach (@throttle) {
+    if (/(.+):(\d+)$/) {
+      my $throttle = $1;
+      my $limit = $2;
+      if (not $bwlimit or $limit < $bwlimit) {
+        # throttle ip address?
+        if ($throttle =~ /^[\d.-]+$/) {
+          if (ipin($ra,$throttle)) {
+            $bwlimit = $limit;
+            last;
+          }
+        }
+        # throttle e-mail address?
+        else {
+          # allow wildcard *, but not regexps
+          $throttle =~ quotemeta $throttle;
+          $throttle =~ s/\*/.*/g;
+          if ($from =~ /^$throttle$/i) {
+            $bwlimit = $limit;
+            last;
+          }
+        }
+      }
+    }
+  }
+}
+
+# address rewriting for storage
+if (not ($skey or $gkey) and $from =~ /^(anonymous|fexmail)/) {
+  my $to = "@to";
+  @to = ($from);
+  $from = $to;
+}
+
+if (not $anonymous and $overwrite =~ /^n/i) {
+  foreach $to (@to) {
+    if (-f "$to/$from/$fkey/data") {
+      http_die("<tt>$file</tt> already exists for <tt>$to</tt>");
+    }
+  }
+}
+
+$to = join(',',@to);
+
+# file overwriting for anonymous is only possible if his client has the 
+# download cookie - else request purging
+if ($anonymous and not $seek and my $dkey = readlink "$to/$from/$fkey/dkey") {
+  if ($overwrite =~ /^n/i) {
+    http_die("<tt>$file</tt> already exists for <tt>$to</tt>");
+  }
+  if ($ENV{HTTP_COOKIE} !~ /$dkey/) {
+    my $purge = "/fop/$dkey/$dkey?purge";
+    # http_die("$file already exists $dkey:$ENV{HTTP_COOKIE}:");
+    http_die("<tt>$file</tt> already exists - <a href=\"$purge\">purge it?!</a>");
+  }
+}
+
+if (@group) {
+  @to = @group;
+  $comment = "[$group] $comment";
+} elsif ($public) {
+  $comment .= ' (public upload)';
+}
+
+# file data still waits on STDIN ... get it now!
+&get_file;
+
+if ($to eq $from and $file eq 'ADDRESS_BOOK') {
+  unlink "$from/\@ADDRESS_BOOK";
+  rename "$from/$from/ADDRESS_BOOK/upload","$from/\@ADDRESS_BOOK"
+    or http_die("cannot save $from/\@ADDRESS_BOOK - $!\n");
+  http_header('200 OK');
+  print html_header($head);
+  print "address book updated",
+        "</body></html>\n";
+  exit;
+}
+
+# finalize upload
+unless ($nostore) {
+  foreach my $to (@group?@group:@to) {
+    $to =~ s/:\w+=.*//; # remove options from address
+    $filed  = "$to/$from/$fkey";
+    $save   = "$filed/data";
+    $upload = "$filed/upload";
+    $dkey{$to} = readlink "$filed/dkey";
+    unlink $save unless -s $save;
+    unlink $save and $overwrite{$to}++;
+    rename $upload,$save or http_die("cannot rename $upload to $save - $!\n");
+    
+    # log dkey
+    my $dlog = "$logdir/dkey.log";
+    if (open $dlog,'>>',$dlog) {
+      flock $dlog,LOCK_EX;
+      seek $dlog,0,SEEK_END;
+      printf {$dlog} "%s %s %s %s %s\n",
+                     isodate(time),$dkey{$to},$from,$to,$fkey;
+      close $dlog;
+    }
+    
+    # send notification e-mails if necessary
+    if (not $nomail and ($comment or not $overwrite{$to})) {
+      my $locale = readlink "$to/\@LOCALE" || readlink "$filed/locale" 
+                   || $default_locale;
+      my $lf = untaint("$FEXHOME/locale/$locale/lib/lf.pl");
+      require $lf if -f $lf;
+      unless ($notify{$locale}) {
+        $locale = 'english';
+        $lf = "$FEXHOME/lib/lf.pl";
+        if (-f $lf) { require $lf }
+        else        { $notify{$locale} = \&notify }
+      }
+      &{$notify{$locale}}(
+# notify(
+        status	   => "new",
+        dkey	   => $dkey{$to},
+        filename   => $filename,
+        keep	   => $keep{$to}||$keep||$keep_default,
+        comment	   => $comment,
+        replyto	   => $replyto,
+        autodelete => $autodelete{$to}||$autodelete,
+      );
+      debuglog("notify $filed [$filename] '$comment'");
+    }
+  }
+}
+
+# send HTTP status
+$HTTP_HEADER = 'HTTP/1.1 200 OK';
+if ($nostore) {
+  nvt_print($HTTP_HEADER,'Content-Type: text/html','');
+  exit if $http_client =~ /^fexsend/;
+} elsif ($file eq 'STDFEX') {
+  nvt_print($HTTP_HEADER,'');
+  exit;
+} else {
+  nvt_print($HTTP_HEADER);
+  if ($xkey) {
+    my $x = "$durl//$xkey";
+    $x =~ s:/fop::;
+    nvt_print("X-Location: $x");
+  }
+  if ($anonymous) {
+    my $dkey = $dkey{$to};
+    my $cookie = $dkey;
+    $cookie = $1 if $ENV{HTTP_COOKIE} =~ /anonymous=([\w:]+)/;
+    $cookie .= ':'.$dkey if $cookie !~ /$dkey/;
+    nvt_print("Set-Cookie: anonymous=$cookie");
+  }
+  foreach my $to (@group?@group:@to) {
+    $to =~ s/:\w+=.*//; # remove options from address
+    my $options = sprintf "(autodelete=%s,keep=%s,locale=%s)",
+      readlink "$to/$from/$fkey/autodelete"||$autodelete,
+      readlink "$to/$from/$fkey/keep"||$keep_default,
+      readlink "$to/$from/$fkey/locale"||$locale;
+    nvt_print("X-Recipient: $to $options");
+    nvt_print("X-Location: $durl/$dkey{$to}/$fkey");
+  }
+  if ($http_client =~ /^(fexsend|schwuppdiwupp)/) {
+    nvt_print('');
+    exit;
+  } else {
+    nvt_print('Content-Type: text/html','');
+  }
+}
+
+# send HTML report
+print html_header($head);
+
+if ($nostore) {
+  printf "%s (%s MB) received\n",$file,$ndata/1024/1024;
+} elsif ($anonymous or $nomail or $from eq $to) {
+  my $size = $ndata<2*1024      ? sprintf "%s B",$ndata:
+             $ndata<2*1024*1024 ? sprintf "%s kB",int($ndata/1024):
+                                  sprintf "%s MB",int($ndata/1024/1024);
+  pq(qq(
+    '$file ($size) received and saved<p>'
+    'Download URL for copy & paste:'
+  ));
+  if ($xkey) {
+    my $x = "$durl//$xkey";
+    $x =~ s:/fop::;
+    print "<h2><tt>$x</tt></h2>\n";
+  } else {
+    print "<h2><tt>$durl/$dkey{$to}/$fkey</tt></h2>\n";
+  }
+  print "Link is valid for $keep days!<p>\n";
+} else {
+  if ($ndata<2*1024) {
+    print "$file ($ndata B) received and saved<p>\n";
+    if (not $boring and not $seek) {
+      print "Ehh... $ndata <b>BYTES</b>?! You are kidding?<p>\n";
+    }
+  } elsif ($ndata<2*1024*1024) {
+    $ndata = int($ndata/1024);
+    print "$file ($ndata kB) received and saved<p>\n";
+    if ($ndata<1024 and not ($boring or $seek)) {
+      print "Using F*EX for less than 1 MB: ",
+        "ever heard of MIME e-mail? :-)<p>\n";
+    }
+  } else {
+    $ndata = int($ndata/1024/1024);
+    print "$file ($ndata MB) received and saved<p>\n";
+  }
+  foreach $to (@to) {
+    if ($overwrite{$to}) { 
+      print "(old $file for $to overwritten)<p>\n" 
+    } else { 
+      print "$to notified<p>\n" 
+    }
+  }
+}
+
+if ($okey) {
+  unlink "$to/\@OKEY/$okey";
+} elsif (not $anonymous and not $sup) {
+  print "<a href=\"/fup?submit=again";
+  if    ($public) { print "&from=$from&to=$to&id=$id" }
+  elsif ($skey)   { print "&skey=$skey" }
+  elsif ($gkey)   { print "&gkey=$gkey" }
+  elsif ($akey)   { print "&akey=$akey&to=$to" }
+  print "&bwlimit=$bwlimit&autodelete=$autodelete&keep=$keep\">";
+  print "send another file</a>\n";
+  print &logout;
+}
+
+print "</body></html>\n";
+exit;
+
+
+# parse GET and POST requests
+sub parse_request {
+  my %to;
+  my ($to,$dkey);
+  my ($x,$k,$v);
+  my $qs = $ENV{QUERY_STRING};
+  local $_;
+
+  # get JUP parameters from environment (HTTP headers)
+  while (($k,$v) = each %ENV) {
+    if ($k =~ s/^FEX_//) {
+      setparam($k,$v);
+    }
+  }
+  
+  # decode base64 PATH_INFO to QUERY_STRING
+  if ($ENV{PATH_INFO} =~ m:^/(\w+=*)$:) {
+    if ($qs) {
+      $qs = sprintf("%s&%s",decode_b64($1),$qs);
+    } else {
+      $qs = decode_b64($1);
+    }
+  }
+
+  # parse HTTP QUERY_STRING (parameter=value pairs)
+  if ($qs) {
+    foreach (split '&',$qs) {
+      if (s/^(\w+)=//) {
+        my $x = $1;
+        # decode URL-encoding
+        s/%([a-f0-9]{2})/chr(hex($1))/gie;
+        if (/([<>])/) {
+          $_ = sprintf("\"&#%s;\" is not allowed in URL parameter",ord($1));
+          http_die($_);
+        }
+        setparam($x,$_); 
+      }
+    }
+  }
+
+  # HTTP redirect does not work correctly with opera!
+  # ==> locale handling is now done by fexsrv
+  if (0 and $locale) {
+    nvt_print(
+      "HTTP/1.1 302 Found",
+      "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/fup",
+      "Set-Cookie: locale=$locale",
+      'Expires: 0',
+      'Content-Length: 0',
+      ''
+    );
+    exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  }
+  
+  if ($showstatus) {
+    &showstatus;
+    exit;
+  }
+  
+  # check for akey, gkey and skey (from HTTP GET)
+  &check_keys;
+  
+  if ($ENV{REQUEST_METHOD} eq 'POST' and $cl) {
+    foreach $sig (keys %SIG) {
+      if ($sig !~ /^(CHLD|CLD)$/) {
+        $SIG{$sig} = \&sigexit;
+      }
+    }
+    $SIG{__DIE__} = \&sigdie;
+    http_die("invalid Content-Length header \"$cl\"") if $cl !~ /^-?\d+$/;
+    debuglog($0);
+    debuglog(sprintf("awaiting %d bytes from %s %s",
+                     $cl,$ENV{REMOTE_ADDR}||'',$ENV{REMOTE_HOST}||''),"\n");
+
+    &check_space($cl) if $cl > 0;
+    
+    $SIG{ALRM} = sub { die "TIMEOUT\n" };
+    alarm($timeout);
+    binmode(STDIN,':raw');
+    
+    if (defined($ENV{FEX_FILENAME})) {
+      # JUP via HTTP header
+      $file = $param{'FILE'} = $ENV{FEX_FILENAME};
+      $fileid = $ENV{FEX_FILEID} || 0;
+      $fpsize = $ENV{X_CONTENT_LENGTH} || 0;
+      $boundary = '';
+    } elsif ($contentlength) {
+      # JUP via URL parameter
+      $fpsize = $contentlength;
+      $boundary = '';
+    } else {
+      # FUP
+      if ($ENV{CONTENT_TYPE} =~ /boundary=\"?([\w\-\+\/_]+)/) {
+        $boundary = $1;
+      } else {
+        http_die("malformed HTTP POST (no boundary found)");
+      }
+    
+      READPOST: while (&nvt_read) {
+        # the file itself - *must* be last part of POST!
+        if (/^Content-Disposition:\s*form-data;\s*name="file";\s*filename="(.+)"/i) {
+          push @header,$_;
+          $file = $param{'FILE'} = $1;
+          while (&nvt_read) {
+            last if /^\s*$/;
+            $fileid = $1 if /^X-File-ID:\s*(.+)/;
+            $fpsize = $1 if /^Content-Length:\s*(\d+)/;
+            $flink  = $1 if /^Content-Location:\s*(\/.+)/;
+            push @header,$_;
+          }
+          # STDIN is now at begin of file, will be read later with get_file()
+          last; 
+        }
+        # all other parameters
+        if (/^Content-Disposition:\s*form-data;\s*name="([a-z]\w*)"/i) {
+          my $x = $1;
+          nvt_skip_to('^\s*$');
+          &nvt_read;
+          setparam($x,$_);
+          NEXTPART: while (&nvt_read) {
+            last READPOST if /^--\Q$boundary--/;
+            last NEXTPART if /^--\Q$boundary/;
+          }
+        }
+      }
+    }
+    
+    if (length($file)) {
+      $file =~ s/%(\d+)/chr($1)/ge;
+      $file = untaint(strip_path(normalize($file)));
+      $file =~ s/[\\\/<>]/_/g; # filter out dangerous chars
+      $file =~ s/^\|//;        # filter out dangerous chars
+      $file =~ s/\|$//;        # filter out dangerous chars
+      $filename = $file;
+      $fkey = urlencode($file);
+    }
+
+    # check for akey, gkey and skey (from HTTP POST)
+    &check_keys;
+
+  }
+
+  if ($from) {
+    $from .= '@'.$mdomain if $mdomain and $from !~ /@/;
+    if ($from ne 'anonymous' and not checkaddress($from)) {
+      http_die("<tt>$from</tt> is not a valid e-mail address");
+    }
+    $from = untaint($from);
+  }
+
+  # collect multiple addresses and check for aliases (not group)
+  if (@to and "@to" !~ /^@[\w-]+$/ 
+      and not ($gkey or $addto or $command =~ /^LIST(RECEIVED)?$/)) 
+  {
+        
+    # read address book
+    if ($from and open my $AB,'<',"$from/\@ADDRESS_BOOK") {
+      my ($alias,$address,$autodelete,$locale,$keep);
+      while (<$AB>) {
+        s/#.*//;
+        $_ = lc $_;
+        if (s/^\s*(\S+)[=\s]+(\S+)//) {
+          ($alias,$address) = ($1,$2);
+          $autodelete = $locale = $keep = '';
+          $autodelete = $1 if /autodelete=(\w+)/;
+          $locale     = $1 if /locale=(\w+)/;
+          $keep       = $1 if /keep=(\d+)/;
+          foreach my $address (split(",",$address)) {
+            $address .= '@'.$mdomain if $mdomain and $address !~ /@/;
+            push @{$ab{$alias}},$address;
+            $autodelete{$alias} = $autodelete;
+            $keep{$alias}       = $keep;
+            $locale{$alias}     = $locale;
+          }
+        }
+      }
+      close $AB;
+    }
+
+    # look for recipient's options and eliminate dupes
+    %to = ();
+    foreach $to (@to) {
+      # address book alias?
+      if ($ab{$to}) {
+        foreach my $address (@{$ab{$to}}) {
+          $address .= '@'.$mdomain if $mdomain and $address !~ /@/;
+          $to{$address} = $address; # ignore dupes
+          if ($specific{'autodelete'}) {
+            $autodelete{$address} = $specific{'autodelete'};
+          } elsif ($autodelete{$to}) {
+            $autodelete{$address} = $autodelete{$to};
+          } else {
+            $autodelete{$address} = readlink "$address/\@AUTODELETE" 
+                                    || $autodelete;
+          }
+          if ($_ = readlink "$address/\@LOCALE") {
+            $locale{$address} = $_;
+          } elsif ($locale{$to}) {
+            $locale{$address} = $locale{$to};
+          } else {
+            $locale{$address} = $locale ;
+          }
+          unless ($locale{$address}) {
+            $locale{$address} = $default_locale || 'english';
+          }
+          if ($specific{'keep'}) { $keep{$address} = $specific{'keep'} }
+          elsif ($keep{$to})     { $keep{$address} = $keep{$to} }
+        }
+      } else {
+        $to .= '@'.$mdomain if $mdomain and $to !~ /@/;
+        $to{$to} = $to; # ignore dupes
+        unless ($autodelete{$to}) {
+          $autodelete{$to} = readlink "$to/\@AUTODELETE" || $autodelete;
+        }
+        $autodelete{$to} = $specific{'autodelete'} if $specific{'autodelete'};
+        $keep{$to} = $keep_default;
+        $keep{$to} = $keep                 if $keep;
+        $keep{$to} = readlink "$to/\@KEEP" if -l "$to/\@KEEP";
+        $keep{$to} = $specific{'keep'}     if $specific{'keep'};
+        # recipient specific parameters
+        $keep{$to}       = $1 if $to =~ /:keep=(\d+)/i;
+        $autodelete{$to} = $1 if $to =~ /:autodelete=(\w+)/i;
+      }
+      if (-e "$to/\@CAPTIVE") {
+        my $v;
+        $v = readlink "$to/\@AUTODELETE" and $autodelete{$to} = $v;
+        $v = readlink "$to/\@KEEP"       and $keep{$to}       = $v;
+      }
+    }
+    @to = keys %to;
+    
+    if (scalar(@to) == 1) {
+      $to = "@to";        
+      $keep       = $keep{$to}       if $keep{$to};
+      $autodelete = $autodelete{$to} if $autodelete{$to};
+    }
+        
+    # check recipients and eliminate dupes
+    %to = ();
+    foreach $to (@to) {
+      if ($to eq 'anonymous') {
+        $to{$to} = $to;
+      } else {
+        if ($to =~ /^@(.+)/) {
+          http_die("You cannot send to more than one group") if @to > 1;
+          http_die("Group <tt>$to</tt> does not exist") unless -f "$from/\@GROUP/$1";
+        } else {
+          $to .= '@'.$mdomain if $mdomain and $to !~ /@/;
+          if (checkaddress($to)) {
+            $to{$to} = untaint($to);
+          } else {
+            http_die("<tt>$to</tt> is not a valid e-mail address");
+          }
+        }
+      }
+    }
+    @to = values %to;
+  }
+
+  foreach $to (@to) {
+    unless (checkforbidden($to)) {
+      http_die("<tt>$to</tt> is not allowed");
+    }
+  }
+}
+
+
+# show the status progress bar
+sub showstatus {
+  my $wclose;
+  my ($upload,$data,$sfile,$ukey,$file);
+  my ($nsize,$tsize);
+  my ($t0,$t1,$t2,$tt,$ts,$tm);
+  my ($osize,$percent,$npercent);
+  local $_;
+  
+  $wclose = '<p><a href="#" onclick="window.close()">close</a>'."\n".
+            '</body></html>'."\n";
+  $ukey   = "$ukeydir/$uid";
+  $upload = "$ukey/upload";
+  $data   = "$ukey/data";
+  $sfile  = "$ukey/size";
+  for (1..16) {
+    sleep 1;
+    $tsize = readlink $sfile and last;
+    # upload error?
+    # remark: stupid Internet Explorer *needs* the error represented in this 
+    # asynchronous popup window, because it cannot display the error in the
+    # main window on HTTP POST!
+    if (-f $ukey and open $ukey,'<',$ukey or 
+        -f "$ukey/error" and open $ukey,'<',"$ukey/error") {
+      undef $/;
+      unlink $ukey;
+      html_error($error,<$ukey> || 'unknown');
+    }
+  }
+  # unlink $sfile;
+  
+  if (defined $tsize and $tsize == 0) {
+    print "<script type='text/javascript'>window.close()</script>\n";
+    exit;
+  }
+  unless ($tsize) {
+    html_error($error,
+               "no file data received - does your file exist or is it >2GB?")
+  }
+  html_error($error,"file size unknown") unless $tsize =~ /^\d+$/;
+  
+  http_header('200 OK');
+  if (open $ukey,'<',"$ukey/filename") {
+    local $/;
+    $file = <$ukey>;
+    close $ukey;
+  }
+  http_die("no filename?!") unless $file;
+  
+  my $ssize = $tsize;
+  if ($ssize<2097152) {
+    $ssize = sprintf "%d kB",int($ssize/1024);
+  } else {
+    $ssize = sprintf "%d MB",int($ssize/1048576);
+  }
+  
+  pq(qq(
+    "<html><body>"
+    "<center>"
+    "<h1>Upload Status for<br><tt>$file ($ssize)</tt></h1>"
+    '<img src="/action-fex-camel.gif" id="afc">'
+    "</center>"
+    "<input type='text' id='percent' style='margin-left:1ex;color:black;background:transparent;border:none;width:32ex;' disabled='true' value='0%'>"
+    "<div style='border:1px solid black;width:100%;height:20px;'>"
+    "<div style='float:left;width:0%;background:black;height:20px;' id='bar'>"
+    "</div></div>"
+  ));
+    
+  # wait for upload file
+  for (1..9) {
+    last if -f $upload or -f $data;
+    sleep 1;
+  }
+  unless (-f $upload or -f $data) {
+    print "<p><H3>ERROR: no upload received</H3>\n";
+    print $wclose;
+    exit;
+  }
+  
+  $SIG{ALRM} = sub { die "TIMEOUT in showstatus: no (more) data received\n" };
+  alarm($timeout*2);
+  
+  $t0 = $t1 = time;
+  $osize = $percent = $npercent = 0;
+  
+  for ($percent = 0; $percent<100; sleep(1)) {
+    $t2 = time;
+    $nsize = -s $upload;
+    if (defined $nsize) {
+      if ($nsize<$osize) {
+        print "<p><h3>ABORTED</h3>\n";
+        print $wclose;
+        exit;
+      }
+      if ($nsize>$osize) {
+        alarm($timeout*2);
+        $osize = $nsize;
+      }
+      $npercent = int($nsize*100/$tsize);
+      $showsize = calcsize($tsize,$nsize);
+    } else {
+      $npercent = 100;
+      $showsize = calcsize($tsize,$tsize);
+    }
+    # hint: for ISDN (or even slower) links, 5 s tcp delay is minimum
+    # so, updating more often is contra-productive
+    if ($t2>$t1+5 or $npercent>$percent) {
+      $percent = $npercent;
+      $t1 = $t2; 
+      $tm = int(($t2-$t0)/60);
+      $ts = $t2-$t0-$tm*60;
+      $tt = sprintf("%d:%02d",$tm,$ts);
+      pq(qq(
+        "<script type='text/javascript'>"
+        "  document.getElementById('bar').style.width = '$percent%';"
+        "  document.getElementById('percent').value = '$showsize, $tt, $percent %';"
+        "</script>"
+      )) or last;
+    }
+  }
+  
+  alarm(0);
+  if ($npercent == 100) {
+    print "<h3>file successfully transferred</h3>\n";
+  } else {
+    print "<h3>file transfer aborted</h3>\n";
+  }
+  pq(qq(
+    "<script type='text/javascript'>"
+    "  document.getElementById('afc').src='/logo.jpg'"
+    "</script>"
+  ));
+  print $wclose;
+  unlink $ukey;
+  exit;
+}
+
+
+# get file from post request
+sub get_file {
+  my ($to,$filed,$upload,$nupload,$speed,$data);
+  my ($b,$n,$uss);
+  my $dkey;
+  my ($fh,$filesize);
+  my ($t0,$tt);
+  my $fb = 0;		# file bytes
+  my $ebl = 0;		# end boundary length
+
+  # FUP, not JUP
+  if ($boundary) {
+    $ebl = length($boundary)+8; # 8: 2 * CRLF + 2 * "--"
+  }
+
+  unless ($nostore) {
+
+    # download already in progress?
+    foreach $to (@to) {
+      $to =~ s/:\w+=.*//; # remove options from address
+      $filed = "$to/$from/$fkey";
+      $data = "$filed/data";
+      if (-f $data and open $data,'>>',$data) {
+        unless (flock($data,LOCK_EX|LOCK_NB)) {
+          http_die("<tt>$filed</tt> locked: a download is currently in progress");
+        }
+      }
+    }
+    
+    # prepare upload
+    foreach $to (@to) {
+      $to =~ s/:\w+=.*//; # remove options from address
+      $filed = "$to/$from/$fkey";
+      $nupload = "$filed/upload"; # upload for next recipient
+      mkdirp($filed);
+      
+      # upload already prepared (for first recipient)?
+      if ($upload) {
+        # link upload for next recipient
+        unless ($upload eq $nupload or
+                -r $upload and -r $nupload and
+                (stat $upload)[1] == (stat $nupload)[1]) 
+        {
+          unlink $nupload;
+          link $upload,$nupload;
+        }
+      } 
+      
+      # first recipient => create upload
+      else {
+        $upload = $nupload;
+        unlink "$ukeydir/$uid";
+        if ($flink) {
+          if ($seek) {
+            http_die("cannot resume on link upload");
+          }
+          &nvt_read and $flink = $_;
+          if ($flink !~ /^\//) {
+            http_die("no file link name ($flink)");
+          }
+          $flink = abs_path($flink);
+          my $fok;
+          foreach my $dir (@file_link_dirs) {
+            $dir = abs_path($dir);
+            $fok = $flink if $flink =~ /^\Q$dir\//;
+          }
+          unless ($fok) {
+            http_die("<tt>$flink</tt> not allowed for linking");
+          }
+          my @s = stat($flink);
+          unless (@s and ($s[2] & S_IROTH) and -r $flink) {
+            http_die("cannot read <tt>$flink</tt>");
+          }
+          unless (-f $flink and not -l $flink) {
+            http_die("<tt>$flink</tt> is not a regular file");
+          }
+          # http_die("DEBUG: flink = $flink");
+          &nvt_read;
+          &nvt_read if /^$/;
+          unless (/^--\Q$boundary--/) {
+            http_die("found no MIME end boundary in upload ($_)");
+          }
+          unlink $upload;
+          symlink untaint($flink),$upload;
+        } else {
+          unlink $upload if -l $upload;
+          open $upload,'>>',$upload or http_die("cannot create $upload - $!");
+          unless (flock($upload,LOCK_EX|LOCK_NB)) {
+            http_die("<tt>$file</tt> locked: a transfer is already in progress");
+          }
+          unless ($seek) {
+            seek $upload,0,0;
+            truncate $upload,0;
+          }
+          # already uploaded file data size
+          $uss = -s $upload;
+          # provide upload ID symlink for showstatus
+          symlink "../$filed","$ukeydir/$uid";
+        }
+      }
+      
+      unlink "$filed/autodelete",
+             "$filed/error",
+             "$filed/download",
+             "$filed/restrictions",
+             "$filed/locale",
+             "$filed/keep",
+             "$filed/header",
+             "$filed/id",
+             "$filed/speed",
+             "$filed/comment",
+             "$filed/notify";
+      unlink "$filed/size" unless $seek;
+    
+      # showstatus needs file name and size
+      # fexsend needs full file size (+$seek)
+      $fh = "$filed/filename";
+      open $fh,'>',$fh or die "cannot write $fh - $!\n";
+      print {$fh} $filename;
+      close $fh;
+      if ($::filesize > 0 or $cl > 0) {
+        if ($::filesize > 0) { $filesize = $fpsize || $::filesize }
+        else                 { $filesize = $cl-$rb-$ebl+$seek }
+        # new file
+        unless ($seek) {
+          if ($::filesize > 0) {
+            # total file size as reported by POST
+            mksymlink("$filed/size",$::filesize) 
+              or die "cannot write $filed/size - $!\n";
+          } else {
+            # file size as counted
+            mksymlink("$filed/size",$filesize) 
+              or die "cannot write $filed/size - $!\n";
+          }
+        }
+      }
+    
+      $autodelete{$to} = $autodelete unless $autodelete{$to};
+      if ($autodelete{$to} =~ /^(DELAY|NO|\d+)$/i) {
+        mksymlink("$filed/autodelete",$autodelete{$to});
+      }
+
+      if (my $keep = $keep{$to} || $::keep) {
+        mksymlink("$filed/keep",$keep);
+      }
+      mksymlink("$filed/id",$fileid)	if $fileid;
+      if ($_ = readlink "$to/\@LOCALE") {
+        mksymlink("$filed/locale",$_);
+      } elsif ($locale{$to}) {
+        mksymlink("$filed/locale",$locale{$to});
+      } elsif ($locale) {
+        mksymlink("$filed/locale",$locale);
+      }
+    
+      my $arh = "$from/\@ALLOWED_RHOSTS";
+      if (-s $arh) {
+        copy($arh,"$filed/restrictions");
+      }
+      
+      if (@header and open $fh,'>',"$filed/header") {
+        print {$fh} join("\n",@header),"\n";
+        close $fh;
+      }
+    
+      if ($nomail) {
+        open $fh,'>',"$filed/notify" and close $fh;
+      } 
+      if ($comment) {
+        if (open $fh,'>',"$filed/comment") {
+          print {$fh} encode_utf8($comment);
+          close $fh;
+        }
+      }
+
+      # provide download ID key
+      unless ($dkey = readlink("$filed/dkey") and -l "$dkeydir/$dkey") {
+        $dkey = randstring(8);
+        unlink "$dkeydir/$dkey";
+        symlink "../$filed","$dkeydir/$dkey" or die "cannot symlink $dkeydir/$dkey";
+        unlink "$filed/dkey";
+        symlink $dkey,"$filed/dkey";
+      }
+    
+    }
+
+    # extra download (XKEY)?
+    if ($anonymous and $fkey =~ /^afex_\d/ or
+        $from eq "@to" and $comment =~ s:^//(.*)$:NOMAIL:) 
+    {
+      $xkey = $1||$fkey;
+      $nomail = $comment;
+      my $x = "$xkeydir/$xkey";
+      unless (-l $x and readlink($x) eq "../$from/$from/$fkey") {
+        if (-e $x) {
+          http_die("extra download key $xkey already exists");
+        }
+        symlink "../$from/$from/$fkey",$x 
+          or http_die("cannot symlink $x - $!\n");
+        unlink "$x/xkey";
+        symlink $xkey,"$x/xkey";
+      }
+    }
+    
+  }
+  
+  # file link?
+  if ($flink) {
+    # upload link has been already created, no data to read any more
+    $to = join(',',@to);
+    fuplog($to,$fkey,0);
+    debuglog("upload successfull, dkey=$dkey");
+  }
+
+  # regular file
+  else {
+
+    # at last, read (real) file data
+    $t0 = time();
+  
+    # streaming data?
+    if ($cl == -1) {
+      alarm($timeout*2);
+      # read until EOF, including MIME end boundary
+      while ($n = read(STDIN,$_,$bs)) {
+        $rb += $n;
+        $fb += $n;
+        syswrite $upload,$_ unless $nostore;
+        alarm($timeout*2);
+      }
+      # size of transferred file, without end boundary
+      $ndata = untaint($fb-$ebl);
+    } 
+    
+    # normal file with known file size
+    else {
+      
+      if ($fpsize) {
+        debuglog(sprintf("still awaiting %d+%d = %d bytes",
+                 $fpsize,$ebl,$fpsize+$ebl));
+        $cl = $rb+$fpsize+$ebl; # recalculate CONTENT_LENGTH
+      } else {
+        if ($::filesize) {
+          $cl = $rb+$::filesize+$ebl; # recalculate CONTENT_LENGTH
+        }
+        debuglog(sprintf("still awaiting %d-%d = %d bytes",
+                         $cl,$rb,$cl-$rb));
+      }
+      # read until end boundary, not EOF
+      while ($rb < $cl-$ebl) {
+        $b = $cl-$ebl-$rb; 
+        $b = $bs if $b > $bs;
+        # max wait for 1 kB/s, but at least 10 s
+        # $timeout = $b/1024;
+        # $timeout = 10 if $timeout < 10;
+        alarm($timeout);
+        if ($n = read(STDIN,$_,$b)) {
+          $rb += $n;
+          $fb += $n;
+          # syswrite is much faster than print
+          syswrite $upload,$_ unless $nostore;
+          if ($bwlimit) {
+            alarm(0);
+            $tt = (time-$t0) || 1;
+            while ($rb/$tt/1024 > $bwlimit) {
+              sleep 1;
+              $tt = time-$t0;
+            }
+          }
+          # debuglog($_);
+        } else {
+          last;
+        }
+      }
+      # read end boundary - F*IX is broken!
+      if ($ebl and $http_client !~ /F\*IX/) {
+        $_ = <STDIN>;
+        $_ = <STDIN>||'';
+        unless (/^--\Q$boundary--/) {
+          http_die("found no MIME end boundary in upload ($_)");
+        }
+      }
+      $rb += $ebl;
+      $ndata = untaint($fb);
+    } 
+
+    alarm(0);
+  
+    unless ($nostore) {
+      close $upload; # or die "cannot close $upload - $!\n";;
+  
+      # throuput in kB/s
+      $tt = (time-$t0) || 1;
+      mksymlink("$filed/speed",int($fb/1024/$tt));
+      
+      unless ($ndata) {
+        http_die(
+          "No file data received!".
+          " File name correct?".
+          " File too big (browser-limit: 2 GB!)?"
+        );
+      }
+      
+      $to = join(',',@to);
+    
+      # streaming upload?
+      if ($cl == -1) {
+      
+        open $upload,'<',$upload or http_die("internal error - cannot read upload");
+        seek $upload,$ndata+2,0;
+        $_ = <$upload>||'';
+        unless (/^--\Q$boundary--/) {
+          http_die("found no MIME end boundary in upload ($_)");
+        }
+        close $upload;
+        truncate $upload,$ndata;
+        
+      } else {
+      
+        # truncate boundary string
+        # truncate $upload,$ndata+$uss if -s $upload > $ndata+$uss;
+      
+        # incomplete?
+        if ($cl != $rb) {
+          fuplog($to,$fkey,$ndata,'(aborted)');
+          if ($fpsize) {
+            http_die("read $rb bytes, but Content-Length announces $fpsize bytes");
+          } else {
+            http_die("read $rb bytes, but CONTENT_LENGTH announces $cl bytes");
+          }
+        }
+      
+        # multipost, not complete
+        if ($::filesize > -s $upload) {
+          http_header('206 Partial OK');
+          exit;
+        }
+      
+        # save error?
+        if (-s $upload > ($::filesize||$filesize)) {
+          fuplog($to,$fkey,$ndata,'(write error: upload > filesize)');
+          http_die("internal server error while writing file data");
+        }
+      
+      }
+      fuplog($to,$fkey,$ndata);
+      debuglog("upload successfull, dkey=$dkey");
+    }
+  }
+}
+
+
+# check recipients restriction
+sub check_rr {
+  my $from = shift;
+  my @to = @_;
+  my $rr = "$from/\@ALLOWED_RECIPIENTS";
+  my ($allowed,$to,$ar,$rd);
+  
+  if (-s $rr and open $rr,'<',$rr) {
+      
+    foreach $to (@to) {
+      $allowed = 0;
+      seek $rr,0,0;
+      while (<$rr>) {
+        chomp;
+        s/#.*//;
+        s/\s//g;
+        
+        if (/^\@LOCAL_RDOMAINS/) {
+          $ar = '(@';
+          foreach $rd (@local_rdomains) {
+            # allow wildcard *, but not regexps
+            $rd =~ s/\./\\./g;
+            $rd =~ s/\*/[\\w.-]+/g;
+            $ar .= '|[^\@]+\@' . $rd;
+          }
+          $ar .= ')';
+        } else {
+          # allow wildcard *, but not regexps
+          $ar = quotemeta $_;
+          $ar =~ s/\\\*/[^@]*/g;
+        }
+        
+        if ($to =~ /^$ar$/i or 
+          $to !~ /@/ and $mdomain and "$to\@$mdomain" =~ /^$ar$/i) {
+            $allowed = 1;
+            last;
+          }
+      }
+      
+      unless ($allowed) {
+        fuplog("ERROR: $from not allowed to fex to $to");
+        debuglog("$to not in $spooldir/$from/\@ALLOWED_RECIPIENTS");
+        http_die("You ($from) are not allowed to fex to $to");
+      }
+    }
+    
+    close $rr;
+  }
+}
+
+
+# forward-copy an already uploaded file
+sub forward {
+  my $file = shift;
+  my ($nfile,$to,$AB);
+  my ($filename);
+  my (%to);
+
+  http_die("no file data for <tt>$file</tt>") unless -f "$file/data";
+
+  if (@to) {
+
+    # check recipients restriction
+    check_rr($from,@to);
+
+    # read aliases from address book
+    if (open $AB,'<',"$from/\@ADDRESS_BOOK") {
+      while (<$AB>) {
+        s/#.*//;
+        $_ = lc $_;
+        if (s/^\s*(\S+)[=\s]+(\S+)//) {
+          my ($alias,$address) = ($1,$2);
+          foreach my $address (split(",",$address)) {
+            $address .= '@'.$mdomain if $mdomain and $address !~ /@/;
+            push @{$ab{$alias}},$address;
+          }
+        }
+      }
+      close $AB;
+    }
+
+    # collect addresses
+    foreach $to (@to) {
+      if ($ab{$to}) {
+        foreach my $address (@{$ab{$to}}) {
+          $to{$address} = $address;
+        }
+      } else {
+        $to .= '@'.$mdomain if $mdomain and $to !~ /@/;
+        $to{$to} = $to;
+      }
+    }
+
+    http_header('200 OK');
+    print html_header($head);
+
+    @to = keys %to;
+    
+    foreach $to (@to) {
+      $to =~ s/:\w+=.*//; # remove options from address
+      $nfile = $file;
+      $nfile =~ s:.*?/:$to/:;
+      next if $nfile eq $file;
+      mkdirp($nfile);
+      http_die("cannot create directory $nfile") unless -d $nfile;
+      unlink "$nfile/data",
+             "$nfile/upload",
+             "$nfile/autodelete",
+             "$nfile/error",
+             "$nfile/download",
+             "$nfile/restrictions",
+             "$nfile/keep",
+             "$nfile/header",
+             "$nfile/id",
+             "$nfile/speed",
+             "$nfile/comment",
+             "$nfile/notify";
+      if ($comment) {
+        open $comment,'>',"$nfile/comment";
+        print {$comment} $comment;
+        close $comment;
+      }
+      if ($autodelete =~ /^(DELAY|NO|\d+)$/i) {
+        symlink($autodelete,"$nfile/autodelete");
+      }
+      symlink($keep||$keep_default,         "$nfile/keep");
+                    copy("$file/id",        "$nfile/id");
+      $filename   = copy("$file/filename",  "$nfile/filename");
+      link               "$file/data",      "$nfile/data"
+        or die http_die("cannot create $nfile/data - $!");
+      unless ($dkey = readlink("$nfile/dkey") and -l "$dkeydir/$dkey") {
+        $dkey = randstring(8);
+        unlink "$dkeydir/$dkey";
+        symlink "../$nfile","$dkeydir/$dkey" or die "cannot symlink $dkeydir/$dkey";
+        unlink "$nfile/dkey";
+        symlink $dkey,"$nfile/dkey";
+      }
+      
+      if ($nomail) {
+        if ($filename) {
+          my $url = "$durl/$dkey/".normalize_filename($filename);
+          pq(qq(
+            'Download-URL for $to:<br>'
+            '<tt>$url</tt>'
+            '<p>'
+          ));
+        }
+      } else {
+        my $locale = readlink "$to/\@LOCALE" || $::locale 
+          || readlink "$file/locale" || 'english';
+        my $lf = untaint("$FEXHOME/locale/$locale/lib/lf.pl");
+        require $lf if -f $lf;
+        if ($notify{$locale}) {
+          mksymlink("$nfile/locale",$locale);
+        } else {
+          $locale = 'english';
+          $notify{$locale} = \&notify unless $notify{$locale};
+        }
+        &{$notify{$locale}}(
+          status	=> "new",
+          dkey	   	=> $dkey,
+          filename	=> $filename,
+          keep		=> $keep||$keep_default,
+          comment    	=> $comment||'',
+          autodelete 	=> $autodelete,
+        );
+        fuplog($to,urlencode($filename),"(forwarded)");
+        if ($filename) {
+          pq(qq(
+            'File "$filename" copy-forwarded to $to and notified.'
+            '<p>'
+          ));
+        }
+      }
+    }
+    pq(qq(
+      '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+      '</body></html>'
+    ));
+  } else {
+    $filename = filename($file);
+    http_header('200 OK');
+    print html_header($head);
+    pq(qq(
+      '<form name="upload"'
+      '      action="/fup"'
+      '      method="post"'
+      '      accept-charset="UTF-8"'
+      '      enctype="multipart/form-data">'
+      '  <input type="hidden" name="akey"    value="$akey">'
+      '  <input type="hidden" name="dkey"    value="$dkey">'
+      '  <input type="hidden" name="command" value="FORWARD">'
+      '  forward a copy of "<tt>$filename</tt>" to:<br>'
+      '  <input type="text" name="to" size="80">'
+      '</form>'
+      '</body></html>'
+    ));
+  }
+}
+
+
+# modify file parameter
+sub modify {
+  my $file = shift;
+  my $filename = filename($file);
+  my $to;
+  my @parameter;
+
+  http_die("no file data for <tt>$file</tt>") unless -f "$file/data";
+
+  $to = $file;
+  $to =~ s:/.*::;
+  if ($specific{'keep'}) {
+    mksymlink("$file/keep",$keep);
+    utime time,time,"$file/filename";
+    push @parameter,'KEEP';
+  }
+  if ($specific{'autodelete'}) {
+    mksymlink("$file/autodelete",$autodelete);
+    push @parameter,'AUTODELETE';
+  }
+  if ($comment) {
+    if (open $comment,'>',"$file/comment") {
+      print {$comment} $comment;
+      close $comment;
+    }
+    notify(
+      status	 => "new",
+      dkey	 => $dkey,
+      filename	 => $filename,
+      keep	 => $keep||$keep_default,
+      comment	 => $comment,
+      autodelete => $autodelete,
+    );
+    push @parameter,'COMMENT';
+  }
+  http_header('200 OK');
+  print "Parameter ".join(',',@parameter)." modified for $filename for $to\n";
+}
+
+
+sub calcsize {
+  my ($tsize,$nsize) = @_;
+  if ($tsize<2097152) {
+    return sprintf "%d kB",int($nsize/1024);
+  } else {
+    return sprintf "%d MB",int($nsize/1048576);
+  }
+}
+
+
+# read one line from STDIN (net socket) and assign it to $_
+# returns number of read bytes
+sub nvt_read {
+  my $len = 0;
+
+  if (defined ($_ = <STDIN>)) {
+    debuglog($_);
+    $len = length;
+    $rb += $len;
+    s/\r?\n//;
+  }
+  return $len;
+}
+
+
+# read forward to given pattern
+sub nvt_skip_to {
+  my $pattern = shift;
+
+  while (&nvt_read) { return if /$pattern/ }
+}
+
+
+# set parameter variables
+sub setparam {
+  my ($v,$vv) = @_;
+  my ($idf,$to);
+  
+  $v = uc(despace($v));
+  $param{$v} = $vv;
+  if ($v eq 'LOGOUT') {
+    $logout = $v;
+    # skey and gkey are persistant!
+    $akey = $1 if $ENV{QUERY_STRING} =~ /AKEY:(\w+)/i;
+    unlink "$akeydir/$akey";
+    $login = $FEXHOME.'/cgi-bin/login';
+    if (-x $login) {
+      $login = readlink $login || 'login';
+      nvt_print(
+        "HTTP/1.1 302 Found",
+        "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/$login",
+        'Content-Length: 0',
+        ""
+      );
+      exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+      exit;
+    }
+  } elsif ($v eq 'LOCALE' and $vv =~ /^(\w+)$/) {
+    $locale = $vv;
+  } elsif ($v eq 'REDIRECT' and $vv =~ /^([\w?=]+)$/) {
+    $redirect = $vv;
+  } elsif (($v eq 'KEY' or $v eq 'SKEY') and $vv =~ /^([\w:]+)$/) { 
+    $skey = $1;
+  } elsif ($v eq 'GKEY' and $vv =~ /^([\w:]+)$/) { 
+    $gkey = $1 unless $nomail;
+  } elsif ($v eq 'DKEY' and $vv =~ /^(\w+)$/) { 
+    $dkey = $1;
+  } elsif ($v eq 'AKEY' and $vv =~ /^(\w+)$/) { 
+    $akey = $1;
+  } elsif ($v eq 'FROM' or $v eq 'USER') { 
+    $from = lc(normalize(despace($vv)));
+    checkchars('from address',$from);
+    $from =~ s:/:_:g;
+    $from =~ s:^\.:_:;
+    $from = untaint($from);
+  } elsif ($v eq 'REPLYTO') { 
+    $replyto = lc(normalize(despace($vv)));
+    checkchars('replyto address',$replyto);
+    $replyto = untaint($replyto);
+  } elsif ($v eq 'ADDTO') {
+    $vv =~ s/\s.*//;
+    $vv =~ s/[<>]//g;
+    $addto = untaint(lc($vv)); # if checkaddress($vv);
+  } elsif ($v eq 'SUBMIT') {
+    $submit = $vv;
+  } elsif ($v eq 'FEXYOURSELF') {
+    $submit = $vv;
+    @to = ($from);
+  } elsif ($v eq 'TO') {
+    # extract AUTODELETE and KEEP options
+    if ($vv =~ s/[\s,]+AUTODELETE=(\w+)//i) {
+      $specific{'autodelete'} = $autodelete = uc($1);
+    }
+    if ($vv =~ s/[\s,]+KEEP=(\d+)//i) {
+      $keep = $1;
+      $keep = $keep_max if $keep_max and $keep > $keep_max;
+      $specific{'keep'} = $keep;
+    }
+    $to	= normalize(lc($vv));
+    $to	=~ s/[\n\s;,]+/,/g;
+    if ($from) {
+      if ($to eq '.') {
+        $to = $from;
+      }
+      if ($to eq '//') {
+        $to = $from;
+        $comment = '//';
+      }
+    }
+    checkchars('to address',$to);
+    push @to,split(',',$to);
+  } elsif ($v eq 'ID') {
+    $id	= despace($vv);
+    checkchars('auth-ID',$id);
+  } elsif ($v eq 'TCE') {
+    $test = despace($vv);
+  } elsif ($v eq 'OKEY' and $vv =~ /^(\w+)$/) {
+    $okey = $1;
+  } elsif ($v eq 'FILEID' and $vv =~ /^(\w+)$/) {
+    $fileid = $1;
+  } elsif ($v eq 'CONTENTLENGTH' and $vv =~ /^(\d+)$/) {
+    $contentlength = $1;
+  } elsif ($v eq 'FILE' or $v eq 'FILENAME') {
+    $file = strip_path(normalize($vv));
+  } elsif ($v eq 'UID' and $vv =~ /^(\w+)$/) {
+    $uid = $1;
+  } elsif ($v eq 'ID_FORGOTTEN') {
+    $id_forgotten = $vv;
+  } elsif ($v eq 'SHOWSTATUS' and $vv =~ /^(\w+)$/) {
+    $showstatus = $uid = $1;
+  } elsif ($v eq 'COMMENT') {
+    $comment = decode_utf8(normalize($vv));
+    $comment =~ s/^\s*!\.!/!SHORTMAIL!/;
+    $comment =~ s/^!#!/!NOMAIL!/;
+    $comment =~ s/^!-!/!NOSTORE!/;
+    $nomail = $comment if $comment =~ /NOMAIL/;
+    $nostore = $nomail = $comment if $comment =~ /NOSTORE/;
+    $bcc .= " $from"   if $comment =~ s/\s*!bcc!?\s*//i;
+    # backward compatibility
+    foreach my $cmd (qw(
+      DELETE LIST CHECKQUOTA CHECKRECIPIENT RECEIVEDLOG SENDLOG FOPLOG FORWARD
+    )) { $command = $comment if $comment eq $cmd }
+  } elsif ($v eq 'COMMAND') {
+    $command = normalize($vv);
+  } elsif ($v eq 'BWLIMIT' and $vv =~ /^(\d+)$/) {
+    $bwlimit = $1;
+  } elsif ($v eq 'SEEK' and $vv =~ /^(\d+)$/) {
+    $seek = $1;
+  } elsif ($v eq 'FILESIZE' and $vv =~ /^(\d+)$/) {
+    $filesize = $1; # complete filesize! 
+    &check_space($filesize-$seek);
+  } elsif ($v eq 'AUTODELETE' and $vv =~ /^(\w+)$/) {
+    $specific{'autodelete'} = $autodelete = uc($1);
+  } elsif ($v eq 'KEEP' and $vv =~ /^(\d+)$/) {
+    $keep = $1;
+    $keep = $keep_max if $keep_max and $keep > $keep_max;
+    $specific{'keep'} = $keep;
+  } elsif ($v eq 'TIMEOUT' and $vv =~ /^(\d+)$/) {
+    $specific{'timeout'} = $timeout = $1;     
+  }
+}
+
+
+sub id_forgotten {
+  my ($id,$to,$subuser,$gm,$skey,$gkey,$url,$fup);
+  
+  return if $nomail;
+  
+  $fup = $durl;
+  $fup =~ s:/fop:/fup:;
+  
+  # full user
+  if (open $from,'<',"$from/\@") {
+    $id = getline($from);
+    close $from;
+  }
+  if ($id) {
+    $url = "$fup/".b64("from=$from&id=$id");
+    mail_forgotten($from,qqq(qq(
+      'Your reqested F*EX auth-ID for $fup?from=$from is:'
+      '$id'
+      ''
+      'Or use:'
+      '$url'
+    )));
+    exit;
+  }
+  
+  # sub user
+  foreach my $skey (glob("$skeydir/*")) {
+    if (-f $skey and open $skey,'<',$skey) {
+      while (<$skey>) {
+        $_ = lc;
+        if (/^(\w+)=(.+)/) {
+          $subuser = $2 if $1 eq 'from';
+          $to	   = $2 if $1 eq 'to';
+        }
+      }
+      close $skey;
+    }
+    if ($from and $to and $from eq $subuser) {
+      $skey =~ s:.*/::;
+      mail_forgotten($subuser,qqq(qq(
+        'Your reqested F*EX login is:'
+        ''
+        '$fup?skey=$skey'
+      )));
+      exit;
+    }
+  }
+  
+  # group user
+  foreach my $gkey (glob("$gkeydir/*")) {
+    if (-f $gkey and open $gkey,'<',$gkey) {
+      while (<$gkey>) {
+        $_ = lc;
+        if (/^(\w+)=(.+)/) {
+          $gm = $2 if $1 eq 'from';
+          $to = $2 if $1 eq 'to';
+        }
+      }
+      close $gkey;
+    }
+    if ($gm and $to and $from eq $gm) {
+      $gkey =~ s:.*/::;
+      mail_forgotten($gm,qqq(qq(
+        'Your reqested F*EX login is:'
+        ''
+        '$fup?gkey=$gkey'
+      )));
+      exit;
+    }
+  }
+  http_die("<tt>$from</tt> is not a F*EX user on this server");
+}
+
+
+sub mail_forgotten {
+  my $user = shift;
+  my @msg = @_;
+  local *P;
+
+  return if $nomail;
+
+  open P,'|-',$sendmail,$user,$bcc or http_die("cannot start sendmail - $!\n");
+  pq(P,qq(
+    'From: $admin'
+    'To: $user'
+    'Subject: F*EX service $hostname'
+    'X-Mailer: F*EX'
+    ''
+  ));
+  print P @msg;
+  close P or http_die("cannot send mail - $!\n");
+  http_header('200 OK');
+  print html_header($head);
+  print "<h3>Mail has been sent to you ($from)</h3>\n";
+  print "</body></html>\n";
+}
+
+
+# lookup akey, skey and gkey (full and sub user and group)
+sub check_keys {
+
+  # only one key can be valid
+  $akey = $gkey = '' if $skey;
+  $akey = $skey = '' if $gkey;
+
+  if ($skey) {
+    # encrypted SKEY?
+    if ($skey =~ s/^MD5H:(.+)/$1/) {
+      # search real SKEY
+      foreach my $s (glob "$skeydir/*") {
+        $s =~ s:.*/::;
+        if ($skey eq md5_hex($s.$sid)) {
+          $skey = $s;
+          last;
+        }
+      }
+    }
+    if (open $skey,'<',"$skeydir/$skey") {
+      $akey = $gkey = '';
+      while (<$skey>) {
+        if (/^(\w+)=(.+)/) {
+          $from      = $2   if lc($1) eq 'from';
+          @to	     = ($2) if lc($1) eq 'to';
+          $rid = $id = $2   if lc($1) eq 'id';
+        }
+      }
+      close $skey;
+    } else {
+      # $skey = '';
+      http_die("invalid SKEY <tt>$skey</tt>");
+    }
+  }
+
+  if ($gkey) {
+    # encrypted GKEY?
+    if ($gkey =~ s/^MD5H:(.+)/$1/) {
+      # search real GKEY
+      foreach my $g (glob "$gkeydir/*") {
+        $g =~ s:.*/::;
+        if ($gkey eq md5_hex($g.$sid)) {
+          $gkey = $g;
+          last;
+        }
+      }
+    }
+    if (open $gkey,'<',"$gkeydir/$gkey") {
+      $akey = $skey = '';
+      while (<$gkey>) {
+        if (/^(\w+)=(.+)/) {
+          $from      = $2 if lc($1) eq 'from';
+          $to	     = $2 if lc($1) eq 'to';
+          $rid = $id = $2 if lc($1) eq 'id';
+          # $user    = $2 if lc($1) eq 'user';
+        }
+      }
+      close $gkey;
+      @to = ($to);
+    } else {
+      # $gkey = '';
+      http_die("invalid GKEY <tt>$gkey</tt>");
+    }
+  }
+
+  if ($akey and not $id) {
+    my $idf;
+
+    # sid is not set with web browser
+    # akey with sid is set with schwuppdiwupp & co
+    $idf = "$akeydir/$akey/@";
+    
+    if (open $idf,'<',$idf and $id = getline($idf)) {
+      close $idf;
+      $from = readlink "$akeydir/$akey"
+        or http_die("internal server error: no $akey symlink");
+      $from =~ s:.*/::;
+      $from = untaint($from);
+      if ($akey ne md5_hex("$from:$id")) {
+        $from = $id = '';
+      }
+    } else {
+      $akey = '';
+    }
+  }
+
+}
+
+
+# check if there is enough space on spool
+sub check_space {
+  my $req = shift;
+  my ($df,$free,$uprq);
+  local *P;
+  
+  if (open $df,"df -k $spooldir|") {
+    while (<$df>) {
+      if (/^.+?\s+\d+\s+\d+\s+(\d+)/ and $req/1024 > $1) {
+        $free = int($1/1024);
+        $uprq = int($req/1024/1024);
+        if (not $nomail and open P,"|$sendmail -t") {
+          pq(P,qq(
+            'From: $admin'
+            'To: $admin'
+            'Subject: F*EX spool out of space'
+            ''
+            'F*EX spool $spooldir on $ENV{SERVER_NAME} is out of space.'
+            ''
+            'Current free space: $free MB'
+            'Upload request: $uprq MB'
+          ));
+          close P;
+        }
+        debuglog("aborting because not enough free space in spool ($free MB)");
+        http_die("not enough free space for this upload");
+      }
+    }
+    close $df;
+  }
+}
+
+
+# global substitution as a function like in gawk
+sub gsub { 
+  local $_ = shift;
+  my ($p,$r) = @_; 
+  s/$p/$r/g; 
+  return $_;
+}
+
+
+# standard log
+sub fuplog {
+  my $msg = "@_";
+  
+  $msg =~ s/\n/ /g;
+  $msg =~ s/\s+$//;
+  
+  if (open $log,'>>',$log) {
+    flock $log,LOCK_EX;
+    seek $log,0,SEEK_END;
+    printf {$log} "%s [%s_%s] %s (%s) %s\n",
+                  isodate(time),$$,$ENV{REQUESTCOUNT},$from,$fra,$msg;
+    close $log;
+  }
+}
+
+
+sub sigdie {
+  local $_ = shift;
+  chomp;
+  sigexit('DIE',$_);
+}
+
+
+sub sigexit {
+  my ($sig) = @_;
+  my $msg;
+  my $to = join(',',@to);
+  
+  $msg = @_ ? "@_" : '???';
+  $msg =~ s/\n/ /g;
+  $msg =~ s/\s+$//;
+  
+  if (open $log,'>>',$log) {
+    printf {$log} 
+           "%s %s (%s) %s %s caught SIGNAL %s %s\n",
+           isodate(time),
+           $from||'-',
+           $fra||'-',
+           $to||'-',
+           encode_Q($file||'-'),
+           $msg,
+           $rb?"(after $rb bytes)":"";
+    close $log;
+  }
+  $SIG{__DIE__} = '';
+  if ($sig eq 'DIE') {
+    shift;
+    die "$msg\n";
+  } else {
+    die "SIGNAL $msg\n";
+  }
+}
+
+
+sub mtime {
+  my @s = lstat shift;
+  return @s ? $s[9] : undef;
+}
+
+
+sub present_locales {
+  my $url = shift;
+  my @locales = @::locales;
+
+  if ($url =~ /\?/) { 
+    $url .= "&";
+    $url =~ s/locale=\w+&//g;
+  } else { 
+    $url .= "?";
+  }
+  
+  if (@locales) {
+    map { $_ = "$FEXHOME/locale/$_" } @locales;
+  } else {
+    @locales = glob "$FEXHOME/locale/*";
+  }
+      
+  print "<h3>";
+  foreach my $locale (@locales) {
+    if (-x "$locale/cgi-bin/fup") {
+      my $lang = "$locale/lang.html";
+      $locale =~ s:.*/::;
+      # offer only those locales defined in fex.ph (default=all)
+      if (@locales) {
+        grep /^$locale$/,@locales or next;
+        next if @locales == 1;
+      }
+      if (open $lang,'<',$lang and $lang = getline($lang)) {
+        close $lang;
+      } else {
+        $lang = $locale;
+      }
+      print "<a href=\"${url}locale=$locale\">$lang</a> ";
+    }
+  }
+  print "</h3>\n";
+}
+
+
+sub check_camel {
+  my ($logo,$camel);
+  local $\;
+  
+  if (open $logo,"$docdir/logo.jpg") {
+    $camel = md5_hex(<$logo>) eq 'ad8a95bba8dd1a61d70bd38611bc2059';
+  }
+  if ($camel and open $logo,"$docdir/action-fex-camel.gif") {
+    $camel = md5_hex(<$logo>) eq '1f3d7acc70377496f95c5adddaf4ca7b';
+  }
+  http_die("Missing camel") unless $camel;
+}

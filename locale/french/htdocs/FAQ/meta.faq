@@ -1,0 +1,48 @@
+<html><pre>
+
+Q: Pourquoi "F*EX" comme nom et pas simplement "FEX"
+A: À l'époque de l'annonce du logiciel, il existait déja un programme (plus ancien) nommé "FEX" sur 
+   freshmeat.net.
+
+Q: Pourquoi ne pas utiliser un service commercial comme DropLoad, ALLPeers, YouSendIt, etc ?
+A: <ul>
+   <li>Ils ont une limite de 2GB ou moins.
+   <li>Leur politique de sécurité et de confidentialité est inconnue.
+   <li>Ils ne sont pas opensource.
+   <li>Il n'y a pas d'interface en ligne de commande (CLI) UNIX.
+   <li>Ils ont besoin de java, active-X, flash ou d'autres plugins esotériques.
+   <li>On ne sait pas combien de temps ils vont exister - DropLoad and ALLPeers ont déja cessé leur activité.
+   </ul>
+   
+Q: Pourquoi un chameau comme logo ?
+A: Le logo est inspiré du chameau de Perl, mais il est basé sur un chameau "Steiff plush"
+   qui courent avec nous lors de nos courses de tandem. Le logo a été dessiné par mon "chauffeur" Beate.
+   http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html
+
+Q: Où puis-je récupérer les sources de F*EX ?
+A: http://fex.rus.uni-stuttgart.de/fex.html
+
+Q: Perl n'est-il pas trop lent pour faire tout ça ?
+A: fex.rus.uni-stuttgart.de tourne sur un ordinateur de bureau et est capable de gérer des uploads
+   à plus de 300 MB/s. Essayer donc ça avec un serveur web généraliste comme Apache !
+
+Q: De quoi ais-je besoin de pour installer F*EX ?
+A: D'une machine UNIX avec une entrée DNS et un service smtp fonctionnel. Vous devez être root sur la machine.
+
+Q: Qu'est-ce que DNS et smtp ?
+A: N'installez pas F*EX. Ce n'est pas fait pour vous.
+
+Q: Qui est l'auteur ?
+A: Ulli Horlacher framstag@rus.uni-stuttgart.de
+
+Q: Quel est la licence de F*EX ?
+A: Perl Artistic free software
+
+Q: Est-ce qu'il y a une mailing list F*EX ?
+A: https://listserv.uni-stuttgart.de/mailman/listinfo/fex
+
+Q: Où puis-je avoir un support commercial pour F*EX ?
+A: Contacter fex@nepustil.net http://www.nepustil.net/
+
+Q: J'ai encore des questions !
+A: Demandez directement à l'auteur framstag@rus.uni-stuttgart.de

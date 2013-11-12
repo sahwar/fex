@@ -1,0 +1,788 @@
+#!/usr/bin/perl -w
+
+# CLI client for the FEX service for retrieving files
+#
+# see also: fexsend
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+# Copyright: Perl Artistic
+
+use 5.006;
+use strict qw'vars subs';
+use Config;
+use POSIX;
+use Encode;
+use Getopt::Std;
+use Socket;
+use IO::Handle;
+use IO::Socket::INET;
+use Time::HiRes 'time';
+use constant k => 2**10;
+use constant M => 2**20;
+
+eval 'use Net::INET6Glue::INET_is_INET6';
+
+our $SH;
+our ($fexhome,$idf,$tmpdir,$windoof,$useragent);
+our $bs = 2**16; # blocksize for tcp-reading and writing file
+our $version = 20130805;
+our $CTYPE = 'ISO-8859-1';
+our $fexsend = $ENV{FEXSEND} || 'fexsend';
+
+
+# inquire default character set
+# cannot use "use I18N::Langinfo" because of no windows support!
+eval {
+  local $^W = 0;
+  require I18N::Langinfo;
+  I18N::Langinfo->import(qw'langinfo CODESET');
+  $CTYPE = langinfo(CODESET());
+};
+
+$version = mtime($0) unless $version;
+
+if ($Config{osname} =~ /^mswin/i) {
+  $windoof = $Config{osname};
+  $ENV{HOME} = $ENV{USERPROFILE};
+  $fexhome = $ENV{FEXHOME} || $ENV{HOME}.'/fex';
+  $tmpdir = $ENV{FEXTMP} || $ENV{TMP} || "$fexhome/tmp";
+  $idf = "$fexhome/id";
+  $useragent = sprintf("fexget-$version (%s %s)",
+                       $Config{osname},$Config{archname});
+  chdir $ENV{USERPROFILE}.'\Desktop';
+  # open XX,'>XXXXXX';close XX;
+} else {
+  $0 =~ s:(.*)/:: and $ENV{PATH} .= ":$1";
+  $fexhome = $ENV{FEXHOME} || $ENV{HOME}.'/.fex';
+  $tmpdir = $ENV{FEXTMP} || "$fexhome/tmp";
+  $idf = "$fexhome/id";
+  $_ = `(lsb_release -d||uname -a)2>/dev/null`||'';
+  chomp;
+  s/^Description:\s+//;
+  $useragent = "fexget-$version ($_)";
+}
+
+$| = 1;
+
+
+my $usage = <<EOD;
+usage: $0 [-v] [-m limit] [-s filename] [-o] [-k] [-X] [-P proxy:port] F*EX-URL(s)
+   or: $0 [-v] -d F*EX-URL(s)
+   or: $0 [-v] -f F*EX-URL(s) e-mail-address
+   or: $0 [-v] -a
+   or: $0 -l [-i tag]
+options: -v verbose mode
+         -m limit kB/s
+         -s save to filename (-s- means: write to STDOUT/pipe)
+         -o overwrite existing file
+  	 -k keep on server after download
+  	 -X do not extract archive files
+  	 -d delete without download
+  	 -f forward a file to another recipient
+         -a get all files (implies -X)
+  	 -l list files on server
+         -i tag alternate server/account, see: $fexsend -h
+         -P use Proxy for connection to the F*EX server
+argument: F*EX-URL may be file number (see: $0 -l)
+EOD
+
+if ($windoof and not @ARGV and not $ENV{PROMPT}) {
+  # restart with cmd.exe to have mouse cut+paste
+  my $cmd = "cmd /k \"$0\"";
+  # print "$cmd\n";
+  exec $cmd;
+  exit;
+}
+
+my $atype = '\.(tgz|tar|zip|7z)$';
+my $proxy = '';
+my $proxy_prefix = '';
+my $chunksize;
+
+our ($opt_h,$opt_v,$opt_l,$opt_d,$opt_m,$opt_z,$opt_K,$opt_o,$opt_a);
+our ($opt_s,$opt_k,$opt_i,$opt_V,$opt_X,$opt_f, $opt_P);
+$opt_m = $opt_h = $opt_v = $opt_l = $opt_d = $opt_K = $opt_o = $opt_a = 0;
+$opt_V = $opt_X = $opt_f = 0;
+${'opt_+'} = 0;
+$opt_s = $opt_k = $opt_i = $opt_P = '';
+getopts('hvVldkzoaXf+m:s:i:K:P:') or die $usage;
+$opt_k = '?KEEP' if $opt_k;
+
+if ($opt_m =~ /(\d+)/) {
+  $opt_m = $1
+} else {
+  $opt_m = 0
+}
+
+print "Version: $version\n" if $opt_V;
+die $usage                  if $opt_h;
+
+my $ffl = "$tmpdir/fexget"; 		# F*EX files list (cache)
+
+my @rcamel = (
+'[A
+(_*)  _  _     
+   \\\\/ \\/ \\
+    \  __  )=*
+    //\\\\//\\\\   
+',
+'[A     \\\\/\\\\/ 
+',
+'[A    //\\\\//\\\\
+');
+
+# get fexlog
+if ($opt_z) {
+  my $cmd = "$fexsend -Z";
+  $cmd .= " -i $opt_i" if $opt_i;
+  warn "$cmd\n" if $opt_v;
+  exec $cmd;
+  die "$0: cannot run $cmd : $!\n";
+}
+
+if ($opt_l) {
+  &list;
+  exit;
+}
+
+if ($opt_P) {
+  if ($opt_P =~ /^([\w.-]+:\d+)(:(\d+))?/) {
+    $proxy = $1;
+    $chunksize = $3 || 0;
+  } else {
+    die "$0: proxy must be: SERVER:PORT\n";
+  }
+}
+
+if ($opt_a) {
+  $opt_X = $opt_a;
+  die $usage if @ARGV;
+  &list;
+  print "\n";
+  if (open $ffl,$ffl) {
+    while (<$ffl>) {
+      push @ARGV,$1 if /^\s+(\d+)/;
+    }
+    close $ffl;
+  }
+} else {
+  unless (@ARGV) {
+    if ($windoof) {
+      my $url;
+      for (;;) {
+        print "download-URL: ";
+        chomp($url = <STDIN>);
+        if ($url =~ /^http/) {
+          @ARGV = ($url);
+          last;
+        }
+      }
+    } else {
+      die $usage;
+    }
+  }
+}
+
+my ($file,%files,$download,$server,$port,$fop);
+
+if ($opt_f) {
+  unless ($ENV{FEXID} or -f $ENV{HOME}.'/.fex/id') {
+    die "$0: no local FEXID\n";
+  }
+  $opt_f = pop(@ARGV);
+  if ($opt_f =~ /^\d+$|^https?:/) {
+    die "$0: $opt_f is not an e-mail address\n";
+  }
+}
+
+foreach my $url (@ARGV) {
+
+  # do not overrun server
+  sleep 1 if $fop;
+
+  if ($url !~ /^http/) {
+    unless (%files) {
+      open $ffl,$ffl or die "$0: no $ffl, use first: $0 -l\n";
+      my $from = '';
+      while (<$ffl>) {
+        if (/^from (.+) :$/) {
+          $from = $1;
+        } elsif (/^\s*(\d+)\)\s+\d+ MB.* (http\S+)/) {
+          push @{$files{all}},$2;
+          push @{$files{$from}},$2;
+        }
+      }
+      close $ffl;
+    }
+
+    if ($url =~ /^(\d+)$/) {
+      $url = ${files{all}}[$1-1] or die "$0: unknown file number\n";
+    }
+  }
+
+  if ($url =~ m{^http(s?)://([\w\.\-]+)(:(\d+))?(/.*fop/\S+)}) {
+    $server = $2;
+    $port   = $4 || ($1?443:80);
+    $fop    = $5;
+  } else {
+    die "$0: unknown F*EX URL $url\n";
+  }
+
+  if ($proxy) {
+    if    ($port == 80)   { $proxy_prefix = "http://$server" }
+    elsif ($port == 443)  { $proxy_prefix = "" }
+    else                  { $proxy_prefix = "http://$server:$port" }
+  }
+
+  serverconnect($server,$port);
+
+  if ($opt_f) {
+    forward($url);
+    next;
+  }
+
+  if ($opt_d) {
+    my @r = del($url);
+    $_ = shift @r;
+    if (/^HTTP.* 200/) {
+      ($file) = grep { $_ = $1 if /^X-File:\s+(.+)/ } @r;
+      $file = $url unless $file;
+      $file =~ s:.*/::;
+      printf "%s deleted\n",urldecode($file);
+    } else {
+      s:HTTP/[\d\. ]+::;
+      die "$0: server response: $_";
+    }
+    next;
+  }
+
+  if ($opt_K) {
+    my @r = keep($url);
+    $_ = shift @r;
+    if (/^HTTP.* 200/) {
+      $file = $url;
+      $file =~ s:.*/::;
+      print "$file kept\n";
+    } else {
+      s:HTTP/[\d\. ]+::;
+      die "$0: server response: $_";
+    }
+    next;
+  }
+
+  $download = download($server,$port,$fop);
+  exit if $opt_s eq '-';
+  unlink $download unless -s $download;
+  exit 2 unless -f $download;
+  
+  if ($windoof) {
+    print "READY\n";
+    exit;
+  }
+
+  if (not $opt_X and $download =~ /\.gpg$/) {
+    if (-t) {
+      print "decrypt \"$download\"? ";
+      $_ = <STDIN>||'y';
+      unless (/^[y\n]/i) {
+        print "keeping \"$download\"\n";
+        exit;
+      }
+    }
+    if (system('gpg',$download) == 0) {
+      unlink $download;
+      $download =~ s/\.gpg$//;
+    }
+  }
+
+  if (not $opt_X and $download =~ /$atype/) {
+    if (-t) {
+      print "Files in archive:\n";
+      if ($download =~ /\.tgz$/) {
+        system qw'tar tvzf',$download;
+        &cont;
+        system qw'tar xvzf',$download;
+      } elsif ($download =~ /\.tar$/) {
+        system qw'tar tvf',$download;
+        &cont;
+        system qw'tar xvf',$download;
+      } elsif ($download =~ /\.zip$/i) {
+        system qw'unzip -l',$download;
+        &cont;
+        system qw'unzip',$download;
+      } elsif ($download =~ /\.7z$/i) {
+        system qw'7z l',$download;
+        &cont;
+        system qw'7z x',$download;
+      } else {
+        die "$0: unknown archive \"$download\"\n";
+      }
+    } else {
+      if    ($download =~ /\.tgz$/)  { system qw'tar xvzf',$download }
+      elsif ($download =~ /\.tar$/)  { system qw'tar xvf',$download }
+      elsif ($download =~ /\.zip$/i) { system qw'unzip',$download }
+      elsif ($download =~ /\.7z$/i)  { system qw'7z x',$download }
+      else                           { die "$0: unknown archive \"$download\"\n" }
+    }
+    if ($? == 0) {
+      unlink $download;
+    } else {
+      die "$0: keeping \"$download\"\n";
+    }
+  }
+
+}
+
+exit;
+
+sub cont {
+  unless ($windoof) {
+    print "extract these files (Y/n)? ";
+    $_ = <STDIN>||'y';
+    unless (/^[y\n]/i) {
+      print "keeping \"$download\"\n";
+      exit;
+    }
+  }
+}
+
+sub del {
+  my $url = shift;
+  my ($server,$port);
+  my $del;
+  my @r;
+
+  if ($url =~ m{^http(s?)://([\w\.\-]+)(:(\d+))?(/fop/.+)}) {
+    $server = $2;
+    $port   = $4 || ($1?443:80);
+    $del    = $5.'?DELETE';
+  } else {
+    die "$0: unknown F*EX URL $url\n";
+  }
+
+  sendheader("$server:$port","GET $del HTTP/1.1","User-Agent: $useragent");
+  while (<$SH>) {
+    s/\r//;
+    last if /^\n/; # ignore HTML output
+    warn "<-- $_" if $opt_v;
+    push @r,$_;
+  }
+  die "$0: no response from fex server $server\n" unless @r;
+  return @r;
+}
+
+
+sub forward {
+  my $url = shift;
+  my ($server,$port);
+  my ($uri,$dkey,$list,$cmd,$n);
+  my @r;
+
+  if ($url =~ m{^http(s?)://([\w\.\-]+)(:(\d+))?(/fop/.+)}) {
+    $server = $2;
+    $port   = $4 || ($1?443:80);
+    $uri    = $5;
+  } else {
+    die "$0: unknown F*EX URL $url\n";
+  }
+
+  sendheader(
+    "$server:$port",
+    "GET $uri?COPY HTTP/1.1",
+    "User-Agent: $useragent",
+  );
+  
+  $_ = <$SH>;
+  die "$0: no reply from fex server $server\n" unless $_;
+  warn "<-- $_" if $opt_v;
+  
+  unless (/^HTTP.*200/) {
+    s/^HTTP.... \d+ //;
+    die "$0: $_";
+  }
+  
+  while (<$SH>) {
+    s/\r//;
+    last if /^\n/; # ignore HTML output
+    $dkey = $1 if /^Location:.*\/(\w+)\/.+/;
+    warn "<-- $_" if $opt_v;
+  }
+
+  $cmd = 'fexsend -l >/dev/null 2>&1';
+  print "$cmd\n" if $opt_v;
+  system 'fexsend -l >/dev/null 2>&1';
+  $list = $ENV{HOME}.'/.fex/tmp/fexlist';
+  open $list,$list or die "$0: cannot open $list - $!\n";
+  while (<$list>) {
+    if (/^\s+(\d+)\) (\w+)/ and $2 eq $dkey) {
+      $n = $1;
+      $cmd = "fexsend -b $n $opt_f";
+      print "$cmd\n" if $opt_v;
+      system $cmd;
+      last;
+    }
+  }
+  close $list;
+  
+  if ($n) {
+    $cmd = "fexsend -d $n >/dev/null 2>&1";
+    print "$cmd\n" if $opt_v;
+    system $cmd;
+  } else {
+    warn "$0: forwarding failed\n";
+  }
+}
+
+
+sub keep {
+  my $url = shift;
+  my ($server,$port);
+  my $keep;
+  my (@hh,@r);
+
+  if ($url =~ m{^http(s?)://([\w\.\-]+)(:(\d+))?(/fop/.+)}) {
+    $server = $2;
+    $port   = $4 || ($1?443:80);
+    $keep    = "$5?KEEP=$opt_K";
+  } else {
+    die "$0: unknown F*EX URL $url\n";
+  }
+
+  push @hh,"GET $keep HTTP/1.1",
+           "Host: $server:$port",
+           "User-Agent: $useragent",
+           "";
+
+  foreach (@hh) {
+    warn $_,"\n" if $opt_v;
+    print $SH $_,"\r\n";
+  }
+  while (<$SH>) {
+    s/\r//;
+    last if /^\n/;
+    push @r,$_;
+  }
+  die "$0: no response from fex server $server\n" unless @r;
+  grep { warn "\t$_" } @r if $opt_v;
+  return @r;
+}
+
+
+sub download {
+  my ($server,$port,$fop) = @_;
+  my ($file,$download,$ssl,$pipe,$filesize);
+  my (@hh,@r);
+  my ($t0,$t1,$t2,$tt,$tm,$ts,$kBs,$b,$bt,$tb,$B,$buf);
+  my $length = 0;
+  my $seek = 0;
+  my $tc = 0;
+  local $_;
+  local *X;
+
+  if ($opt_s) {
+    $file = $opt_s;
+    if ($opt_s eq '-') {
+      $pipe = $download = $opt_s;
+    } elsif (-p $opt_s or -c $opt_s) {
+      $download = $opt_s;
+    } else {
+      $download = $file.'.tmp';
+      $seek = -s $download || 0;
+    }
+  } else {
+    # ask server for real file name
+    serverconnect($server, $port);
+    sendheader("$server:$port","HEAD $proxy_prefix$fop HTTP/1.1","User-Agent: $useragent");
+    my $reply = $_ = <$SH>;
+    unless (defined $_ and /\w/) {
+      die "$0: no response from server\n";
+    }
+    warn "<-- $_" if $opt_v;
+    unless (/^HTTP\/[\d.]+ 200/) {
+      s:HTTP/[\d. ]+::;
+      die "$0: server response: $_";
+    }
+    while (<$SH>) {
+      s/\r//;
+      warn "<-- $_" if $opt_v;
+      last if /^\r?\n/;
+      if (/^Content-Disposition: attachment; filename="(.+)"/i) {
+        $file = locale(decode_utf8($1));
+          $file =~ s:.*/::;
+      }
+    }
+    unless ($file) {
+      $file = $fop;
+      $file =~ s:.*/::;
+    }
+    $download = $file.'.tmp';
+    $seek = -s $download || 0;
+  }
+
+  push @hh,"GET $proxy_prefix$fop$opt_k HTTP/1.1",
+           "User-Agent: $useragent",
+           "Connection: close";
+  push @hh,"Range: bytes=$seek-" if $seek;
+
+  # HTTPS needs a new connection for actually downloading the file
+  serverconnect($server,$port) if $opt_P and $port == 443;
+  sendheader("$server:$port",@hh);
+  $_ = <$SH>;
+  die "$0: no response from fex server $server\n" unless $_;
+  s/\r//;
+
+  if (/^HTTP\/[\d.]+ 2/) {
+    warn "<-- $_" if $opt_v;
+    while (<$SH>) {
+      s/\r//;
+      warn "<-- $_" if $opt_v;
+      last if /^\r?\n/;
+      if (/^Content-length:\s*(\d+)/i) {
+        $length = $1;
+      } elsif (/^X-Size: (\d+)/i) {
+        $filesize = $1;
+      }
+    }
+  } else {
+    s/HTTP\/[\d.]+ \d+ //;
+    die "$0: bad server reply: $_";
+  }
+
+  if ($pipe) {
+    *X = *STDOUT;
+  } else {
+    if ($opt_s and $opt_s eq $download) {
+      open X,'>',$download or die "$0: cannot write to \"$download\" - $!\n";
+    } else {
+      if (-e $file and not $opt_o) {
+        die "$0: destination file \"$file\" does already exist\n";
+      }
+      if ($seek) {
+        open X,'>>',$download or die "$0: cannot write to \"$download\" - $!\n";
+      } else {
+        open X,'>',$download or die "$0: cannot write to \"$download\" - $!\n";
+      }
+    }
+  }
+
+  $t0 = $t1 = $t2 = int(time);
+  $tb = $B = 0;
+  printf STDERR "resuming at byte %s\n",$seek if $seek;
+  print $rcamel[0] if ${'opt_+'};
+  while ($B < $length and $b = read $SH,$buf,$bs) {
+    syswrite X,$buf;
+    $B += $b;
+    $tb += $b;
+    $bt += $b;
+    $t2 = time;
+    if (${'opt_+'} and int($t2*10)>$tc) {
+      print $rcamel[$tc%2+1];
+      $tc = int($t2*10);
+    }
+    if (int($t2) > $t1) {
+      $kBs = int($bt/k/($t2-$t1));
+      $kBs = int($tb/k/($t2-$t0)) if $kBs < 10;
+      $t1 = $t2;
+      $bt = 0;
+      # smaller block size is better on slow links
+      $bs = 4096 if $bs>4096 and $tb/($t2-$t0)<65536;
+      if ($tb<10*M) {
+        printf STDERR "%s: %d kB (%d%%) %d kB/s \r",
+                      $download,
+                      int(($tb+$seek)/k),
+                      int(($tb+$seek)/($length+$seek)*100),
+                      $kBs;
+      } else {
+        printf STDERR "%s: %d MB (%d%%) %d kB/s        \r",
+                      $download,
+                      int(($tb+$seek)/M),
+                      int(($tb+$seek)/($length+$seek)*100),
+                      $kBs;
+      }
+    }
+    if ($opt_m) {
+      if ($t2 == $t0 and $B > $opt_m*k) {
+        print "\nsleeping...\r" if $opt_v;
+        sleep 1;
+      } else {
+        while ($t2 > $t0 and $tb/k/($t2-$t0) > $opt_m) {
+          print "\nsleeping...\r" if $opt_v;
+          sleep 1;
+          $t2 = time;
+        }
+      }
+    }
+  }
+  close $SH;
+  close X;
+  
+  print $rcamel[2] if ${'opt_+'};
+
+  $tt = $t2-$t0;
+  $tm = int($tt/60);
+  $ts = $tt-$tm*60;
+  $kBs = int($tb/k/($tt||1));
+  if ($seek) {
+    printf STDERR "$file: %d MB, last %d MB in %d s (%d kB/s)      \n",
+                  int(($tb+$seek)/M),int($tb/M),$tt,$kBs;
+  } else {
+    printf STDERR "$file: %d MB in %d s (%d kB/s)      \n",
+                  int($tb/M),$tt,$kBs;
+  }
+
+  if ($tb != $length) {
+    if ($windoof) {
+      exec "\"$0\" @ARGV";
+      exit;
+    } else {
+      die "$0: $server annouced $length bytes, but only $tb bytes has been read\n";
+    }
+  }
+
+  unless ($pipe or -p $download or -c $download) {
+    my @s = stat $file if -e $file;
+    rename $download,$file
+      or die "$0: cannot rename \"$download\" to \"$file\" - $!\n";
+    chmod $s[2],$file if @s;
+  }
+
+  return $file;
+}
+
+
+sub list {
+  my $cmd = "$fexsend -L";
+  $cmd .= " -i $opt_i" if $opt_i;
+  if ($opt_v) {
+    $cmd .= " -v";
+    warn "$cmd\n";
+  }
+  open $cmd,"$cmd|" or die "$0: cannot run $cmd : $!\n";
+  open $ffl,'>',$ffl or die "$0: cannot open $ffl : $!\n";
+  my $n;
+  while (<$cmd>) {
+    if (/\d MB .*http/) {
+      $n++;
+      printf {$ffl} "%4d) %s",$n,$_;
+      s:http[^\"]*/::;
+      printf        "%4d) %s",$n,$_;
+    } else {
+      print;
+      print {$ffl} $_;
+    }
+  }
+}
+
+
+# set up tcp/ip connection
+sub tcpconnect {
+  my ($server,$port) = @_;
+
+  if ($port == 443) {
+    eval "use IO::Socket::SSL";
+    $SH = IO::Socket::SSL->new(
+      PeerAddr => $server,
+      PeerPort => $port,
+      Proto    => 'tcp',
+    );
+  } else {
+    $SH = IO::Socket::INET->new(
+      PeerAddr => $server,
+      PeerPort => $port,
+      Proto    => 'tcp',
+    );
+  }
+  die "cannot connect $server:$port - $@\n" unless $SH;
+  warn "TCPCONNECT to $server:$port\n" if $opt_v;
+}
+
+
+sub locale {
+  my $string = shift;
+
+  if ($CTYPE) {
+    if ($CTYPE =~ /UTF-?8/i) {
+      return $string;
+    } elsif (grep { $CTYPE =~ /^$_$/i } Encode->encodings()) {
+      return encode($CTYPE,$string);
+    } else {
+      return encode('ISO-8859-1',$string);
+    }
+  }
+
+  return $string;
+}
+
+
+sub sendheader {
+  my $sp = shift;
+  my @head = @_;
+  my $head;
+
+  push @head,"Host: $sp";
+
+  foreach $head (@head) {
+    warn "--> $head\n" if $opt_v;
+    print {$SH} $head,"\r\n";
+  }
+  warn "-->\n" if $opt_v;
+  print {$SH} "\r\n";
+}
+
+
+sub mtime {
+  my @d = localtime((stat shift)[9]);
+  return sprintf('%d%02d%02d',$d[5]+1900,$d[4]+1,$d[3]);
+}
+
+
+sub urldecode {
+  local $_ = shift;
+  s/\%([a-f\d]{2})/chr(hex($1))/ige;
+  return $_;
+}
+
+sub serverconnect {
+  my ($server,$port) = @_;
+  my $connect = "CONNECT $server:$port HTTP/1.1";
+  local $_;
+
+  if ($proxy) {
+    tcpconnect(split(':',$proxy));
+    if ($port == 443) {
+      printf "--> %s\n",$connect if $opt_v;
+      nvtsend($connect,"");
+      $_ = <$SH>;
+      s/\r//;
+      printf "<-- $_"if $opt_v;
+      unless (/^HTTP.1.. 200/) {
+        die "$0: proxy error : $_";
+      }
+      eval "use IO::Socket::SSL";
+      die "$0: cannot load IO::Socket::SSL\n" if $@;
+      $SH = IO::Socket::SSL->start_SSL($SH);
+    }
+  } else {
+    tcpconnect($server,$port);
+  }
+}
+
+my $sigpipe;
+
+sub nvtsend {
+  local $SIG{PIPE} = sub { $sigpipe = "@_" };
+
+  $sigpipe = '';
+
+  die "$0: internal error: no active network handle\n" unless $SH;
+  die "$0: remote host has closed the link\n" unless $SH->connected;
+
+  foreach my $line (@_) {
+    print {$SH} $line,"\r\n";
+    if ($sigpipe) {
+      undef $SH;
+      return 0;
+    }
+  }
+}

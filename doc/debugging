@@ -1,0 +1,16 @@
+If your F*EX installation does not work as expected then first look in:
+
+$FEXHOME/spool/fexsrv.log	(log from fexsrv)
+$FEXHOME/spool/fup.log		(log from fup CGI)
+$FEXHOME/spool/fop.log		(log from fop CGI)
+
+If this does not help, set in $FEXHOME/lib/fex.ph :
+
+$debug = 1;
+
+then you will get in $FEXHOME/spool/.debug/ for each download a log file
+with detailed debugging output.
+
+If this does not help at all, contact me :-)
+framstag@rus.uni-stuttgart.de
+

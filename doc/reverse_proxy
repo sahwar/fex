@@ -1,0 +1,32 @@
+You can prosecute F*EX behind a reverse proxy, but then you are limited to
+the capabilities of this proxy. For example, if you use apache, then you
+have a 2 GB upload limitation and a throughput penality.
+
+Example for apache reverse proxy:
+
+On http://tandem-fahren.de:80  there is an apache
+On http://tandem-fahren.de:488 there is a F*EX server
+tandem-fahren.de has ip address 78.46.33.142
+
+If you want to contact the F*EX server via alias URL
+http://tandem-fahren.de/fex/ then you have to put in httpd.conf:
+
+        Redirect      /fex /fex/
+        ProxyRequests Off
+        ProxyPass     /fex/ http://tandem-fahren.de:488/
+        <Location /fex/>
+          ProxyPassReverse   http://tandem-fahren.de:488/
+          SetOutputFilter    proxy-html
+          ProxyHTMLExtended  On
+          ProxyHTMLURLMap    http://tandem-fahren.de:488/ /fex/
+          ProxyHTMLURLMap    / /fex/
+          ProxyHTMLURLMap    /fex/fex/fex/ /fex/
+        </Location>
+
+And write to lib/fex.ph :
+	$hostname = 'tandem-fahren.de';
+        $reverse_proxy_ip = '78.46.33.142';
+        $durl = 'http://tandem-fahren.de/fex/fop';
+
+
+See also: http://8d.no/fexproxy.html

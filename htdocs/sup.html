@@ -1,0 +1,61 @@
+<html>
+<head>
+  <meta http-equiv="expires" content="0">
+  <title>F*EX simple upload</title>
+</head>
+<body>
+<h1><a href="/">F*EX</a> simple upload</h1>
+<p><hr><p>
+<script type="text/javascript">
+  function showstatus() {
+    var file = document.forms["upload"].elements["file"].value;
+    if (file != "") {
+      window.open(
+        '$PROTO$://$HTTP_HOST$/fup?showstatus=$RANDOM$',
+        'fup_status',
+        'width=700,height=500'
+      );
+      return true;
+    } else {
+      return false;
+    }
+  }
+</script>
+<form name="upload"
+      action="/fup"
+      method="post" 
+      accept-charset="UTF-8" 
+      enctype="multipart/form-data" 
+      onsubmit="return showstatus();">
+  <input type="hidden" name="uid"     value="$RANDOM$">
+  <input type="hidden" name="comment" value="!SHORTMAIL!">
+  <table>
+    <tr><td>your e-mail address:
+        <td><input type="text"     name="from" size="80" value="">
+    </tr>
+    <tr><td>your auth-ID:   
+        <td><input type="password" name="id"   size="16" value="">
+    </tr>
+    <tr><td>your file:
+        <td><input type="file"     name="file" size="80" value="">
+    </tr>
+  </table> 
+  <p>
+  <input type="submit" value="submit">
+</form>
+<p>
+<p><hr><p>
+After "submit" you will see an upload progress bar 
+(if you have javascript enabled and popups allowed).
+<p>
+If you have lost your auth-ID use "?" as auth-ID and select a small dummy file.
+Your auth-ID will be sent by e-mail to you.
+<p>
+You can also use the <a href="/fup">regular upload form</a> 
+(with more features).
+<p>
+<em>NOTE: Only Firefox or Google Chrome can upload files > 2 GB!</em><br>
+<p><hr><p>
+<address>Contact: <a href="mailto:$SERVER_ADMIN$">fexmaster</a></address>
+</body>
+</html>

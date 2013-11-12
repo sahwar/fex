@@ -1,0 +1,64 @@
+<HTML> 
+<HEAD><TITLE>Stream EXchange</TITLE></HEAD>
+<BODY>
+<center></center>
+<h1>Stream EXchange (SEX)</h1>
+
+You can imagine SEX as network wide UNIX pipes with a relay between or as
+network based FIFOs.<br>
+This can be useful for piping data from A to B where
+A and B cannot establish a direct connection, but both can connect to the
+SEX-server by HTTP.<br>
+SEX is a synchronous service in conjuction to F*EX
+which is asynchronous.
+<p>
+For seamless integration into the UNIX tool chain, there are the
+shell-tools <a href="download/sex.tar">sexsend and sexget</a>.
+<p>
+Using web browsers for sexing will not work, because they cannot handle
+streams in a pipe. So far, there are only the UNIX clients. Feel free to
+implement other clients for other operating systems :-)
+<p>
+Authentication is the same as with <a href="/">F*EX</a>.
+<p>
+Example:
+<p>
+<PRE>
+  root@lanldap:/var/log: tail -f syslog | sexsend framstag@rus.uni-stuttgart.de
+
+  framstag@blubb:/tmp: sexget | grep ldap
+</PRE>
+<p>
+If you need encryption, then use the standard UNIX toolbox and add an
+appropriate program to the pipe, for example: openssl bf
+
+<h3>public SEX</h3>
+The recipient of regular SEX must be a registered F*EX user.<br>
+But you can also offer streams to non-registered user.<br>
+This is called "<em>public SEX</em>", example:
+<p>
+<PRE>
+  framstag@flupp: cal | sexsend public
+  http://fex.rus.uni-stuttgart.de/sex?user=framstag@rus.uni-stuttgart.de&ID=public
+  http://fex.rus.uni-stuttgart.de/sex?dXNlcj1mcmFtc3RhZ0BydXMudW5pLXN0dXR0Z2FydC5kZSZJRD1wdWJsaWM=
+</PRE>
+<p>
+sexsend then displays two URLs onder which one can get the stream.
+
+<h3>SEX - all inclusive</h3>
+To transfer files by streaming you can use xx-rated SEX:
+<p>
+<PRE>
+  root@vms2:/data/VM# <a href="/download/fuck.tar">sexxx</a> flupp
+  streaming:
+  flupp/
+  flupp/vmware.log
+  flupp/flupp.nvram
+  flupp/flupp.vmxf
+  flupp/flupp.vmx
+  flupp/flupp.vmdk
+  4976 MB 11640 kB/s
+</PRE>
+
+</BODY>
+</HTML>

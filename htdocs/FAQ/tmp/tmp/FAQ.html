@@ -1,0 +1,92 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+       "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>F*EX FAQ</title>
+	<link rel="stylesheet" type="text/css" href="faq.css">
+	<script type="text/javascript" src="jquery.js"></script>
+	<script type="text/javascript">
+	$(document).ready(function(){
+		$(".answer").hide();
+		$(".question").addClass("expand");
+	});
+	</script>
+	<script type="text/javascript">
+	function set_title(title) {
+	  document.getElementById('H1').innerHTML = 
+          'FAQ <a href="'+title.toLowerCase()+'.html">'+title+'</a>';
+	}
+	</script>
+</head>
+
+<body>
+
+<div><h1><a href="/index.html">F*EX</a> <b id='H1'>FAQ</b></h1></div>
+
+<div id="sections-header">
+  <ul class="idTabs"> 
+    <li><a href="#meta"  onclick="set_title('Meta')"> Meta</a>
+    <li><a href="#user"  onclick="set_title('User')"> User</a>
+    <li><a href="#admin" onclick="set_title('Admin')">Admin</a>
+    <li><a href="#misc"  onclick="set_title('Misc')"> Misc</a>
+  </ul> 
+</div>
+
+
+<< 
+  sub faq {
+    my $faq = shift;
+    my ($var,$env,$q,$a);
+    my $n = 0;
+    local $/ = "Q:";
+    local $_;
+    open $faq,"$faq.faq" or return;
+    $_ = <$faq>;
+    while (<$faq>) {
+      chomp;
+      while (/\$([\w_]+)\$/) {
+        $var = $1;
+        $env = $ENV{$var} || '';
+        #s/\$$var\$/<tt>$env<\/tt>/g;
+        s/\$$var\$/$env/g;
+      };
+      ($q,$a) = split /A:s*/;
+      $a =~ s/[\s\n]+$/\n/;
+      while ($a =~ s/^(\s*)\*/$1<ul>\n$1<li>/m) { 
+        while ($a =~ s/(<li>.*\n\s*)\*/$1<li>/g) {}
+        $a =~ s:(.*\n)(\s*)(<li>[^\n]+\n):$1$2$3$2</ul>\n:s
+      }
+      $a =~ s/\n\n/\n<p>\n/g;
+      $a =~ s/([^>\n\\])\n/$1<br>\n/g;
+      $a =~ s/\\\n/\n/g;
+      $a =~ s/^\s*<br>\s*//mg;
+      $a =~ s/<([^\s<>\@]+\@[\w.-]+)>/<a href="mailto:$1">&lt;$1><\/a>/g;
+      $a =~ s: (/\w[\S]+/[\S]+): <tt>$1</tt>:g;
+      $a =~ s/(https?:[^\s<>]+)/<a href="$1">[$1]<\/a>/g;
+      $n++;
+      print qq(<div class="question"><div class="label">Q$n:</div>\n);
+      print qq(<div class="content">$q</div></div>\n);
+      print qq(<div class="answer"><div class="label"><p>A$n:</div>\n);
+      print qq(<div class="content">$a</div></div>\n);
+    }
+  }
+>>	
+
+<div id="meta">	 <<faq('meta')>>  </div>
+<div id="user">	 <<faq('user')>>  </div>
+<div id="admin"> <<faq('admin')>> </div>
+<div id="misc">	 <<faq('misc')>>  </div>
+
+<script type="text/javascript">
+  $(".question").click(function(e) {
+    e.preventDefault();
+    $(this).next('.answer').slideToggle(200);
+    $(this).toggleClass('colapse');
+  });
+</script>
+
+## << faq($ENV{QUERY_STRING}) >>
+</body>
+</html>

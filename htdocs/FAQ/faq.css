@@ -1,0 +1,77 @@
+.idTabs {
+	font-weight: bold;
+}
+
+.idTabs a {
+	background: inherit;
+	border: 1px solid white;
+	color: #777;
+	display: block;
+	float: left;
+	font-size: 90%;
+	height: 24px;
+	line-height: 22px;
+	margin: 8px 8px 0 0;
+	padding: 0 11px 0 11px;
+	text-decoration: none;
+}
+
+.idTabs a.activetab {
+	background: green;
+	border: 1px solid #777;
+	border-bottom-color: white;
+	color: black;
+	font-size: 110%;
+}
+
+#sections-header {
+	border-bottom: 1px solid #666;
+	height: 34px;
+	clear: both;
+}
+
+ul.idTabs{
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+	cursor: pointer;
+}
+
+.expand {
+	background:url(downArrow.gif) top left no-repeat;
+}
+
+.colapse {
+	background:url(upArrow.gif) top left no-repeat;
+}
+
+div.question {
+	margin: 22px 0px 0px 0px;
+	padding: 0px 22px 0px 22px;
+	cursor: pointer;
+	display: table;
+}
+
+div.answer {
+	padding: 0px 22px 22px 22px;
+	display: table;
+}
+
+div.label {
+	padding: 0px 12px 0px 0px;
+	display: table-cell;
+}
+
+div.content {
+	display: table-cell;
+}
+
+* {
+	//font-family: Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif;
+	border: 0;
+	vertical-align: baseline;
+	background: transparent;
+}

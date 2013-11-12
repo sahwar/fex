@@ -1,0 +1,134 @@
+#!/usr/bin/perl -w
+
+use Encode;
+use File::Basename;
+
+# add fex lib
+$ENV{FEXLIB} = $FEXLIB = dirname(dirname($0)).'/lib';
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+# import from fex.pp
+our ($logdir,$debug);
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+binmode(STDOUT,":encoding(ISO-8859-1)");
+
+$log = shift || "$logdir/fexsrv.log";
+
+$ignore = join('|',qw(
+  (CONNECT|CONTINUE).*(crawl|msnbot|obertux)
+  DISCONNECT:.no.HTTP.request
+  GET.*(favicon|robots\.txt)
+  GET./organization\.gif
+  GET./small_logo\.jpg
+  GET./10+.B
+  GET.*Arrow\.gif
+  GET./apple-touch
+  User-Agent:.*(Webnote|FeedFetcher|\w+bot|bot/|Website.Watcher|crawler|spider|searchme|Yandex|Slurp|ScoutJet|findlinks|urlmon)
+  User-Agent:.fnb.*quak
+  From:.*(msnbot|yandex|googlebot|webcrawler)
+  Referer:.*sex.*stream
+  Referer:.*stream.*sex
+  X-.*prefetch
+  X-Purpose:.preview
+));
+
+@weed = qw(
+  .*keep-alive
+  .*no-cache
+  Connection:
+  Cache-Control:
+  Content-Type:
+  Accept
+  TE:
+  UA-CPU:
+  Pragma:
+  DNT:
+  Via:
+  profile:
+  if-modified-since
+  Surrogate-Capability
+  X-Moz
+  X-Wap
+  X-FH
+  X-Nokia
+  X-UCBrowser
+  X-NSN
+  X-OperaMini
+  x-Device
+  x-up
+  X-Behavioral
+  X-Do-Not-Track
+  X-\S*Via
+  x-Mobile
+  X-Country
+  .*:\s*$
+);
+
+$/ = "\n\n"; 
+$| = 1;
+
+if (-t STDIN or $ENV{GATEWAY_INTERFACE}) {
+  open L,$log or die "$0: $log - $!\n";
+  seek L,0,2;
+} else {
+  *L = *STDIN;
+}
+
+for (;;) {
+  while (<L>) {
+    next if /(^|\n)($ignore)/i;
+    s/[\x00-\x08\x0B-\x1F\x1F\x80-\x9F]/_/g;
+    s/^\n//;
+    foreach $weed (@weed) {
+      while (s/\n$weed.*\n/\n/i) {}
+    }
+    if (/^\n*(CONNECT|CONTINUE).*\s\[([\d_]+)\]/i) { $pid = $2 }
+    if (/\n(POST|GET)\s+\/(\w+)/i)                 { $cgi = $2 }
+    if (/Content-Length: (\d+)/i) {
+      $d = $1;
+      while ($d =~ s/(\d)(\d\d\d\b)/$1,$2/) {};
+      s/Content-Length: \d+/Content-Length: $d/i;
+    }
+    s/\n*$/\n\n/;
+    print or exit;
+  }
+  sleep 1;
+  if ($debug and $pid and $cgi) {
+    sleep 1;
+    &read_debug_log;
+    $pid = $cgi = '';
+  };
+}
+
+
+sub read_debug_log {
+  my (@log,$log);
+  local $/ = "\n";
+  # no warnings "all";
+  
+  if (@log = glob "$logdir/.debug/*_$pid.$cgi") {
+    $log = pop @log;
+    if (open $log,$log) {
+      binmode($log,":encoding(UTF-8)");
+      while (<$log>) {
+        s/\r//;
+        if (/^Content-Disposition:.*name="FILE".*filename="(.+)"/i) {
+          print "  FILE=\"$1\"\n";
+        } elsif (/^Content-Disposition:.*name="(\w+)"/i) {
+          $p = $1;
+          $_ = <$log>;
+          $v = <$log>;
+          $v =~ s/[\r\n]+//;
+          print "  $p=\"$v\"\n" if $v;
+        } elsif (/^(Param|Exp): (\w+=".+")/) {
+          print "  $2\n";
+        }
+      }
+      close $log;
+      print "\n";
+    }
+  }
+}

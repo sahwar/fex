@@ -1,0 +1,139 @@
+<HTML> 
+  <meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/>
+  <meta http-equiv="Content-Language" content="cs"/>
+<HEAD><TITLE>F*EX - File EXchange</TITLE></HEAD>
+<BODY>
+<center>
+<h1>F*EX - Frams' Fast File EXchange</h1>
+<IMG SRC="logo.jpg">
+</center>
+<p>
+F*EX (Frams' Fast File EXchange) je služba pro odesílání velkých 
+souborů uživatelem A uživateli B.
+<p>
+Odesilatel pomocí <a href="/fup">webového formuláře pro nahrání</a> nahraje 
+soubor na F*EX server a ten příjemci automaticky odešle 
+e-mail s oznámením a s URL ke stažení.
+<p>
+
+Říkáte si:
+<blockquote><em>
+  Proč potřebuji další službu pro přenos souborů?!<br>
+  Mám e-mail, ftp, ssh a v neposlední řadě i sendfile!
+</em></blockquote>
+<p>
+Já pravím:
+<blockquote><em>
+  Stále potřebujete F*EX :-)
+</em></blockquote>
+<p>
+  
+Například chcete poslat svému známému video z vaší poslední dovolené (1 GB).
+Máte následující možnosti (a s tím související problémy):<p>
+
+<ul>
+  <li><h3>poslat DVD poštou</h3><p>
+      Nepřichází v úvahu - žijeme 
+      <<my @x=gmtime(time); $x[5]-69;>> let
+      od roku, kdy byl vynalezen Internet!
+      Posílání paměťových médií je pro staříky.
+      <p>
+  <li><h3>použít e-mail</h3><p>
+      Většina e-mailových serverů má limit pro přílohu 10 MB a
+      velikost schránky kolem 100 MB a někdy i méně.
+      <p>
+  <li><h3>uucp</h3><p>
+      Proč rovnou nezůstat u psaní klínovým písmem na kamenné destičky?
+      <p>
+  <li><h3>ssh</h3><p>
+      Vy máte heslo svého známého, nebo se mu chystáte dát to své
+      jen kvůli přenosu souboru?
+      <p>
+  <li><h3>ftp</h3><p>
+      <ul>
+        <li>Pomocí jakého ftp serveru?
+        <li>Pomocí jakého účtu, jakého hesla?
+        <li>Vám nevadí posílání nešifrovaného hesla a souborů přes nezabezpečený Internet?
+        <li>Podporuje vaše proxy pasivní režim pro ftp?
+        <li>V případě anonymního ftp:
+          <ul>
+            <li>Umožňuje nahrát 1 GB?
+            <li>Umožňuje po nahrání soubor smazat?
+            <li>Kdo další si váš soubor může stáhnout?
+            <li>Kdo další může váš soubor smazat?
+            <li>Svému známému musíte poslat URL, kde si soubor může stáhnout, on vás musí
+                informovat, že si soubor stáhl, vy jej pak 
+                musíte smazat.<br>
+                Sečteno a podrženo: Otrava.
+          </ul>
+      </ul>
+      <p>
+  <li><h3>http</h3><p>
+      <ul>
+        <li>Žádné výchozí nahrávání a správa uživatelů - musí se naprogramovat
+        <li>Žádné automatické oznamování
+        <li>Žádné automatické mazání
+        <li>Velice málo http serverů umí zpracovat soubory větší než 2 GB
+      </ul>
+      <p>
+  <li><h3>sendfile</h3><p>
+      <ul>
+        <li>Používáte UNIX a máte nainstalovaný sendfile?
+        <li>Používá příjemce UNIX a má nainstalovaný sendfile?
+        <li>Nemáte vy ani příjemce firewall, který blokuje port 487?
+      </ul>
+      <p>
+  <li><h3>komerční služby jako jsou DropLoad, ALLPeers, YouSendIt, etd.</h3><p>
+      <ul>
+        <li>Jaký mají limit (většinou méně než 2 GB)?
+        <li>Co bezpečnost a ochrana osobních údajů: Budou vaše soubory skutečně uloženy a v bezpečí?
+        <li>Jsou provozovány na open-source, nebo na uzavřeném proprietálním softwaru?
+        <li>Jsou přístupné se všemi prohlížeči, nebo potřebujete Javu, Active-X, Flash či jiné hnusné zásuvné moduly?
+        <li>Budou existovat více, jak pár měsíců?<br>
+           (DropLoad, ALLPeers a drop.io své služby již ukončili)
+      </ul>
+      <p>
+</ul>
+<p>
+Pokud jste byť na jedinou z výše uvedených otázek odpověděli "ne", potom potřebujete 
+F*EX.
+<p>
+<h2>Hlavní funkce F*EX</h2>
+<p>
+<ul>
+  <li>přenos souborů s prakticky neomezenou velikostí
+  <li>příjemci a uživatelé potřebují pouze program pro elektronickou poštu a webový prohlížeč
+      jakéhokoli typu, nemusí instalovat žádný další software
+  <li>ZNOVU ODESLÁNÍ a ZNOVU STAŽENÍ pro pokračování přesně tam, kde došlo k selhání spojení
+  <li>automatické oznamování pro příjemce
+  <li>automatické mazání po stažení
+  <li>automatické mazání po době platnosti (výchozí: 5 dnů)
+  <li>plnohodnotní uživatelé si mohou vytvářet poduživatelé, kteří mohou odesílat pouze jim
+  <li>plnohodnotní uživatelé mohou vytvářet skupiny, obdoba poštovních konferencí s tím rozdílem, že se jedná o soubory
+  <li>bezúdržbovost: ze strany správce nejsou nutné žádné zásahy s vyjímkou vytváření nových F*EX účtů
+  <li>odesílání více příjemcům spotřebuje na serveru pouze místo pro jednoho příjemce
+  <li>F*EX je webová služba pro protokol HTTP a nepotřebuje žádné tunely ve firewallu
+  <li>podporuje také vysílání
+  <li>pro skalní UNIXové uživatele jsou k dispozici programy pro příkazovou řádku fexsend a fexget pro
+      vyhnutí se použití otravných webových prohlížečů
+  <li>protokol i zdrojový kód jsou volně dostupné (Perl Artistic)
+</ul>
+
+<h2>Promluvme si o SEXu</h2>
+F*EX má společníka: Stream EXchange (SEX).<p>
+SEX si můžete představit jako bránu mezi UNIXovými síťovými rourami.
+Ta může být užitečná k odesílání dat uživatelem A uživateli B, kde A a B mezi sebou
+nemohou navázat přímé spojení, ale oba dva se mohou připojit pomocí HTTP k 
+SEX serveru. Pro snadné začlenění do řady UNIXových nástrojů slouží nástroje
+pro příkazovou řádku sexsend a sexget.
+<p>
+Ověřování je stejné jako u F*EX.
+
+<h2>Máte otázky?</h2>
+Přečtěte si <a href="/FAQ.html">FAQ</a>
+
+<p>
+<ADDRESS>kontaktujte: <A HREF="mailto:$SERVER_ADMIN$">fexmaster</A></ADDRESS>
+
+</BODY>
+</HTML> 

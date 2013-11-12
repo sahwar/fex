@@ -1,0 +1,264 @@
+<HTML>
+<PRE>
+Cuesti&oacute;ns meta:
+===============
+
+<a name="1"><a href="#1">Q</a>: Por que o nome &quot;F*EX&quot; e non directamente &quot;FEX&quot;?
+
+A: No momento de facerse p&uacute;blico xa hab&iacute;a unha (antigo) aplicativo chamado &quot;FEX&quot; en
+   freshmeat.net.
+
+
+<a name="2"><a href="#2">Q</a>: Por que non usar un servizo comercial como
+   DropLoad, ALLPeers, YouSendIt, etc?
+
+A: Te&ntilde;en un l&iacute;mite de 2 GB ou menor.
+   A s&uacute;a seguranza e privacidade son desco&ntilde;ecidas.
+   Non se basean en c&oacute;digo fonte aberto.
+   Non hai clientes de UNIX (CLI) para eles.
+   Necesitan java, active-X, flash ou outros endemo&ntilde;ados complementos.
+   Desco&ntilde;&eacute;cese canto tempo van funcionar - DropLoad e ALLPeers xa pecharon
+   as s&uacute;as portas.
+
+
+<a name="3"><a href="#3">Q</a>: Por que un camelo no logo?
+
+A: O logo inspirouse no camelo de Perl, pero base&aacute;se en Steiff, un camelo de peluxe,
+   co cal constitu&iacute;mos o noso t&aacute;ndem. O logo foi debuxado
+   por Beate
+   <a href="http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html">http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html</a>
+
+
+<a name="4"><a href="#4">Q</a>: Onde podo eu obter as fontes de F*EX?
+
+A: <a href="http://fex.rus.uni-stuttgart.de/fex.html">http://fex.rus.uni-stuttgart.de/fex.html</a>
+
+
+<a name="5"><a href="#5">Q</a>: Que necesito para instalar F*EX?
+
+A: Un servidor UNIX con entrada no DNS e smtp para o correo de sa&iacute;da.
+   E debe ser root nese servidor.
+
+
+<a name="6"><a href="#6">Q</a>: Que &eacute; o DNS e smtp?
+
+A: Non instale F*EX. Est&aacute; al&eacute;n das s&uacute;as posibilidade.
+
+
+<a name="7"><a href="#7">Q</a>: Quen e o autor?
+
+A: Ulli Horlacher &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+<a name="8"><a href="#8">Q</a>: Que licenza ten F*EX?
+
+A: De software libre, Perl Artistic, vexa <a href="http://fex.rus.uni-stuttgart.de/doc/Licence">http://fex.rus.uni-stuttgart.de/doc/Licence</a>
+
+
+<a name="9"><a href="#9">Q</a>: Hai unha lista de correo de F*EX?
+
+A: <a href="https://listserv.uni-stuttgart.de/mailman/listinfo/fex">https://listserv.uni-stuttgart.de/mailman/listinfo/fex</a>
+
+
+<a name="10"><a href="#10">Q</a>: Onde podo obter asistencia comercial para F*EX?
+
+A: Contacto <a href="mailto:fex@nepustil.net">fex@nepustil.net</a> <a href="http://www.nepustil.net/">http://www.nepustil.net/</a>
+
+
+<a name="11"><a href="#11">Q</a>: Te&ntilde;eo m&aacute;is/outras preguntas diferentes!
+
+A: Preguntarlle ao autor &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+
+Preguntas de usuario:
+=====================
+
+<a name="12"><a href="#12">Q</a>: Que &eacute; o &quot;auth-ID&quot;?
+
+A: O auth-ID &eacute; unha identificaci&oacute;n interna que autentica o usuario.
+   Ser&aacute; a primeira xerada polo admin ou o proceso de rexistro autom&aacute;tico
+   e pode despois modificalo vostede, o usuario. Tr&aacute;tase dun contrasinal
+   de baixa seguranza.
+
+
+<a name="13"><a href="#13">Q</a>: Podo usar un proxy HTTP?
+
+A: Si.
+
+
+<a name="14"><a href="#14">Q</a>: Carguei un ficheiro ENORME pero equivoqueime ao escribir o enderezo do destinatario. Agora te&ntilde;o
+   un erro de entrega de correo. Debo volver cargar ese ENORME ficheiro?
+
+A: Non, non fai falta. Pode redirixir o ficheiro con
+   <a href="http://$HTTP_HOST$/rup">http://$HTTP_HOST$/rup</a>
+
+
+<a name="15"><a href="#15">Q</a>: Cargue un ficheiro ENORME pero esquec&iacute;n outro destinatario.
+   Debo volver cargar ese ENORME ficheiro?
+
+A: Non, non &eacute; necesario. Pode reenviar copia do ficheiro con
+   <a href="http://$HTTP_HOST$/foc">http://$HTTP_HOST$/foc</a>
+
+
+<a name="16"><a href="#16">Q</a>: Non podo cargar ficheiros &gt; 2 GB co meu navegador web!?
+
+A: Todos os navegadores te&ntilde;en defectos na implementaci&oacute;n dos
+   seus formularios HTML. O l&iacute;mite m&aacute;is frecuente &eacute; de 2 GB, &aacute;s veces 4 GB.
+
+   Debe usar un cliente especial de F*EX para cargar ficheiros &gt; 2 GB, vexa
+   <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+<a name="17"><a href="#17">Q</a>: A mi&ntilde;a descarga abortouse antes de rematar. Podo retomar esa descarga?
+
+A: F*EX permite retomar e descargar, pero o seu cliente tam&eacute;n debe permitir
+   esta funcionalidade. Firefox por exemplo carece desta funcionalidade HTTP, necesitar&aacute;
+   outro cliente como Opera, wget ou fexget.
+
+
+<a name="18"><a href="#18">Q</a>: A mi&ntilde;a carga foi abortada antes de rematar. Podo retomar esa carga?
+
+A: F*EX permite retomar a carga, pero o seu cliente debe permitir vbnm, 1tupports resuming at upload, but your client also has to support it.
+   No web browser has this feature, you need a special F*EX client like
+   fexsend, schwuppdiwupp or F*IX.
+   See <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+<a name="19"><a href="#19">Q</a>: O meu navegador non pode iniciar o cliente java F*IX, que indica:
+   &quot;non se atopou un entorno de execuci&oacute;n java, non se pode iniciar F*IX o miniaplicativo de carga&quot;
+
+A: Non se localiza un complemento java do navegador. En Debian e Ubuntu pode
+   instalalo con: &quot;sudo aptitude install sun-java6-plugin&quot;
+
+
+<a name="20"><a href="#20">Q</a>: Cando premo[ESC] no Firefox a carga canc&eacute;lase. Por que?
+
+A: Esta &eacute; unha funcionalidade interna do Firefox: ESC termina a operaci&oacute;n actual.
+   Soluci&oacute;n simple: non prema ESC no Firefox.
+   Soluci&oacute;n complexa: p&iacute;dalles aos desenvolvedores do Firefox que engadan un atallo de teclado.
+
+
+<a name="21"><a href="#21">Q</a>: O env&iacute;o como un usuario F*EX &eacute; doado, pero como recibir ficheiros doutros,
+   de f&oacute;ra?
+
+A: Rex&iacute;streos como subusuarios ou cree un grupo F*EX
+   con <a href="http://$HTTP_HOST$/fuc">http://$HTTP_HOST$/fuc</a>
+
+
+<a name="22"><a href="#22">Q</a>: &Aacute;s veces podo descargar un ficheiro m&aacute;is dunha vez, especialamente cando
+   o repito rapidamente. Est&aacute; a funcionalidade de auteliminaci&oacute;n defectuosa?
+
+A: O servidor F*EX ten un per&iacute;od de gracia de 1 minuto despois da primeira
+   descarga correcta no cal o ficheiro a&iacute;nda est&aacute; dispo&ntilde;&iacute;bel. Isto &eacute; necesario
+   porque alg&uacute;ns &quot;xestores de descargas&quot; est&uacute;pidos solicitan o ficheiro
+   varias veces &aacute; vez. Caso contrario poder&iacute;an indicar un erro ao usuario.
+
+A: O seu fexmaster ten un conxunto AUTODELETE=DELAY como predeterminado, o que significa que
+   o proceso de autolimpeza real&iacute;zase unha vez ao d&iacute;a.
+
+A: Os &quot;Power users&quot; ou usuarios con permisos (usa a forza, Luke!) poden establecer unha marca &quot;non eliminar ata
+   despois da descarga&quot;.
+
+
+<a name="23"><a href="#23">Q</a>: O per&iacute;odo de reserva predeterminado &eacute; demasiado curto para min, c&oacute;mpreme m&aacute;is. Como podo estabelecelo?
+
+A: Use fexsend, p&iacute;dallo ao seu fexmaster ou lea o c&oacute;digo fonte :-)
+
+
+<a name="24"><a href="#24">Q</a>: Non podo descargar ficheiros con Internet Explorer, dime &quot;Non se pode
+   abrir o sitio da Internet&quot;. Que deber&iacute;a facer?
+
+A: Use Firefox ou calquera outro navegador compat&iacute;bel con Internet, xa que Internet
+   Explorer non o &eacute;. Este &eacute; un de tanto defectos do Internet Explorer.
+
+
+
+
+Preguntas de administrador:
+===========================
+
+<a name="25"><a href="#25">Q</a>: Non podo instalar un servidor web como fexsrv, porque non te&ntilde;o permisos de root
+   Hai algunha versi&oacute;n en puro CGI de F*EX que funcione cun servidor web Apache?
+
+A: F*EX est&aacute; intimamente unido a fexsrv por varias raz&oacute;ns (rendemento, l&iacute;mite de
+   tama&ntilde;o de ficheiro, concepto de sesi&oacute;nt, etc.) e non se pode executar como CGI
+   con Apache.
+   Pero p&oacute;delle botar un ollo a
+   <a href="http://gpl.univ-avignon.fr/filez/">http://gpl.univ-avignon.fr/filez/</a>
+   <a href="http://freshmeat.net/projects/eventh/">http://freshmeat.net/projects/eventh/</a>
+   <a href="http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html">http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html</a> (s&oacute; en alem&aacute;n!)
+   que implementa un intercambio de ficheiros como puros CGI, pero cun tama&ntilde;o l&iacute;mite de 2 GB por ficheiro.
+
+
+<a name="26"><a href="#26">Q</a>: F*EX non funciona! Non podo conectarme co meu navegador web!
+
+A: Comprobe o seu enrutamento, filtros ip e configuraci&oacute;n de devasa.
+   Tam&eacute;n comprobe se o seu xinetd est&aacute; ligado cun tcp-wrapper e config&uacute;reo
+   correctamente (hosts.allow).
+   F*EX necesita o porto 80/tcp (HTTP) e o porto opcional 443/tcp (HTTPS).
+
+
+<a name="27"><a href="#27">Q</a>: F*EX &eacute; complicado de m&aacute;is! Necesito algo m&aacute;is simplificado.
+
+A: Probe <a href="http://www.home.unix-ag.org/simon/woof.html">http://www.home.unix-ag.org/simon/woof.html</a>
+
+
+<a name="28"><a href="#28">Q</a>: Como podo integrar F*EX no xestor de usuarios do meu sitio?
+
+A: F*EX ten varios m&oacute;dulos de autenticaci&oacute;n:
+   local, RADIUS, LDAP, mailman e POP
+   Para os 4 &uacute;ltimos, contacte por favor co autor <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+
+
+<a name="29"><a href="#29">Q</a>: Que que todos os meus usuarios locais poidan usar F*EX automatimente. Como?
+
+A: Perm&iacute;taos rexistrarse a si mesmos con http://yourfexserver/fur
+   Ten que editar lib/fex.ph e establecer (exemplo):
+   @local_hosts = qw(127.0.0.1 10.10.100.0-10.10.255.255);
+   @local_domains = qw(flupp.org ulm.sub.net);
+   (Por suposto, ten que engadir os seus servidores/redes locais reais!)
+
+
+<a name="30"><a href="#30">Q</a>: Necesito m&aacute;is seguranza! Como podo activar HTTPS?
+
+A: Lea doc/SSL e busque &quot;fop_auth&quot; en doc/concept
+
+
+<a name="31"><a href="#31">Q</a>: Necesito un aspecto corporativo. Como podo configurar F*EX neste sentido?
+
+A: Vexa a vari&aacute;bel @H1_extra en fex.ph e pode engadir o c&oacute;digo HTML a
+   htdocs/header.html
+
+A: Vexa htdocs/fup_template.html, modif&iacute;queo &aacute;s s&uacute;as necesidades e &uacute;seo como a s&uacute;a
+   p&aacute;xina de inicio.
+
+
+<a name="32"><a href="#32">Q</a>: F*EX &eacute; demasiado complicado para os meus pobres usuarios. Necesito un formulario de
+   carga simmplificado.
+
+A: Vexa htdocs/fup_template.html
+
+
+<a name="33"><a href="#33">Q</a>: Quero que os correos Ccc a (ao usuario admin) se env&iacute;en a outro enderezo.
+
+A: Use procmail ou escriba OTHERADDRESS en /home/fex/.forward
+
+
+<a name="34"><a href="#34">Q</a>: Podo obter unha versi&oacute;n localizada no meu idioma?
+
+A: Sempre coa s&uacute;a axuda, si. Contacte co autor <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+
+
+Preguntas en miscel&aacute;nea:
+========================
+
+<a name="35"><a href="#35">Q</a>: F*EX &eacute; fant&aacute;stico! Podo unirme ao equipo de desenvolvemento? Que hai que facer?
+
+A: Contacte co autor <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+   As funcionalidades buscadas son:
+
+     - un complemento F*EX para o Thunderbird ou o Outlook
+     - m&aacute;is (outras) idiomas dispo&ntilde;&iacute;beis
+
+</PRE></HTML>

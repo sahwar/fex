@@ -1,0 +1,537 @@
+#!/usr/bin/perl -wT
+
+# F*EX document output
+#
+# is a subprogram of fexsrv! do not run it directly!
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use File::Basename;
+use CGI::Carp	qw(fatalsToBrowser);
+use Fcntl 	qw(:flock :seek :mode);
+use POSIX	qw(strftime locale_h);
+use Cwd 	qw(getcwd abs_path);
+
+# import from fex.pp
+our ($bs,$tmpdir,@doc_dirs);
+
+my $log = "$logdir/dop.log";
+
+# POSIX time format needed for HTTP header
+setlocale(LC_TIME,'POSIX');
+
+sub dop {
+  my $doc = shift;
+  my $source = shift;
+  my $seek = 0;
+  my $stop = 0;
+  my ($link,$host,$path,$range);
+  
+  our $error = 'F*EX document output ERROR';
+  
+  # reget?
+  if ($range = $ENV{HTTP_RANGE}) {
+    $seek = $1 if $range =~ /^bytes=(\d+)-/i;
+    $stop = $1 if $range =~ /^bytes=\d*-(\d+)/i;
+  }
+
+  # redirect on relative symlinks without "../" 
+  if ($link = readlink($doc) and 
+      $link !~ m:^/: and $link !~ m:\.\./: and $link !~ /^:.+:$/) {
+    $path = $ENV{REQUEST_URI};
+    $path =~ s:[^/]*$::;
+    $doc = "$path/$link";
+    $doc =~ s:/+:/:g;
+    $doc =~ s:^/::;
+    $host = $ENV{HTTP_HOST} || $hostname;
+    nvt_print(
+      "HTTP/1.1 301 Moved Permanently",
+      "Location: $ENV{PROTO}://$host/$doc",
+      "Content-Length: 0",
+      "Connection: close",
+      ""
+    );
+    exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit; 
+  }
+
+  # watchdog documents
+  if (@wdd and $wdd and grep { $doc =~ /$_/ } @wdd) { &$wdd($doc) }
+
+  my $dir = untaint(getcwd());
+  chdir(dirname($doc));
+  http_output($doc,$seek,$stop);
+  chdir($dir);
+}
+
+sub http_output {
+  my ($file,$seek,$stop) = @_;
+  my ($filename,$files,$streamfile,$size,$total_size);
+  my ($data,$type);
+  my ($var,$env,$con);
+  my @files;
+  my $htmldoc = '';
+  my @s;
+  my $s = 0;
+  my $b = 0;
+  my $http_client = $ENV{HTTP_USER_AGENT} || '';
+  local $_;
+
+  # extra security check: document must not be in lib or spool directory
+  if (path_match($file,$FEXLIB) or path_match($file,$spooldir)) {
+    http_error(403);
+  }
+
+  security_check($file);
+
+  if (-f $file) {
+    # normal file
+    open $file,'<',$file or http_error(400);
+    security_check($file);
+  } elsif ($file =~ /(.+)\.(tar|tgz|zip)$/ and 
+           @s = lstat($streamfile = "$1.stream") and $s[4] == $<)
+  {
+    # streaming file (only if it is owned by user fex)
+    chdir dirname($file);
+    security_check($file);
+    if (-l $streamfile and readlink($streamfile) =~ /^:(.+):$/) {
+      # special symlink pointer file for streaming
+      @files = split(/:/,$1);
+    } elsif (open $streamfile,$streamfile) {
+      # special streaming file
+      while (<$streamfile>) {
+        chomp;
+        if (/^(\/.*):/) {
+          chdir $1;
+          security_check($1);
+        } else {
+          push @files,$_;
+        }
+      }
+    } else {
+      http_error(503);
+    }
+    close $streamfile;
+    foreach (@files) {
+      if (/^\// or /\.\.\//) { 
+        # absolute path or relative path with parent directory is not allowed
+        http_error(403);
+      }
+      if (@s = stat($_) and not($s[2] & S_IRGRP) or not -r $_) { 
+        # file must be readable by user and group
+        http_error(403);
+      }
+    }
+    http_error(416) if $ENV{HTTP_RANGE};
+    close STDERR;
+    my @a;
+    if    ($file =~ /\.tar$/) { @a = qw'tar --exclude *~ -cf -' } 
+    elsif ($file =~ /\.tgz$/) { @a = qw'tar --exclude *~ -czf -'} 
+    elsif ($file =~ /\.zip$/) { @a = qw'zip -x *~ -rq -' } 
+    else { http_error(400) }
+    open $file,'-|',@a,@files or http_error(503);
+  } else {
+    http_error(404);
+  }
+  
+  $type = 'application/octet-stream';
+  if    ($file =~ /\.html$/)	{ $type = 'text/html' } 
+  elsif ($file =~ /\.txt$/)	{ $type = 'text/plain' }
+  elsif ($file =~ /\.css$/)	{ $type = 'text/css' }
+  elsif ($file =~ /\.js$/)	{ $type = 'text/javascript' }
+  elsif ($file =~ /\.ps$/)	{ $type = 'application/postscript' }
+  elsif ($file =~ /\.pdf$/)	{ $type = 'application/pdf' }
+  elsif ($file =~ /\.jpg$/)	{ $type = 'image/jpeg' }
+  elsif ($file =~ /\.png$/)	{ $type = 'image/png' }
+  elsif ($file =~ /\.gif$/)	{ $type = 'image/gif' }
+  elsif ($file !~ /\.(tar|tgz|zip|jar|rar|arj|7z|bz2?|gz)$/) {
+    my $qfile = untaint(abs_path($file));
+    $qfile =~ s/([^\/\.\+\w!=,_-])/\\$1/g;
+    $_ = `file $qfile`;
+    if (/HTML/) {
+      $type = 'text/html';
+    } elsif (/text/i and not -x $file) {
+      $type = 'text/plain';
+    }
+  }
+
+  # show sourcecode if URL ends with '!'
+  # to avoid this for a HTML file, simple do a: chmod o-r file
+  if ($type eq 'text/html') {
+    if ($htmlsource) {
+      if (@s = stat($file) and $s[2] & S_IROTH) {
+        $type = 'text/plain';
+      } else {
+        http_error(403);
+      }
+    }
+  } elsif ($ENV{'QUERY_STRING'} eq '!') {
+    $type = 'text/plain';
+  }
+      
+  
+  if ($type eq 'text/html') {
+    $seek = $stop = 0;
+    local $^W = 0;
+    local $/;
+    $htmldoc = <$file>;
+    while ($htmldoc =~ s/\n##.*?\n/\n/) {};
+    # evaluate #if ... #else ... #elseif ... #endif blocks
+    my $mark = randstring(16);
+    while ($htmldoc =~ s/\n(#if\s+(.+?)\n.+?\n)#endif/\n$mark/s) {
+      $_ = $1;
+      # if block
+      if (eval $2) {
+        s/#if.*\n//;
+        s/\n#else.*//s;
+        $htmldoc =~ s/$mark/$_/;
+      } else {
+        # elseif blocks
+        while (s/.*?\n#elseif\s+(.+?)\n//s) {
+          if (eval $1) {
+            s/\n#else.*//s;
+            $htmldoc =~ s/$mark/$_/;
+          }
+        }
+        # else block left?
+        if ($htmldoc =~ /$mark/) {
+          s/.*\n#else\s*\n//s or $_ = '';
+          $htmldoc =~ s/$mark/$_/;
+        }
+      }
+    };
+    # evaluate #include
+    while ($htmldoc =~ s/\n#include "(.*?)"/\n$mark/s) {
+      my $file = $1;
+      my $include = '';
+      if (open $file,$file) {
+        $include = <$file>;
+        close $file;
+      }
+      $dynamic = $htmldoc =~ s/$mark/$include/;
+    }
+    # evaluate <<perl-code>>
+    while ($htmldoc =~ /<<(.+?)>>/s) {
+      local $pc = $1;
+      local $__ = '';
+      tie *STDOUT => "Buffer",\$__;
+      $__ .= eval $pc;
+      untie *STDOUT;
+      $dynamic = $htmldoc =~ s/<<(.+?)>>/$__/s;
+    };
+    # substitute $variable$ with value from environment
+    while ($htmldoc =~ /\$([\w_]+)\$/) {
+      $var = $1;
+      $env = $ENV{$var} || '';
+      $htmldoc =~ s/\$$var\$/$env/g;
+    };
+    $total_size = $size = $s = length($htmldoc);
+  } else {
+    if (@files) {
+      $size = 0;
+    } else {
+      $total_size = -s $file || 0;
+      $size = $total_size - $seek - ($stop ? $total_size-$stop-1 : 0);
+    }
+  }
+
+  if ($size < 0) {
+    http_header('416 Requested Range Not Satisfiable');
+    exit;
+  }
+  
+  alarm($timeout*10);
+  
+  if ($seek or $stop) {
+    my $range;
+    if ($stop) {
+      $range = sprintf("bytes %s-%s/%s",$seek,$stop,$total_size);
+    } else {
+      $range = sprintf("bytes %s-%s/%s",$seek,$total_size-1,$total_size);
+    }
+    nvt_print(
+      'HTTP/1.1 206 Partial Content',
+      'Server: fexsrv',
+      "Content-Length: $size",
+      "Content-Range: $range",
+      "Content-Type: $type",
+      '',
+    );
+  } else {
+    # streaming?
+    if (@files) {
+      nvt_print(
+        'HTTP/1.1 200 OK',
+        'Server: fexsrv',
+        "Expires: 0",
+        "Content-Type: $type",
+        '',
+      );
+    } else {
+      # Java (clients) needs Last-Modified header!
+      # if there are locale versions, use actual time for Last-Modified
+      # to enforce reload of page
+      $file =~ m{/htdocs/(.+)};
+      my @lfiles = glob("$FEXHOME/locale/*/htdocs/$1");
+      my $date = ($dynamic or @lfiles > 1) ?
+                 strftime("%a, %d %b %Y %T GMT",gmtime(time)) :
+                 http_date($file);
+      nvt_print(
+        'HTTP/1.1 200 OK',
+        'Server: fexsrv',
+        "Last-Modified: $date",
+        "Expires: 0",
+        "Content-Length: $size",
+        "Content-Type: $type",
+        '',
+      );
+    }
+  }
+
+  if ($ENV{REQUEST_METHOD} eq 'GET') {
+    if ($type eq 'text/html') {
+      alarm($timeout*10);
+      print $htmldoc;
+    } else {
+      # binary data # can be stream!
+      seek $file,$seek,0 if $seek;
+      while ($b = read($file,$data,$bs)) {
+        if ($stop and $s+$b > $size) {
+          $b = $size-$s;
+          $data = substr($data,0,$b)
+        }
+        $s += $b;      
+        alarm($timeout*10);
+        print $data or last;
+      }
+    }
+    fdlog($log,$file,$s,$size) if $s;
+  }
+  
+  alarm(0);
+  close $file;
+  exit if @files; # streaming end
+  return $s;
+}
+
+
+# show directory index
+sub showindex {
+  my $dir = shift;
+  my ($htmldoc,$size);
+  my @links = ();
+  my @dirs = ();
+  my @files = ();
+  my $uri = $ENV{REQUEST_URI};
+  my $allowed;
+  local $_;
+  
+  $uri =~ s:/+$::;
+  $dir =~ s:/+$::;
+
+  security_check($dir);
+  
+  open my $htindex,"$dir/.htindex" or http_error(403);
+  
+  # .htindex may contain listing regexp
+  chomp ($allowed = <$htindex>||'.');
+  close $htindex;
+  
+  opendir $dir,$dir or http_error(503);
+  while (defined($_ = readdir $dir)) {
+    next if /^[.#]/ or /~$/;
+    if    (-l "$dir/$_") { push @links,$_ }
+    elsif (-d "$dir/$_") { push @dirs,$_ }
+    elsif (-f "$dir/$_") { push @files,$_ }
+  }
+  closedir $dir;
+
+  # parent directory listable?
+  if ($uri =~ m:(/.+)/.+: and -f "$dir/../.htindex") {
+    unshift @dirs,$1;
+  }
+
+  # first the (sub)directories
+  $htmldoc = "<HTML>\n<h1>$uri/</h1>\n";
+  foreach my $d (sort @dirs) {
+    if ($d =~ m:^/: and -f "$d/.htindex") {
+      $htmldoc .= "<h3><a href=\"$d/\">$d/</a></h3>\n";
+    } elsif (-f "$dir/$d/.htindex") {
+      $htmldoc .= "<h3><a href=\"$uri/$d/\">$uri/$d/</a></h3>\n";
+    }
+  }
+  
+#  # then the symlinks
+#  $htmldoc .= "\n<pre>\n";
+#  my $link;
+#  foreach my $l (sort @links) {
+#    if ($l =~ /$allowed/ and $link = readlink "$dir/$l" and $link =~ /^[^.\/]/) {
+#      $htmldoc .= "$l -> <a href=\"$link\">$dir/$link</a>\n";
+#    }
+#  }
+  
+  # then the files
+  $htmldoc .= "\n<pre>\n";
+  foreach my $f (sort @files) {
+    if ($f =~ /$allowed/) {
+      $htmldoc .= sprintf "%20s %20s <a href=\"%s/%s\">%s</a>\n",
+                          isodate(mtime("$dir/$f")),
+                          d3(-s "$dir/$f"||0),
+                          $uri,urlencode($f),$f;
+    }
+  }
+  $htmldoc .= "</pre>\n</HTML>\n";
+  
+  $size = length($htmldoc);
+  nvt_print(
+    'HTTP/1.1 200 OK',
+    'Server: fexsrv',
+    "Content-Length: $size",
+    "Content-Type: text/html",
+    '',
+  );
+  print $htmldoc;
+  fdlog($log,"$dir/",$size,$size);
+}
+
+
+sub mtime {
+  return (lstat shift)[9];
+}
+
+
+sub d3 {
+  local $_ = shift;
+  while (s/(\d)(\d\d\d\b)/$1,$2/) {};
+  return $_;
+}
+
+
+sub http_date {
+  my $file = shift;
+  my @stat;
+  
+  if (@stat = stat($file)) {
+    return strftime("%a, %d %b %Y %T GMT",gmtime($stat[9]));
+  } else {
+    return 0;
+  }
+}
+
+
+sub path_match {
+  my $p1 = abs_path(shift);
+  my $p2 = abs_path(shift);
+
+  if (defined $p1 and defined $p2) {
+    return 1 if $p1          =~ /^\Q$p2/;
+    return 2 if dirname($p1) =~ /^\Q$p2/;
+  }
+  return 0;
+}
+
+
+# return real file name (from symlink)
+sub realfilename {
+  my $file = shift;
+  
+  return '' unless -e $file;
+  
+  if (-l $file) {
+    return realfilename(readlink($file));
+  } else {
+    return $file;
+  }
+}
+
+
+sub security_check {
+  my $file = shift; # can be directory, too
+  my @s;
+
+  # client ip allowed?
+  access_check($file);
+
+  # documents with leading . are not allowed
+  if (abs_path($file) =~ /\/\./) {
+    errorlog("$file with leading .");
+    http_error(403);
+  }
+
+  if (-f $file) {
+
+    # document filename must not contain @
+    if (realfilename($file) =~ /@/) {
+      errorlog("$file contains @");
+      http_error(403);
+    }
+  
+    # document filename must not end with ~
+    if (realfilename($file) =~ /~$/) {
+      errorlog("$file ends with ~");
+      http_error(403);
+    }
+  
+    # file must be group or world readable
+    if (@s = stat($file) and not($s[2] & (S_IRGRP|S_IROTH))) {
+      errorlog("$file not group or world readable");
+      http_error(403);
+    }
+
+    # symlink to regular file and symlink owned by root or fex? ==> ok!
+    if (-l $file and path_match(dirname($file),$docdir)) {
+      @s = lstat($file);
+      return if $s[4] == 0 or $s[4] == $<;
+    }
+    
+  }
+  
+  # file in allowed directory? ==> ok!
+  foreach my $dir (@doc_dirs) {
+    return if path_match($file,$dir);
+  }
+  
+  errorlog("$file not in \@doc_dirs");
+  http_error(403);
+}
+
+# security check: client ip allowed?
+sub access_check {
+  my $file = abs_path(shift);
+  my $dir = $file;
+  my $af;
+  local $_;
+
+  $dir .= '/x' if -d $dir;
+  
+  while ($dir = dirname($dir) and $dir ne '/') {
+    $af = "$dir/.htaccessfrom";
+    if (open $af,$af) {
+      while (<$af>) {
+        s/\s//g;
+        if (ipin($ra,$_)) {
+          close $af;
+          return;
+        }
+      }
+      errorlog("no access to $file by $af");
+      http_error(403);
+    }
+  }
+    
+}
+
+# function for <<perl-code>> inside HTML documents
+sub out {
+  $__ .= join('',@_);
+  return '';
+}
+
+
+# tie STDOUT to buffer variable (redefining print)
+package Buffer;
+sub TIEHANDLE { my ($class,$buffer) = @_; bless $buffer,$class; }
+sub PRINT { my $buffer = shift; $$buffer .= $_ foreach @_; }
+  
+1;

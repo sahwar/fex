@@ -1,0 +1,56 @@
+<html>
+<head><title>F*EX FAQ</title></head>
+<body>
+
+## <pre>
+## << while (($v,$vv) = each %ENV) { print "$v = $vv\n" } >>
+## </pre>
+
+<< 
+  $ENV{PATH_INFO} =~ /(\w+)/ and $ENV{faq} = $faq = $f = $1; 
+  $faq =~ s/(\w)/uc($1)/e;
+  $f = lc $f;
+  print qq(<h1><a href="/index.html">F*EX</a> <a href="FAQ.html">FAQ</a> $faq</h1>\n);
+  print "<h3>";
+  foreach (qw(Meta User Admin Misc)) {
+    print '<a href="',lc($_),'.html?0">',$_,'</a> ';
+  }
+  print "</h3>\n";
+  
+  $ENV{QUERY_STRING} =~ /(\d+)/ and $q = $1;
+  my $n = 0;
+  local $/ = "Q:";
+  local $_;
+  open $faq,"$f.faq" or return;
+  print "<table border=1>\n";
+  $_ = <$faq>;
+  while (<$faq>) {
+    chomp;
+    while (/\$([\w_]+)\$/) {
+      $var = $1;
+      $env = $ENV{$var} || '';
+      s/\$$var\$/$env/g;
+    };
+    ($Q,$A) = split /A:s*/;
+    $A =~ s/([^>\n\\])\n/$1<br>\n/g;
+    $A =~ s/\\\n/\n/g;
+    $A =~ s/<([^\s<>\@]+\@[\w.-]+)>/<a href="mailto:$1">&lt;$1><\/a>/g;
+    $A =~ s: (/\w[\S]+/[\S]+): <tt>$1</tt>:g;
+    $A =~ s/(https?:[^\s<>]+)/<a href="$1">[$1]<\/a>/g;
+    $n++;
+    if ($q) {
+      if ($q == $n) {
+        print "<tr><th>Q$n:<td>$Q</tr>\n";
+        print "<tr><th>A$n:<td>$A</tr>\n";
+      }
+    } else {
+      print "<tr><th>Q$n:<td>$Q</tr>\n";
+      print "<tr><th>A$n:<td>$A</tr>\n";
+      print "<tr><th><td></tr>\n";
+    }
+  }
+  print "</table>\n";
+>>
+
+</body>
+</html>

@@ -1,0 +1,683 @@
+2013-07-28 dop: added .htaccessfrom support
+2013-07-27 fex.ph,dop: security enhancement: 
+                       static documents must be in @doc_dirs
+           dop: documents with leading . are not allowed
+2013-07-25 fexsend: added option -= to upload a file with another name
+2013-07-21 fixed bug environment variables are cut at newline
+2013-07-18 fup,fexsend: use header Content-Location instead of Content-Type for
+                        file linking
+2013-07-15 fup: modifying keep references actual time, not upload date
+           fexsend: fixed bug no feedback on option -x -k (modify keep)
+2013-07-13 fup: fixed bug user specific keep and autodelete defaults are ignored
+2013-07-12 fup,fop: added file link support
+           fexsend: added option -/ for file linking
+2013-07-09 fexget: added option -P proxy:port
+2013-06-28 new all-in-one FAQ
+2013-06-27 fup: to/from storage swap for fexmail and anonymous users
+           fup: anonymous recipient with random number
+2013-06-26 fop: allow multiple downloads from same ip
+           fup,fac: extended "fex yourself" support
+           added sup.html
+2013-06-22 fop,fexsend: Location output for fexmail for already transfered files
+2013-06-19 fexget: fixed bug cannot download MIME file
+2013-06-15 fex.ph: new config variable $notify_newrelease checks
+                   fex.rus.uni-stuttgart.de for new release and sends mail
+2013-06-12 fac(CGI): fixed bug wrong spooldir for virtual server
+2013-06-11 fex.ph: new config variable $usage_conditions for registrations mails
+           fop: fixed bug fexmail download possible only once
+2013-06-10 fac: added option -D to disable a user 
+                (with hooks in fop,fop.fuc,foc,fur)
+2013-06-03 fuc: fixed bug user can modify his auth-ID to an illegal value
+2013-05-30 install: force creation of $admin_pw
+           fex_cleanup: fixed bug wrong fexadmin fexid for reactivation e-mails
+2013-05-25 added afex and asex to distribution
+2013-05-23 dop: fixed bug no output on file.stream 
+2013-05-22 install script installs as user fex (and not as root)
+2013-05-19 security patch: config variable @local_rhosts restricts download of
+                           files from new external users to specific ip ranges
+           use <from> and <to> syntax in notification e-mail header
+           added support for $max_fail_handler()
+2013-05-18 fac: fixed bug option -rd does not work
+           fac: added option -R
+2013-05-16 fop: fexmail support (multiple downloads allowed)
+2013-05-09 fup: fixed bug anonymous only works if $mdomain is defined
+           fop: fixed bug anonymous only works if recipient host is in
+                @anonymous_upload list 
+2013-05-07 fup: fixed bug multiple Location HTTP headers generate an error with
+                some web browsers 
+2013-05-03 added support for axel download accelerator (multiple HTTP Range)
+2013-05-02 add X-FEX-File-ID header to notification e-mails
+2013-04-23 dop: fixed bug HTTP 301 redirection timeout on symlinks
+2013-04-05 fexsend: fixed bug server timeout when sending huge ZIPs
+2013-02-20 fac: added -m maintenance mode
+2013-02-17 fup: fixed bug stored comment in spool not in UTF8
+           fop: fixed bug file deletion also deletes fop.log
+2013-02-16 fur,fex.ph: allow "*" for local domains self registration
+           fex.ph: new config variable @registration_hosts
+           fex.ph: new config variable @admin_hosts
+2013-02-11 fur: fixed bug insecure dependency with exuser
+2013-01-31 receiving of reminder e-mails is user configurable
+2013-01-24 fup: decode UTF8 comment
+2013-01-07 added X-Frame-Options header to prevent clickjacking
+2012-12-26 fup,fexsend: added replyto option
+2012-12-21 dop: download manager prevention:
+                no concurrent downloads from same client with HTTP Range
+2012-12-17 fop: fixed bug ip based download restriction
+2012-12-16 added name based virtual host server
+2012-12-15 fexsrv: HTTP error logging to error.log
+2012-12-07 fex.ph: added optional config variable @durl
+2012-12-04 new feature forward a file from incoming spool
+2012-11-21 fac: show more user information
+2012-11-20 added CAPTIVE user mode
+2012-11-19 fup: with comment NOSTORE file will not be stored ==> benchmarking
+2012-11-14 fexsend: fixed bug gkey and skey URL recipients not working
+2012-11-12 fexsend: 7z archives without compression
+2012-11-08 fop: fixed bug cannot use "?" in file name with fexsend
+2012-11-07 fixed security bug restricted user can redirect files
+2012-11-06 fup: show download-URL after upload if sender = recipient
+           fup,fop,fac: added user up/download IP restriction by admin
+2012-11-05 added HTTP Strict Transport Security if $force_https is enabled
+           fixed bug afex accessible via xkey from everywhere
+2012-11-02 fup: fixed bug one time upload URL gives "no recipient specified" 
+                error
+2012-11-01 fup: fixed bug public upload always gives error
+2012-10-16 fop,fup: added afex support
+           fup: accept recipients . and //
+2012-10-15 sex,sexsend: added anonymous mode (no auth-ID necessary)
+2012-10-14 fop,fup: added support for fexsend anonymous mode
+2012-10-11 fex.ph: added optional config variable $overwrite
+2012-10-10 fup: anonymous upload with non-anonymous recipient
+2012-09-30 fup: fixed bug groups not working any more (NOMAIL)
+2012-09-19 fup: logout functions respects login CGI (or symlink)
+           foc: detailed/brief notification mail configuration
+2012-09-18 fexsend: added options -. and -n
+           fup: added shortmail option in comment
+2012-09-17 added mailmode configuration option in fex.ph
+           fup: shows download-URL if NOMAIL
+2012-09-15 sex: public URL parameter may be in base64 format, too
+2012-09-10 dop: added more security checks
+2012-09-01 dop: added streaming document output
+2012-08-30 sex: fixed bug second receiving client corrupts the stream
+2012-08-26 Changed licence from AGPL to Perl Artistic
+2012-08-21 schwuppdiwupp: error handling on network failures for Windows
+           schwuppdiwupp: removed Tk::FileSelect for Windows
+2012-07-11 fop: fixed bug no multiple downloads for anonymous uploads
+2012-07-10 fixed French, Spanish and Czech localization (code syntax) bugs
+2012-07-09 fup: anonymous upload with modifyable keep option and multiple
+                downloads
+2012-07-05 fexsrv: added camel easteregg
+2012-07-02 fup: added optional anonymous upload with fex.ph variable
+                @anonymous_upload 
+           fup: fixed bug throttle 0 configuration is ignored
+2012-07-01 fexsend: optional argument '@' as files/recipients separator
+           fexsend: fixed bug notification e-mail for recipient '.'
+2012-06-21 dop: inside HTML documents: #include "file" 
+2012-06-06 fexget: new option -+
+2012-06-05 fexsend: new option -+
+2012-06-01 fup: show transfered size instead of total size in status window
+2012-05-04 fexsrv: added bunny easteregg
+2012-05-02 fexsrv: allow HTTP 1.0 with Range header (wget!)
+           fexsrv: disallow negative value in Range (client signed int bug)
+2012-04-26 Changed licence from GPL to AGPL
+2012-04-07 foc: check new address book for syntax errors
+2012-04-06 foc: added comment field for new subuser information
+2012-04-04 removed F*IX because of too many bugs and no maintainer any more
+2012-03-05 fup: fixed bug shell wildcards in recipient address are expanded to
+                known users from spool
+           fex.ph: added optional config variable @locales
+2012-03-01 dop: delivers MIME type text/plain if "?!" is appended to URL
+2012-02-20 foc: show auth-ID after click on link
+2012-02-07 fop: MIME-type text/html is no longer possible for security reasons
+2012-02-04 added optional french localization
+2012-02-03 fixed bug 0.0.0.0 not recognized as ip address
+	   fex.ph: added optional config variable $keep_max
+2012-02-02 HTTP parameter filtering to prevent cross-site scripting attacks
+2012-02-01 config variable @throttle may also contains ip addresses
+2012-01-25 pup: locale selection in native language, default autodelete=no
+           fup: "send another file" with same keep and autodelete parameters
+2012-01-17 fixed bug reactivation.txt in czech instead english
+2012-01-06 fup: fixed bug show wrong remaining keep days
+2012-01-02 fup.pl: fixed bug bad FAQ link
+2011-12-31 fex_cleanup: fixed bug notification e-mails not localized
+2011-12-30 fup: additional dkey.log
+2011-12-05 fup: respect @throttle config for all clients
+2011-11-29 dop: delivers text files (scripts!) without x-bit as "text/plain"
+2011-11-15 fup: fixed bug with $autodelete = $NUMBER;
+2011-11-08 fac: added option -S statistics
+2011-11-02 fup: show remaining keep time in files listing
+2011-10-28 fup: fixed bug uninitialized value when using copy-forward 
+2011-10-13 fup: FILESIZE hack for firefox 7 to support uploads > 4 GB
+2011-10-05 fup: fixed bug wrong sender quota calculation
+2011-10-03 fex.ph: added configuration variables @upload_hosts @download_hosts
+2011-09-30 fexsend: added option -g for sending encrypted files
+2011-09-21 fexsrv: use $default_locale if client sends illegal locale cookie
+2011-09-20 fex.ph: added optional config variable $boring for unhumorous mode
+2011-09-19 fur: $USER/.auto contains additional info about account creation
+2011-09-07 fac(CGI): fixed bug infinitve loop in watch logfile
+2011-09-06 fup,fac,fur: new additional login URL type: 
+                        http://FEXSERVER/fup/B64ID
+           fup: show "or select from address book" only if there are entries
+2011-09-05 fexsrv: fixed bug locale cookie not fetched on http://cgi?parameter
+2011-09-01 rup: fixed bug cannot find files (no more SID in akeys directory)
+2011-08-30 fex.ph: new config variable @forbidden_recipients
+2011-08-29 fexsend: accept file number for delete option -d, too
+           dop: fixed bug no text document output if external file command is 
+                non-GNU
+2011-08-26 added one time upload OKEY
+2011-08-13 fex_cleanup: fixed bug comment missing in reminder e-mail
+2011-08-11 dop: #if ... #else ... #elseif ... #endif inside HTML documents
+           dop: show HTML sourcecode if "!" is appended to URL
+2011-08-10 fex_cleanup: delete obsolete users, too, via fex.ph $account_expire
+           new FAQ design (with Javascript/CSS)
+2011-08-09 fup: show error on invalid SKEY or GKEY
+           fuc: fixed bug subuser and groupuser not lowercase forced
+           address book may also contain option locale=<languange>
+2011-08-08 fex_cleanup: auto-expire user accounts with fex.ph variable 
+                        $account_expire
+           fexsend,fup: allow forward with locale
+           dop: extra security check: files from lib and spool are not allowed
+2011-08-07 fup: subusers and groupusers can also select a locale
+           fup: if user selects a locale login, save it as default locale
+                (does not affect fexsend and schwuppdiwupp)
+           notification e-mails come in default locale
+2011-08-03 fexsend: fixed bug uninitialized value when using chunked mode
+           fexsend: added undocumented option -F female mode
+2011-07-31 fexsend: added option -s streaming data
+           fup: accept streaming data
+2011-07-30 fexsend: -a tar archives no longer use a intermediate transferfile,
+                    but send via pipe (streaming)
+           fexsend: fixed bug no resume on -a archives
+           fexsend: always ask server if file already has been uploaded
+           fup: more information on F*EX clients download and configuration
+2011-07-27 fup: if comment contains "!bcc!" then sender will get a bcc 
+                of notification e-mail
+2011-07-26 fexget: added option -X do not extract archive file
+           fexget: added option -a get all files
+           fexsrv: fixed bug uninitialized value when using a reverse proxy
+           fex_cleanup: fixed bug notify reminder e-mail not localized
+2011-07-22 fac(CGI): fixed bug displaying < and & in logfiles
+           fac(CGI): added getting error.log
+           fop: allow multiple downloads from any client if sender = recipient
+2011-07-16 added doc/reverse_proxy 
+2011-07-14 added optional czech localization
+2011-07-01 FAQ.html reformated
+2011-06-30 translate install job 20 times faster
+2011-06-27 added robots.txt to disallow web robots indexing
+2011-06-22 fup: disable HTML code in file listing (filename & comment)
+2011-06-21 added optional italian localization
+2011-06-17 fixed bug $bcc is ignored
+2011-06-16 fexsend,fexget: better reverse proxy support 
+                           (always send Host header)
+           added optional galician localization
+2011-06-15 fup: fixed bug always keep_default days in notification e-mail
+2011-06-14 fexsend: transparent proxy detection (and support)
+           fixed bug $docdir ignored
+2011-06-10 fex.ph: new config variable $bcc for notification e-mails
+2011-06-09 set Reply-To in all notification e-mails
+           fup: fixed security bug everyone can upload files with empty auth-ID
+2011-06-05 fup: fixed bug insecure dependency in printf on "forward file"
+2011-06-03 fup,fop: added throttle bandwith limit option (fex.ph)
+2011-06-02 fup: added bandwith limit option
+2011-06-01 added PID and request-number to the logs
+           fex_cleanup: fixed bug no expire with AUTODELETE=NO
+2011-05-31 support for FEXLIB /usr/local/share/fex/lib /usr/share/fex/lib
+2011-05-30 fup,fexsend: added option -x to modify file parameters
+2011-05-29 fup,fexsend: forward files with new comment and keep time
+           rup: add mdomain to addresses without domain
+2011-05-18 fup: fixed bug restricted users can forward files to anybody
+2011-05-17 fixed bug access problems with AKEYs: now use SID instead of SIP
+2011-05-11 added helper script mksgkeys (regenerates missing SKEYs and GKEYs)
+2011-05-10 fex_cleanup: cleanup ADDRESS_BOOK file upload
+           fex.ph,fex_cleanup: AUTODELETE=NUMBER ==> 
+                               delete file on next NUMBER day after download
+2011-05-09 fac,fup: added user specific autodelete default
+           fac,fex_cleanup: added user specific keep default
+2011-04-27 fexsend: fixed bug archiv.zip not working on Windows
+           dop: added index function for htdoc directory with .htindex file
+2011-04-25 fexsend: better proxy support (non-persistent connections)
+2011-04-24 xx: better ESXi support (heuristic guessing of tar format)
+2011-04-22 sexsend: base64 support for $FEXID and $FEXXX
+2011-04-01 fexsend: continue without SID if SID is not available
+2011-03-26 fexsrv: deactivate header_hook (inquisition) if request is a 
+                   regular fop request
+2011-03-18 fexsend: base64 support for $FEXID and $FEXXX
+2011-03-09 fexget,fexsend: fixed bug no file listing for https
+2011-03-04 removed "use Switch" because of warnings with perl 5.12
+2011-02-28 sexsend: added option -g show transfer rate
+2011-02-24 dop: evaluate <<perl-code>> inside html documents
+2011-02-21 fexsend,fup: added option fexsend -U show authorized (login) URL
+2011-02-18 do not modify download URL protocol if $dkey is set in fex.ph
+           fac(CGI): fixed bug uninitialized value $server
+           URLs in notification e-mails are derived from config variable $durl
+2011-02-17 fup: fixed bug access denied with SKEY
+2011-02-08 fup,fop,fuc: fixed bug access problems with sip in AKEYs
+           fup: fixed bug no notification e-mail for multiple recipients
+2011-02-07 fexsend,fop: do not send same file (filename and mtime) twice
+2011-02-06 fup: fixed bug no notification e-mail after first failed upload
+2011-01-31 schwuppdiwupp: added ISO-8859-1 support
+2011-01-30 schwuppdiwupp: added running camel
+2011-01-28 schwuppdiwupp: added chunksize to proxy options
+           schwuppdiwupp: fixed bug timeout when using address book
+           fexsend: fixed bug chunksize 0
+2011-01-27 schwuppdiwupp: added advanced preferences Proxy and TMPDIR
+2011-01-26 fex_cleanup: fixed bug uninitialized value in debuglog
+           fex_cleanup: added option -v
+           fexsend,fexget,sexsend: added option -V show version
+           schwuppdiwupp: added drag&drop support for windows
+           schwuppdiwupp: added 7zG support
+2011-01-25 fuc: fixed bug cannot delete all subusers
+           schwuppdiwupp: fixed bug 7-zip not found
+           schwuppdiwupp: added drive letters in directory selection
+2011-01-24 fop: IE bug workaround to store *.exe files
+2011-01-18 schwuppdiwupp: added tar, zip and 7z container
+2011-01-17 fexsend: fixed bug option -l not working with https URL
+2011-01-16 fup: added 7zip hint in notification e-mails
+2011-01-13 schwuppdiwupp: fixed bug no transfer at all when comment is set
+2011-01-12 rup: added logging
+           rup: wrong recipient cannot download file, but will get an error
+           fac(CGI): fixed bug $server not declared
+2011-01-07 fexget: keep file permission in overwrite mode
+2011-01-04 fex_cleanup: fixed bug autodelete after partial download
+2010-12-26 fex_cleanup: fixed bug too early expire for forwarded files
+2010-12-10 new config variable @public_recipients for new CGI pup 
+           (public upload) - upload without auth-ID
+2010-12-09 fex.ph,fur: new config variable @local_rdomain for self-
+                       registration of restricted external-to-internal users
+2010-12-08 fup,foc: no access to foc for restricted users
+2010-12-02 fup: if there is a cgi-bin/login it will be called on "logout"
+2010-11-24 fex.ph: new config variable $default_locale
+           dop: auto-expires every document (to prevent browser caching)
+2010-11-16 fexsrv: better error handling if CGI is not executable
+2010-11-09 new SKEYs and GKEYs, because old ones could be not unique
+           access for subuser only with SKEY
+           access for groupuser only with GKEY
+2010-11-07 fup,fuc: added GKEY
+           fexsend: SKEY or GKEY URLs can be recipients, too
+2010-11-04 fexget: added (hidden) option -K
+2010-11-03 fexsend: fixed bug proxy usage failed
+2010-11-02 fop: fixed bug corrupted download with Internet Explorer 
+2010-10-25 fop,fup: better locking: no uploading is possible while a
+                    download is in progress for the same file
+2010-10-24 fix,fop: fixed bug subuser not working (SKEY problem)
+           xx: added locking
+2010-10-23 xx,fop: added xx :slot option (multiple storage slots)
+2010-10-20 fup,fop,fexsend: fexsend for subuser with SKEY
+2010-10-19 fup: expires *KEY cookies on logout
+2010-10-12 fup: fixed bug wrong interpretation of SKEY parameter+cookie
+2010-10-05 fexend,fup: support of http reverse proxy
+2010-09-27 fup: fixed bug missing Content-Type in upload status report
+2010-09-20 fexsrv: ipv6 http support
+2010-09-15 fac(CGI): fixed bug cannot delete and (re)create user
+           fac(CGI): fixed bug cannot create user who was a recipient
+2010-09-12 fexsend,fop: fixed bug resuming upload does not work with alias
+           fup: fixed bug resuming upload handles autodelete and keep
+                parameters incorrectly
+2010-09-07 fac(CGI): fixed bug not working if there is no user at all
+2010-09-05 fop: extra parameter keep=days
+2010-08-31 install: fixed bug wrong ownership for spool files
+2010-08-25 perl 5.8 required
+           fexget: -s can write to named pipe or character special file
+2010-08-21 fop: $limited_download checks dkey cookie instead of client IP
+2009-08-20 removed mma
+2010-08-18 fex_cleanup: fixed bug not expiring
+2010-08-17 fac: fixed bug accept users without domain
+           install: fixed bug empty $admin_pw
+2010-08-15 fex.ph: optional fix address $sender_from (instead of F*EX user) in
+                   notification e-mail From 
+2010-08-14 added optional spanish localization
+2010-08-12 fup: speedup 90%
+           fop: speedup 20%
+           fop: better fexget compatibility 
+                (close connection after file delivery)
+2010-08-11 fop: fixed IE download bug (missing header separating line)
+           fop: fixed 1 min delay bug on AUTODELETE=YES
+2010-08-08 sex: support for compressed streams
+           sex,sexsend: removed unneccesary text mode (option -t)
+           sex,sexsend: speedup factor 5
+           added sexxx
+2010-08-06 sex: fixed various bugs in client and server
+           fac(CGI): fixed bug AKEY not working
+2010-08-03 xx: no user inquiry for postprocessing if output is a pipe
+2010-08-02 added optional german localization
+2010-07-31 separated subusers in extra file $SPOOL/$USER/@SUBUSER
+2010-07-25 fop: log also aborted downloads
+2010-07-23 added fac CGI
+2010-07-18 fexsrv,fup,fexsend: extra XKEY download with short // URL
+           fexsend: fixed bug CHECKRECIPIENT not working
+2010-07-16 added cookie support (for AKEY and SKEY)
+           fup: fixed bug showstatus window too small for close button
+2010-07-13 schwuppdiwupp: added CHECKRECIPIENT
+2010-07-12 fop,xx: allow several concurrent downloads of STDFEX
+2010-07-10 fop: workaround for stupid IE download bug
+2010-07-03 fex.ph,fex.pp: new config variable @remote_domains
+2010-07-01 fexsrv,fex.ph: new config variable $force_https
+2010-06-29 fop: new config variable $limited_download with default NO 
+                => allow multiple downloads through proxy farm (varying IPs)
+           fop: note every successful download in spool file "download"
+2010-06-25 fexget: fixed bug download status info update too often
+2010-06-23 fur: better sendmail clone compatibility: 
+                use space instead of comma as address separator
+2010-06-19 fexget: new option -o overwrite mode
+           fexget: use ./$file.tmp for downloading instead of $HOME/.fex/tmp/
+2010-06-16 schwuppdiwupp: edit and select address book entries
+2010-06-15 rup: fixed bug case sensitive recipient address
+2010-06-12 fop: send X-File-ID on HEAD request, too
+           fexget: added support of X-File-ID
+2010-06-11 schwuppdiwupp: (chunked) multi-POST for proxy with 4 GB limit
+           schwuppdiwupp: X-File-ID support
+2010-06-08 fup,fexsend: (chunked) multi-POST for proxy with 4 GB limit
+2010-06-06 fup,fop,fexsend: protocol extension X-File-ID (contains mtime
+                            of file) is the successor of X-Size for more 
+                            reliable resume function 
+2010-06-02 schwuppdiwupp: added proxy support
+2010-05-31 fexsend: fixed bug windows path elements in filename
+2010-05-30 better server proxy support: 
+           AKEY and SKEY no longer rely on client ip 
+2010-05-29 fexsend: added proxy support
+2010-05-28 fur: allow registration confirmation more than once
+2010-05-27 fexsend: added option -b bounce (copy-forward)
+2010-05-26 fup,foc: added copy-forward feature
+2010-05-20 fexsend: fixed bug uninitialized value with option -@
+           fur: fixed bug $main::admin not declared
+2010-05-17 fexsend: added option -H for hints
+           fexsend: added option -A for edit server address book
+2010-05-16 fexsend: added HTTPS proxy support
+           fup: fixed bug uninitialized value (line 1059)
+2010-05-13 fup: fixed bug ignored KEEP and AUTODELETE options for groups
+2010-05-12 fup: fixed bug ignored autodelete option from ADDRESSBOOK
+2010-04-30 fup: fixed bug uninitialized value with CHECKRECIPIENT
+           fexsend: no SID for https
+2010-04-28 fup: fixed bug case sensitiv group addresses
+2010-04-27 fexsend: fixed bug ignored server address book options
+           fexsend: displays recipients and options before starting post
+           fup: fixed bug ignored server address book autodelete option
+2010-04-26 fexsrv: log all HTTP headers (no more ignore list)
+2010-04-25 fexsrv: accept HTTP header with continuation lines
+2010-04-22 fex.pp: added htdocs/header.html support
+           fex.ph: added variable @H1_extra organization link and logo
+2010-04-20 fexsrv,fexsend: HTTP header X-Timeout (info server->client)
+           fexsrv: logging with locking
+2010-04-19 fexsend: removed broken option -A and replaced it with more
+                    flexible feature "." for recipient address
+           fexsend: fixed bug dies if sender is subuser (ADDRESS_BOOK error)
+           fup: fixed bug no COMMENT in notification e-mail
+           dop: fixed bug error output with non GNU file command
+2010-04-17 fexsend,fexget: added option -i for alternative accounts or servers
+2010-04-12 fexsend: new verbose output format --> <--
+2010-04-11 fexsend: added option -Q quota query
+2010-04-09 fup,fac: added quota support
+2010-03-25 fup: fixed bug "Insecure dependency" when using AKEY parameter
+                (eg: sending a second file)
+           fup_template.html: fixed bug upload status window always shows
+                              "ERROR: no file data received"
+2010-03-24 fexsend: fixed bug dies if there is no server address book
+2010-03-22 FIX.jar: fixed bug interpret HTTP response "200 OK" as error.
+2010-03-20 fup,fop: set mtime on user directory for last successfull access
+2010-03-19 fexsend: fixed bug abort on short address if there is no server
+                    address book
+           fex_cleanup: better cleanup for dkeys directory
+2010-03-18 fup: fixed bug cannot DELETE with group recipient
+2010-03-17 fup: fixed bug wrong success message on aborted uploads
+           fop: fixed bug cannot handle @group names
+2010-03-16 fup,fuc: fixed bug mixed case in F*EX group names and addresses
+2010-03-14 fex.pp: do not send notification e-mails on empty files
+	   fup,fuc: added F*EX groups
+2010-03-12 fup,fop: fixed bug case sensitiv FROM and TO addresses
+2010-03-05 fup: fixed bug aliases are not accepted with fop_auth
+2010-03-04 fexsrv: use CGI login if it exists as start-page
+2010-02-26 fexsend: first check server address book, then mutt aliases
+           fop: do not terminate session after ADDRESSBOOK request
+2010-02-18 fexget: fixed bug always append existing file, ask for overwriting
+2010-02-08 fexsrv: fixed bug uninitialized value in substitution (line 229)
+           fex.pp: better qmail compatibility (space separated addresses)
+2010-02-07 fac: fixed bug uninitialized $EDITOR environment variable
+2009-12-28 fup,fop,fexsend: protocol extension X-Size for more reliable
+                            resume function (checks size of file)
+2009-12-09 FIX.jar: can send more than one file (in zip archive)
+2009-12-04 fex_cleanup: fixed bug send unnecessary reminder on AUTODELETE=NO
+2009-11-26 fexsend,fexget,fup: added -z option for logfile inquiry
+2009-11-13 fup,fuc: keep and autodelete options in server address book
+2009-11-12 fexsrv: support for HTTP/1.0 persistant connections (for proxys)
+                   PID:SID in fexsrv.log CONNECT string (debugging help)
+2009-11-06 added error.log
+2009-11-03 fex_cleanup: also cleanup $SPOOL/.reg directory
+2009-10-23 fup: added X-FEX-Filesize header in notification e-mail
+2009-10-18 fup: also test if $FROM is a valid e-mail address
+2009-10-11 fex_cleanup: fixed bug no cleanup at all on AUTODELETE=NO
+2009-09-25 fex.pp: added X-Mailer in sent mails to please stupid spamfilter at
+                   hotmail or gmail
+2009-09-02 fur,fex.pp: fixed bug not removing quote chars in qqq strings
+2009-08-28 rup: fixed bug UTF-8 file names
+2009-08-25 FIX.jar: accepts parameters TO, AKEY and SKEY (for subusers)
+2009-08-24 fex_cleanup: fixed bug warning unitialized variable
+2009-08-17 fex_cleanup: fixed bug typo mitime --> mtime
+2009-08-12 fup: fixed bug "send another file" for subusers
+2009-08-10 fexsend: fixed bug timeout on big archives
+2009-07-27 to and from addresses in spool are now always localpart@domain,
+           install contains automatic spool converter
+           fup: fixed bug short aliases address list mismatch
+2009-07-24 fup,fex_cleanup: fixed bug delete all files for multiple
+                            recipients after any download
+           fexget: fixed bug delete local file before download
+2009-07-20 fup: added autodelete and keep hack for HTML form
+2009-07-18 fup: fixed bug leading . in file directory name
+           fup: added CHECKRECIPIENT support
+           fup: code cleanup, new 3-stage user interface
+           fexsend: added CHECKRECIPIENT feature
+2009-07-17 fexget: fixed bug wrong UTF8 handling
+2009-07-16 fop: fixed bug sending wrong file size if TO or FROM has
+                uppercase chars ==> resuming upload did not work
+2009-07-11 fup: can select more than one address from address book
+2009-07-08 fup,fex.pp: fixed bug wrong download URLs
+2009-07-07 new spool directory layout $TO/$FROM/urlencode($FILENAME)
+           fup: be more restrictive in accepting (illegal) parameters values
+           fup,fuc: subuser access key name is now SKEY (KEY is depreciated)
+           rup: new HTML layout, fixed bug in file select box
+2009-07-06 fup: substitute all control characters in file name and comment 
+                with "_"
+2009-07-02 better install script, guesses IP
+2009-06-29 changed spool directory layout 
+           $TO/$FROM/$FILE --> $TO/$FROM/md5h($FILENAME)
+           to avoid filename collisions
+2009-06-28 added mailman authorization mma
+           better address-book integration in fup
+2009-06-26 FIX.jar: fixed several bugs, now working with Windows Vista, too
+2009-06-25 added fup_template.html as an example for customizing upload page
+2009-06-22 fup,fexsend,fexget: LIST also shows COMMENT
+2009-06-10 default timeout 10 s --> 30 s
+2009-06-01 fexsend: show transfer status on STDERR (also for xx)
+2009-05-31 fexsend,fexget: show transfer rate (kB/s)
+2009-05-29 fexsend: auto-reconnect after SIGPIPE (link failure, etc)
+2009-05-26 fexsrv: ignore HTML anchors in GET requests (from stupid msnbot)
+2009-05-17 fup: check if there is enough free space in spool
+2009-04-07 new perl based install; requires server IP for xinetd binding
+2009-03-25 fexget: fixed bug saving failed if on other partition then FEXHOME
+           fexget: fixed bug calculated wrong transfer rate
+           fexget: changed default answers to more secure values 
+2009-03-24 fexsend: new option -l for listing sent files
+           fup: support for listing sent files
+           fex.pp: default charset is now UTF-8 in HTTP reply
+2009-03-16 fur: fixed bug no lower case transformation for user and domain
+2009-03-05 fop: fixed bug no parallel download possible on multiple recipients
+2009-03-03 dop: send Last-Modified HTTP header (java needs it)
+2009-02-27 fuc: send information e-mails to sub-users by click-on-address
+2009-02-22 fop: fixed bug download failed without FROM parameter
+2009-02-20 test for /usr/lib/sendmail and /usr/sbin/sendmail
+2009-02-18 fop: fixed bug file size query for alias recipient
+           fexget: added option -a to get address-book from server
+2009-02-17 fup,fuc: better linking
+2009-02-14 fup: first send notification e-mails, then send HTTP 200 OK to client
+           fup: accept ADDRESS_BOOK as upload
+2009-02-13 fup,foc,fuc: added ADDRESS_BOOK support
+           added fix and FIX.jar (Java applet client)
+2009-02-11 fop: fixed bug file size request with multiple $to gives always 0
+                (no upload resume possible with multiple recipients)
+           fop: check for valid recipient address (in file path)
+                ==> early abort possible when client uses illegal address for 
+                    upload (resume-HEAD-request)
+2009-02-10 fur: catch errors from sendmail(clone) and save them to $log
+2009-02-09 fexsrv: fixed bug wrong log sequence in debug files
+2009-02-04 fup: fixed bug cannot delete files by web interface
+2009-02-03 fexsrv: fixed bug wrong download URL by HTTP_HOST from client request
+2009-01-31 fexsrv: fixed bug handling of missing trailing / in doc requests
+2009-01-30 rup: fixed bug wrong download URL in notification e-mail
+2009-01-26 fexsend: archive format 7z and zip with default compression
+           fup,fuc,foc,rup: link to F*EX start page in top header
+2009-01-21 fuc: URL for subusers with KEY parameter
+           fup.fuc,foc: fixed bug wrong AKEY lookup
+2009-01-20 fexsrv: better handling of URLs with trailing / (==> index.html)
+           fop: fixed bug endless loop with fop_auth mode
+2009-01-13 fup,fop: support for MIME-file types
+           fexsend: added option -M for MIME-file to be displayed in webbrowser
+                    on download
+2009-01-04 fup: increase minimum timeout to 10 s
+2008-12-26 fup: do not allow re-upload (overwrite) if file is in download
+                process
+2008-12-23 sexsend,sexget: added HTTPS/SSL support
+2008-12-21 fup: fixed bug removing old autodelete and error files failed
+2008-12-20 added logwatch
+2008-12-18 fexget: fixed bug responsiveness on slow links 
+           fexget: fixed bug save file name for archives
+2008-12-12 fexget: better responsiveness on slow links (modem, ISDN)
+           fup: added warning for incompatible clients (konqueror, etc)
+2008-12-11 fexsend: allow comments in ID file
+2008-12-03 fup,fex.pp: fixed bug UTF-8 subject in notfication e-mail
+2008-12-02 fexsend: better responsiveness on slow links (modem, ISDN)
+	   fop: send UTF-8 filename in HTTP header Content-Disposition
+           fexget: save original filename (parse HTTP header)
+2008-11-28 fexserv: added special FlashGet (download sucker) brake
+	   html error messages now with HTTP_HOST und server-time info
+2008-11-27 added htdocs/version and htdocs/tools.html
+           added fexsend, fexget, sexsend, sexget to htdocs/download
+           dop: fixed bug symlink of symlink leads to hangup
+           fop: teergrub download managers and other suckers
+2008-11-26 fop: with URL parameter ?KEEP file can be downloaded more than once
+           fexget: added option -k for keep on server
+2008-11-24 fex_cleanup: fixed bug $autodelete not defined
+           fexget: added HTTPS/SSL support
+2008-11-22 fexsrv: reject requests with IP hostnames in HTTP Host header
+2008-11-21 fex.ph,fop: $autodelete="DELAY" allows file download many times
+                       (but only from same IP and until next fex_cleanup run)
+           fup,fop: fixed bug options keep and delete autodelay do not
+                    work with spool on NFS
+2008-11-20 fexsend: added HTTPS/SSL support
+           fex.ph: added config variable $autodelete
+           fup: fixed bug subuser cannot send files
+2008-11-19 use md5-hash of $from:$id instead of URL parameters FROM=$from&ID=$id
+           fac: set correct exit status
+2008-11-16 fup: fixed bug DELETE not working 
+           install: do not overwrite lib/fup.pl (perhaps contains site config)
+2008-11-15 fex_cleanup: clean up $SPOOL/.ukeys/, too
+2008-11-14 fup: show "user config" link only after authorization
+2008-11-13 foc,fuc,fup: quick sub-user creation with auto-notification.
+2008-11-10 fexget: fixed bug query <> instead of <STDIN>
+2008-10-29 fup: do not require HTTP authorization if request already
+                contains ID (methode used by xx)
+2008-10-28 fex.pp: fixed bug $warning not defined
+           fup: fixed bug do not allow subuser in fop_auth mode
+2008-10-27 install: do not overwrite existing htdoc/index.html
+           fup: fixed bug resend (SEEK) leads to HTTP error 666
+2008-10-26 fexsrv: accept HTTP request with absolute URLs (http://...), too
+2008-10-23 fexsrv: fixed bug continue connect logfile entry
+2008-10-17 fexsrv: fixed bug keep_alive with HTTP/1.0
+           fexsrv: fixed bug wrong warning in debug mode with empty line
+2008-10-07 fexsrv: moved TIMEOUT message to debug.log
+2008-10-06 dop: fixed bug opening file (did not deliver any file!)
+           dop: implemented HTTP keep-alive (delivering more than one
+                document per session)
+2008-10-04 if config variable $fop_auth is set, download requires
+           authentication and upload is restricted to registered users
+2008-10-02 dop: declare exectuable scripts as application/octet-stream
+           fup: added link to Windows client schwuppdiwupp.exe
+2008-09-29 write upload speed to upload directory
+2008-09-17 fac: fixed bug locating FEXLIB
+2008-09-12 fup: added config lib/fup.pl
+2008-09-05 fexsend: added rudimentary windows support
+2008-09-03 dop: redirect on relative non-parent symlinks
+2008-08-31 added fur (F*EX User (auto-) Registration)
+2008-08-25 will die when no hostname is available
+2008-08-21 added fexsend to htdocs/download
+           fup: added ID mail sendback option
+2008-08-20 fac: added -l option
+2008-08-19 fexsrv: fixed bug SSL handling
+2008-08-15 fup,fuc,fexsrv: dynamic protocol detection (HTTP/HTTPS)
+2008-08-14 fup: fixed bug login possible with wrong login data (but no upload)
+2008-08-13 fup: showstatus terminates immediately when empty file was uploaded
+           fup: showstatus shows error message on illegal recipient address
+                or when no file was uploaded 
+                (nececessary for stupid Internet Explorer!)
+2008-08-11 splitted debugfiles with time stamp in filename 
+           fex_cleanup: clean up aborted uploads, .ukeys/ and .debug/, too
+           fexsend,fexget: allow more than one file (with all options)
+2008-08-08 fup: eliminate superfluous newlines in logfile on error handling
+           changed bareword filehandles to indirect filehandles
+2008-08-06 fup: decode %NUMBERs in file names from POST
+2008-08-02 fexsend: bug fix -A option and argument handling
+2008-08-01 fup: regular users can change the recipient in the upload form,
+                sub users can not
+2008-07-31 fup: fixed bug internet explorer not showing upload status window
+           fup: fixed bug with id / special id / real id mixup
+           fuc: nearly complete rewrite, better user interface
+2008-07-30 fup: fixed bug when account is a symlink
+           fup: fixed bug in authentication of subusers
+2008-07-03 fop: workaround for Internet Explorer download bug
+2008-07-02 fup,fop: switched default charset from ISO-8859-1 to UTF-8
+           fup: uid for showstatus synchronization
+2008-06-21 fexget: downloading without wget, file number as argument
+2008-06-20 fexget,fop: added DELETE option
+           fexsend: send more files in one run
+2008-05-30 added missing sex to distribution
+           fexsend: added -A archiv to yourself option
+2008-05-28 fup: fixed bug in LIST and DELETE commands
+2008-05-27 fexsrv: correct HTTP redirect on missing trailing / in URL
+2008-05-26 sex,sexsend: better public mode
+2008-05-24 sex,sexsend: added text mode option
+2008-05-23 added missing foc and rup to distribution
+2008-05-20 fexsend: fixed bug in list parsing (-l option)
+	   dop: fixed bug in file type determining on symbolic links
+2008-05-15 fexsrv,dop: fixed bug in HTTP keep_alive multi-requests
+2008-05-02 fexsrv,dop: support for HTTP keep_alive multi-requests
+           fexsrv: more robust header parsing (ignore superfluous spaces)
+2008-04-28 added support for HTTP keep_alive
+	   fexsrv: added SID (session ID) support
+	   fexsend: encrypt ID with MD5 and SID
+2008-04-20 added foc and rup
+	   fop: return apropriate error message when file has been (auto)deleted
+                or is expired; error message is kept 3*keep_default days
+2008-04-19 install: do not overwrite old fex.ph, but create fex.ph_new instead
+2008-04-18 fup: fixed bug filename with path in notification e-mail
+2008-04-16 fexsrv,fop,dop: implemented HTTP HEAD
+2008-04-14 renamed cgilaunch to fexsrv
+           fup: do not send notify-mail if file already exists (overwrite mode)
+           fup: do not accept file if authentication fails
+           fup,fop,fexsend: new secure download URL scheme with random dkey
+2008-04-11 fup: fixed bug in upload bar with 8-bit file names
+           fex_cleanup: fixed bug not removing aborted uploads
+2008-04-10 added F*EX camel logo
+2008-04-09 added dop (generic document output)
+	   install: better infos
+2008-04-08 renamed confusing ID to auth-ID (request by chris@citecs.de)
+           fuc: fixed bug with more than 1 sub-user
+2008-04-07 fup: readded keep parameter (code got lost sometime?)
+	   fup: added sender restriction (ALLOWED_RECIPIENTS)
+	   fac: added restriction option -r and delete user option -d
+2008-04-06 fup: use Net::DNS instead of external host command
+	   fup: more debuglog, fixed wrong error messages
+	   added doc/concept doc/FAQ 
+2008-04-02 install: better error handling (patch by chris@citecs.de)
+           more docs and improved logging
+2008-04-01 cgilaunch: fixed bug in determing REMOTE_HOST when using stunnel
+	   fexget: added -s streaming option
+           sex,sexsend: added public mode
+2008-03-31 changed project name to F*EX because of name collision with
+	   http://freshmeat.net/projects/fex/
+	   added sex, sexsend and sexget to distribution
+2008-03-28 xx: changed syntax, now compatible to zz
+	   added zz to distribution
+2008-03-27 fup: fixed bug in mail address verification
+2008-03-24 fup,fexsend: show transfer rate in kB if filesize < 2 MB
+	   fup: code-cleanup, more comments
+           fex.pp: umask 077
+2008-03-23 fup: fixed bug in using multiple recipients
+2008-03-22 first public release
+2006-11-?? first code

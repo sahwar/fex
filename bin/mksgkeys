@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+
+# helper script to regenerate missing SKEYs and GKEYs
+
+use Digest::MD5 qw(md5_hex);
+
+@pw = getpwnam('fex');
+$spool = $pw[7].'/spool';
+chdir $spool or die "$spool - $!";
+
+foreach $suf (glob "*/\@SUBUSER") {
+  if (-f $suf and open $suf,$suf) {
+    $to = $user = $suf;
+    $to =~ s:/.*::;
+    $user =~ s:/.*::;
+    while (<$suf>) {
+      chomp;
+      s/#.*//;
+      if (/(.+):(.+)/) {
+        $from = $1;
+        $id = $2;
+        $skey = md5_hex("$user:$from:$id");
+        unless (-f ".skeys/$skey") {
+          if (open $skey,">.skeys/$skey") {
+            warn "creating $spool/.skeys/$skey\n";
+            print {$skey} "from=$from\n";
+            print {$skey} "to=$to\n";
+            print {$skey} "id=$id\n";
+            close $skey;
+          }
+        }
+      }
+    }
+    close $suf;
+  }
+}
+
+foreach $guf (glob "*/\@GROUP/*") {
+  if (-f $guf and not -l $guf and open $guf,$guf) {
+    $group = $user = $guf;
+    $group =~ s:.*/::;
+    $user =~ s:/.*::;
+    while (<$guf>) {
+      chomp;
+      s/#.*//;
+      if (/(.+):(.+)/) {
+        $from = $1;
+        $id = $2;
+        $gkey = md5_hex("$user:$group:$from:$id");
+        unless (-f ".gkeys/$gkey") {
+          if (open $gkey,">.gkeys/$gkey") {
+            warn "creating $spool/.gkeys/$gkey\n";
+            print {$gkey} "from=$from\n";
+            print {$gkey} "to=\@$group\n";
+            print {$gkey} "user=$user\n";
+            print {$gkey} "id=$id\n";
+            close $gkey;
+          }
+        }
+      }
+    }
+    close $guf;
+  }
+}

@@ -1,0 +1,2575 @@
+# english:	Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+# german:	Waldemar Bronsch <aw.bronsch@gmx.de>     
+# swabian:	Hans-Georg Bickel <bickelhg@gmx.de>     
+# spanish:	Francisco Ruiz <fjrbas@yahoo.es>
+# galician:	Anton Meixome <meixome@certima.net>
+# italian:	Vanni Piagno <vpiagno@gmail.com>
+# czech:	Michal Simunek <michal.simunek@gmail.com>
+# french:	Jean-Baptiste Denis <jbd@jbdenis.net>
+
+F*EX operation control ERROR
+F*EX Bedienungssteuerungs-Fehler
+F*EX Fehler bei dr Bedienongsschdeuerong
+Error del control de operaciones de F*EX
+Erro do control de operaci&oacute;ns do F*EX
+Errore di controllo delle operazioni di F*EX
+Chyba při řízení provozu F*EX
+Erreur de gestion F*EX
+
+back to F*EX operation control
+Zur&uuml;ck zur F*EX-Bedienungssteuerung
+Zrigg zur Bedienongsschdeuerong
+Volver al control de operaciones de F*EX
+Volver ao control de operaci&oacute;ns do F*EX
+Torna al controllo delle operazioni di F*EX
+Zpět na řízení provozu F*EX
+Retour à la gestion de F*EX
+
+wrong user or auth-ID
+Falscher Benutzer oder falsche auth-ID
+Benutzr odr auth-ID isch falsch
+usuario o auth-ID err&oacute;neo
+o usuario ou o auth-ID son incorrectos
+utente o auth-ID sbagliato
+chybný uživatel nebo ověřovací ID
+utilisateur ou auth-ID invalide
+
+operation control
+Bedienungssteuerung
+Bedienongsschdeuerong
+control de operaciones
+control de operaci&oacute;ns
+controllo delle operazioni
+Řízení provozu
+gestion
+
+for user
+F&uuml;r Benutzer
+Fir dr Benutzr
+para el usuario
+para o usuario
+per l'utente
+pro uživatele
+pour l'utilisateur
+
+You as the sender have a server disk quota of $quota MB and currently using
+Sie als Absender haben auf dem Server insgesamt $quota MB Speicherplatz und Sie benutzen momentan
+Du als Absender hosch uffm Server alles en allem $quota MB Platz zom Schbeichra ond Du benutzsch dovo grad
+Usted como emisario tiene una cuota de disco en el servidor de $quota MB y actualmente en uso
+Vostede como remitente ten unha cota de disco do servidor que est&aacute; utilizando actualmente de $quota MB
+Tu in qualita' di mittente hai una quota disco nel server di $quota MB ed attualmente stai usando
+Jako odesilatel máte na serveru k dispozici $quota MB. Nyní využíváte
+Vous disposez de $quota MB d'espace disque en tant qu'expéditeur et vous utilisez actuellement
+
+sender quota (used)
+Absender Speicherplatz (benutzt)
+Absender Platz zom Schbeichra (benutzt)
+cuota de env&iacute;o (usada)
+cota de remitente (usada)
+quota mittente (in uso)
+limit pro odesilatele (využito)
+quota expéditeur (utilisé)
+
+recipient quota (used):
+Emp&auml;nger Speicherplatz (benutzt):
+Empf&auml;nger Platz zom Schbeichra (benutzt):
+quota de recepci&oacute;n (usada):
+cota de destinatario (usada):
+quota destinatario (in uso):
+limit pro příjemce (využito):
+quota destinataire (utilisé):
+
+Retrieve a list of all your received files</a> in F*EX spool
+Zeige die Liste aller empfangenen Dateien</a>
+Zeig mol a Lischde von &auml;lle empfangene Dateia</a>
+Ver la lista de todos los ficheros</a> recibidos en la cola de F*EX
+Ver a lista de todos os ficheiros</a> recibidos na cola de F*EX
+Richiama una lista di tutti i tuoi file ricevuti</a> nello spool di F*EX
+Načíst seznam všech souborů</a> čekajících ve frontě
+Récupérer une liste de tous les fichiers que vous avez reçus</a>
+
+Show download URLs of files you have sent
+Liste Download URLs von gesendeten Dateien auf
+Zoig Ronderlad URLs von verschickte Dateia
+Mostrar direcciones URL de los archivos enviados
+Amosar os URL dos ficheiros enviados
+Mostra scarica gli URL dei file inviati
+Zobrazit URL pro stažení souborů, které jste odeslali
+Lister les URLs des fichiers que vous avez envoyés
+
+Forward a copy of a file</a> you already have uploaded to another recipient
+Eine Kopie der Datei weiterleiten</a>, welche Sie bereits f&uuml;r einen anderen Empf&auml;nger hochgeladen haben
+A Kobie von der Datei weiderloide</a>, die Du scho fier en andra Empf&auml;nger nuffglade hosch
+Reenviar una copia de un fichero </a> que ha subido a otro destinatario
+Reenviar unha copia dun ficheiro </a> que cargou a outro destinatario
+Inoltra una copia di un file</a> che hai gia' caricato per un altro destinatario
+Přidat příjemce</a> k již nahranému souboru
+Reexpédier une copie d'un fichier</a> que vous avez déja uploadé à un autre destinataire
+
+Redirect files</a> you have uploaded to a wrong or misspelled recipient
+Leite Dateien weiter</a>, die an eine falsche oder ung&uuml;ltige E-Mail Adresse gegangen sind
+Dateia weiderloide</a>, die an a falsche oder ogildige E-Mail-Adress gange send
+Redirigir ficheros</a> que ha subido y enviado a un destinatario equivocado o mal escrito
+Redirixir ficheiros</a> que cargou e enviou a un destinatario equivocado ou mal escrito
+Inoltra file</a> che hai caricato ad un destinatario sbagliato o di cui hai sbagliato l'indirizzo
+Přesměrovat nahrané soubory</a> pro nesprávného či chybně uvedeného příjemce
+Rediriger un fichier que vous avez déja uploadé vers un mauvais destinataire
+
+Create a subuser who can send you files. Enter his e-mail address:
+Subuser anlegen, der Ihnen Dateien schicken kann. Geben Sie seine E-Mail Adresse ein:
+Subuser olega, der dir Dateia schicka ko. Gib sei E-Mail Adress ei:
+Crear un subuser que pueda enviar archivos. Escriba su direcci&oacute;n de correo electr&oacute;nico:
+Crear un subusuario que poida enviarlle ficheiros. Escriba o seu enderezo de correo:
+Crea un sottoutente che possa spedirti dei file. Inserisci il suo indirizzo e-mail:
+Vytvořit poduživatele, který vám může zasílat soubory. Zadejte jeho e-mailovou adresu:
+Créer un utilisateur qui peut vous envoyer des fichiers. Saisir son adresse électronique:
+
+for only one upload
+nur f&uuml;r einen Upload
+bloss fir oimal Nufflada
+por s&oacute;lo una carga
+Soamente para un envío
+per un solo upload
+pouze pro jedno nahrání
+pour un upload unique
+
+Comment to send with information e-mail:
+Kommentar, der mit der Informations E-Mail mitgeschickt wird:
+Kommentar, der mit dr Enformations E-Mail mitgschickt wird:
+Comentario para enviar la informaci&oacute;n por e-mail:
+Comentario que se enviará xunto coa información do correo:
+Commenta per spedire con un'e-mail di notifica:
+V informačním e-mailu odeslat komentář:
+Commentaire à envoyer avec le message d'information:
+
+create subuser and send e-mail
+Subuser anlegen und E-Mail verschicken
+Subuser olegea ond E-Mail verschicka
+crear subuser y enviar e-mail
+Crear un subusuario en enviar un correo
+crea un sottoutente se spedisci l'e-mail
+vytvořit poduživatele a odeslat e-mail
+créer un utilisateur et envoyer un message électronique
+
+You can <a href="/fur">register yourself
+Sie k&ouml;nnen sich <a href="/fur">selbst registrieren
+Du kosch De <a href="/fur">selber regischdriera
+Puede <a href="/fur">autoregistrarse
+Podo <a href="/fur">autorexistrarse
+Puoi <a href="/fur">registrarti
+Můžete <a href="/fur">se zaregistrovat
+Vous pouvez vous <a href="/fur">enregistrer
+
+if you do not have a F*EX account yet
+wenn Sie noch keinen F*EX Account haben
+wenn De no koi F*EX Konto hosch
+si no tiene todav&iacute;a una cuenta en F*EX
+se non ten a&iacute;nda unha conta no F*EX
+se non hai ancora il tuo account F*EX
+pokud ještě nemáte svůj F*EX účet
+si vous n'avez pas déjà un compte F*EX
+
+You may also use <a href="/fup?from=anonymous&to=$a">anonymous upload</a>
+Sie k&ouml;nnen auch <a href="/fup?from=anonymous&to=$a">anonymen Upload</a> verwenden.
+Du kosch au <a href="/fup?from=anonymous&to=$a">anonymes Nufflada</a> nemma.
+Se tambien puede usar <a href="/fup?from=anonymous&to=$a">anonymous upload</a>
+Tamén pode usar <a href="/fup?from=anonymous&to=$a">o envío anónimo</a>
+Potresti anhe utilizzare <a href="/fup?from=anonymous&to=$a">anonymous upload</a>
+Můžete také využít <a href="/fup?from=anonymous&to=$a">anonymnínahrávání</a>
+Vous pouvez aussi utiliser <a href="/fup?from=anonymous&to=$a">l'upload anonyme</a>
+
+<tt>$file</tt> already exists for
+<tt>$file</tt> existiert bereits f&uuml;r
+<tt>$file</tt> gibts scho fir
+<tt>$file</tt> ya existe para
+xa existe <tt>$file</tt> para
+<tt>$file</tt> esiste giàper
+<tt>$file</tt> již existuje pro
+Le fichier <tt>$file</tt> existe déjàpour
+
+<tt>$file</tt> already exists - <a href=\"$purge\">purge it?!</a>
+<tt>$file</tt> existiert bereits - <a href=\"$purge\">entfernen?!</a>
+<tt>$file</tt> gibts scho - <a href=\"$purge\">wegschmeissa?!</a>
+<tt>$file</tt> ya existe - <a href=\"$purge\">&iexcl;&iquest;Purgarlo?!</a>
+xa existe <tt>$file</tt> - <a href=\"$purge\">purgalo?!</a>
+<tt>$file</tt> esiste già - <a href=\"$purge\">lo vuoi eliminare?!</a>
+<tt>$file</tt> již existuje - <a href=\"$purge\">odstranit jej?!</a>
+Le fichier <tt>$file</tt> existe déjà - <a href=\"$purge\">Effacer?!</a>
+
+Manage your subusers and groups
+Subusers und Gruppen verwalten
+Onderbenutzr ond Grubba verwalde
+Gestione sus subusuarios y grupos
+Xestione os seus subusuarios e grupos
+Gestisci i tuoi sotto-utenti e gruppi
+Spravovat své poduživatele a skupiny
+Gérer vos sous-utilisateurs et vos groupes
+
+Change your <a href="" onclick="show_id();" title="$id">auth-ID</a> to
+&Auml;ndern Sie Ihre <a href="" onclick="show_id();" title="$id">auth-ID</a> in
+&Auml;ndr die <a href="" onclick="show_id();" title="$id">auth-ID</a> noch
+Cambie su <a href="" onclick="show_id();" title="$id">auth-ID</a> en
+Cambie o seu <a href="" onclick="show_id();" title="$id">auth-ID</a> en
+Cambia il tuo <a href="" onclick="show_id();" title="$id">auth-ID</a> in
+Změnit si ověřovací ID <a href="" onclick="show_id();" title="$id">auth-ID</a> na
+Changer votre <a href="" onclick="show_id();" title="$id">auth-ID</a> pour
+
+remember it
+merken
+aber ned vergessa, gell
+recuerden
+rec&oacute;rdeo
+ricordati
+zapamatovat
+souvenez-vous en
+
+Edit your address book
+Ihr Adressbuch editieren
+Dei Adressb&uuml;chle bearbeide
+Edite su libro de direcciones
+Edite a s&uacute;a axenda de enderezos
+Edita la tua rubrica
+Upravit adresář
+Éditez votre carnet d'adresses
+
+Get <a href="/fuc?notification=detailed&akey=$akey">detailed</a> notification e-mails (current setting: <em>brief</em>)
+<a href="/fuc?notification=detailed&akey=$akey">Ausf&uuml;rliche</a> Benachrichtigungs E-Mails bekommen (aktuelle Einstellung: <em>kurz</em>)
+<a href="/fuc?notification=detailed&akey=$akey">Langs Gschw&auml;tz</a> en de Benochrichtigongs E-Mails (aktuelle Eischtellong: <em>kurz</em>)
+Recibir <a href="/fuc?notification=detailed&akey=$akey">detallado</a> e-mails de notificación (configuración actual: <em>corto</em>)
+Obter unha <a href="/fuc?notification=detailed&akey=$akey">detallada</a> notificación para os correos (axuste actual: <em>breve</em>)
+Avere <a href="/fuc?notification=detailed&akey=$akey">dettagliata</a> di notifica e-mail (impostazione attuale: <em>breve</em>)
+Dostávat <a href="/fuc?notification=detailed&akey=$akey">podrobné</a> e-maily s oznámením (současné nastavení: <em>zkrácené</em>)
+Recevoir des emails de notifications <a href="/fuc?notification=detailed&akey=$akey">détaillés</a> (configuration courante: <em>simple</em>)
+
+Get <a href="/fuc?notification=short&akey=$akey">brief</a> notification e-mails (current setting: <em>detailed</em>)
+<a href="/fuc?notification=short&akey=$akey">Kurze</a> Benachrichtigungs-E-Mails bekommen (aktuelle Einstellung: <em>detailliert</em>)
+<a href="/fuc?notification=short&akey=$akey">Machs kurz</a> en de Benochrichtigongs-E-Mails (aktuelle Eischtellong: <em>langs Gschw&auml;tz</em>)
+Recibir <a href="/fuc?notification=short&akey=$akey">corto</a> e-mails de notificación (configuración actual: <em>detallado</em>)
+Obter unha <a href="/fuc?notification=short&akey=$akey">breve</a> notificación para os correos (axuste actual: <em>detallado</em>)
+Avere <a href="/fuc?notification=short&akey=$akey">breve</a> notifica e-mail (impostazione attuale: <em>dettagliata</em>)
+Dostávat e-maily s upozorněním v <a href="/fuc?notification=short&akey=$akey">zkráceném</a> formátu (současné nastavení: <em>detailed</em>)
+Recevoir des emails de notifications <a href="/fuc?notification=short&akey=$akey">simple</a> (configuration courante: <em>détaillé</em>)
+
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+<a href="/fuc?reminder=yes&akey=$akey">Erinnerungs</a> E-Mails erhalten (aktuelle Einstellung: <em>keine</em>)
+<a href="/fuc?reminder=yes&akey=$akey">Drodenka</a> E-Mails erhalta (aktuelle Eischtellong: <em>koine</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>)
+
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+<a href="/fuc?reminder=no&akey=$akey">Keine Erinnerungs</a> E-Mails erhalten (aktuelle Einstellung: <em>Erinnerungs E-Mails werden verschickt</em>)
+<a href="/fuc?reminder=no&akey=$akey">Koine Drodenka</a> E-Mails erhalta (aktuelle Eischtellong: <em>Drodenka E-Mails werdad verschickt</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>)
+
+You will now get no reminder notification e-mails
+Sie werden nun keine Erinnerungs E-Mails erhalten
+Du wirsch jetzt koine Drodenka E-Mails meh bekomma
+You will now get no reminder notification e-mails
+You will now get no reminder notification e-mails
+You will now get no reminder notification e-mails
+You will now get no reminder notification e-mails
+You will now get no reminder notification e-mails
+
+You will now get reminder notification e-mails
+Sie werden nun Erinnerungs E-Mails erhalten
+Du wirsch jetzt Drodenka E-Mails bekomma
+You will now get reminder notification e-mails
+You will now get reminder notification e-mails
+You will now get reminder notification e-mails
+You will now get reminder notification e-mails
+You will now get reminder notification e-mails
+
+Notification e-mails now come in detailed format
+Benachrichtigungs-E-Mails kommen ab jetzt in detailliertem Format
+Benochrichtigongs-E-Mails kommet ab jetzt mit langem Gschw&auml;tz
+E-mails de notificación desde ahora datallados
+Os correos de notificación virán a partir de agora en formato detallado
+Notifica e-mail ora sono disponibili in formato dettagliato
+E-maily s upozorněním jsou nyní odesílány v podrobném formátu
+Les emails de notifications sont maintenant au format détaillé
+
+Notification e-mails now come in short format
+Benachrichtigungs-E-Mails kommen ab jetzt in kurzem Format
+Benochrichtigongs-E-Mails kommet ab jetzt em kurzem Format
+E-mails de notificación desde ahora cortos
+Os correo de notificación virán a partir de agora en formato curto
+Notifica e-mail ora sono disponibili in formato breve
+E-maily s upozorněním jsou nyní odesílány ve zkráceném formátu
+Les emails de notifications sont maintenant au format simple
+
+Back to fup (upload page)
+Zur&uuml;ck zu fup (Upload Seite)
+Zrigg zu fup (Nufflad-Seite)
+Volver a fup (p&acute;gina de carga)
+Volver a fup (p&acute;xina de carga)
+Indietro a fup (pagina di caricamento)
+Zpět na fup (stránku pro nahrávání)
+Retour à fup (page d'upload)
+
+Download URLs of files you have sent
+Download URLs von gesendeten Dateien
+Ronderlad URLs von verschickte Dateia
+URLs de descarga de los archivos enviados
+Descargar os URL dos ficheiros enviados
+Scarica URL dei file che sono stati inviati
+URL pro stažení souborů, které jste odeslali
+URLs de téléchargement que vous avez envoyés
+
+<h3>to <tt>
+<h3>an <tt>
+<h3>an <tt>
+<h3>vez <tt>
+<h3>para <tt>
+<h3>per <tt>
+<h3>pro <tt>
+<h3>pour <tt>
+
+reminder F*EX-upload
+Erinnerung F*EX-upload
+Ned vergessa F*EX-upload
+recuerdo del F*EX-upload
+recordatorio do envío F*EX
+ricordo F*EX-upload
+Oznámení o nahraném souboru na F*EX
+Pense-bête F*EX-upload
+
+value="continue"
+value="weiter"
+value="weidr ghods"
+value="continuar"
+value="continuar"
+value="continua"
+value="pokračovat"
+value="continuer"
+
+> user:
+> Benutzer:
+> Benutzr:
+> usuario:
+> usuario:
+> utente:
+> uživatel:
+> utilisateur:
+
+user config ERROR
+ERROR Benutzer-Einstellungen
+ERROR Benutzr-Eischdellunga
+ERROR en la confiuraci&oacute;n del usuario
+Produciuse un ERRO na configuaci&oacute;n do usuario
+ERRORE di configurazione utente
+CHYBA nastavení uživatele
+ERREUR de configuration utilisateur
+
+F*EX user config
+F*EX Benutzer-Einstellungen
+F*EX Benutzr-Eischdellunga
+configuraci&oacute;n del usuario F*EX
+configuraci&oacute;n do usuario F*EX
+Configurazione utente F*EX
+Nastavení F*EX uživatele
+Configuration utilisateur F*EX
+
+An information e-mail has been sent to your subuser
+Eine Benachrichtiguns-E-Mail wurde gesendet zu Ihrem Subuser
+Dein Onderbenutzr isch per E-Mail benochrichdigt worde
+Un correo electr&oacute;nico informativo se ha enviado a su subusuario
+Un correo electr&oacute;nico informativo enviouse ao seu subusuario
+Una e-mail di informazione e' stata spedita al tuo sotto-utente
+Vašemu poduživateli byl odeslán informační e-mail
+Un message d'information a été envoyé à votre sous-utilisateur
+
+A one time upload URL for <tt>$otuser</tt> has been created
+Eine einmal g&uuml;ltige upload URL f&uuml;r <tt>$otuser</tt> wurde angelegt
+A oimol giltig nufflad URL fir <tt>$otuser</tt> isch oglegt worda
+Un URL para subir una vez <tt>$otuser</tt> ha sido creado
+Un enderezo URL de �nico uso para <tt>$otuser</tt> acaba de se crear
+E' stato creato un URL di caricamento utilizzabile una sola volta per l'utente <tt>$otuser</tt>
+Jednorázová URL pro nahrání pro <tt>$otuser</tt> byla vytvořena
+Une URL d'upload à usage unique pour <tt>$otuser</tt> a été créée
+
+and an information e-mail has been sent to this address
+und eine Informations-E-Mail wurde an diese Adresse verschickt
+ond a Was-macha-musch-E-Mail isch do no verschickt worda
+y un email de informaci�n ha sido enviado a esta direcci�n
+e un correo informativo acaba de se enviar a este enderezo
+e una e-mail di informazioni � stata spedita a questo indirizzo
+a informační e-mail byl odeslán na tuto adresu
+et un message d'information a été envoyé à cette adresse
+
+wrong user or auth-ID
+Falscher Benutzer oder falsche auth-ID
+Benutzr oddr auth-ID send falsch
+usuario o auth-ID err&oacute;neo
+o usuario ou o auth-ID son incorrectos
+utente o auth-ID sbagliato
+chybný uživatel nebo ověřovací ID
+utilisateur ou auth-ID invalide
+
+no group name specified
+kein Gruppen-Name angegeben
+Seggl, Du hosch koin Grubbenoma ogebe
+nombre de grupo sin especificar
+non se especificou o nome do grupo
+nome gruppo non specificato
+nebyl uveden žádný název skupiny
+pas de nom de groupe spécifié
+
+is already a registered F*EX full user
+ist bereits ein registrierter F*EX Voll-Benutzer
+isch scho l&auml;ngscht als Vollbenutzr bei F*EX regischdriert
+ya es un usuario normal registrado en F*EX
+xa &eacute; un usuario completo rexistrado en F*EX
+e' gia' un utente F*EX completo registrato 
+je již zaregistrovaným plnohodnotným F*EX uživatelem 
+est déja enregistré en tant qu'utilisateur F*EX
+
+Your subuser upload URL is:
+Ihr Subuser Upload-URL ist:
+Dei Onderbenutzr Nufflad-URL isch:
+La URL de subida de su subusuario es:
+O seu enderezo URL de carga como subusuario:
+L'URL per il caricamento del tuo sotto-utente e':
+URL pro nahrání pro vašeho poduživatele je:
+L'URL d'upload de votre sous-utilisateur est:
+
+Your subusers upload URLs are:
+Die Upload-URLs f&uuml;r Ihre Subusers sind:
+Dui Nufflad-URLs fier Deine Onderbenutzr send:
+Las URLs de sus subusuarios son:
+Os URL de carga dos seus subusuarios
+Gli URL per il caricamento dei tuoi sotto-utenti sono:
+URL pro nahrání pro vaše poduživatele jsou:
+Les URLs d'upload de vos sous-utilisateurs sont:
+
+An information e-mail has been sent to
+Eine Benachrichtigungs-E-Mail wurde gesendet an
+A Benochrichdigongs-E-Mail isch gschickt worde an
+Un correo electr&oacute;nico informativo se ha enviado a
+Enviouse un correo electr&oacute;nico informativo 
+Una e-mail di informazione e' stata spedita a
+Informační e-mail byl odeslán na
+Un message d'information a été envoyé à
+
+<a href="/foc/?akey=$akey">add more subusers
+<a href="/foc/?akey=$akey">weitere Subusers hinzuf&uuml;gen
+<a href="/foc/?akey=$akey">no meh Onderbenutzr drzudo
+<a href="/foc/?akey=$akey">a&ntilde;adir m&aacute;s subusuarios
+<a href="/foc/?akey=$akey">engadir m&aacute;s subusuarios
+<a href="/foc/?akey=$akey">aggiungi ulteriori sotto-utenti
+<a href="/foc/?akey=$akey">přidat více poduživatelů
+<a href="/foc/?akey=$akey">ajouter plus de sous-utilisateurs
+
+Edit address book
+Adressbuch editieren
+Adressb&uuml;chle bearbeita
+Editar el libro de direcciones
+Editar a axenda de enderezos
+Edita la rubrica
+Upravit adresář
+Éditez le carnet d'adresse
+
+Entry:<th>alias<th>e-mail address<th># optional comment
+Eintrag:<th>Alias<th>E-Mail Adresse<th># optionaler Kommentar
+Eidrag:<th>Alias<th>E-Mail Adress<th># Kommendar (kosch macha oddr bleiba lassa)
+Entrada:<th>alias<th>direcci&oacute;n de correo electr&oacute;nico<th># comentario opcional
+Entrada:<th>alias<th>enderezo de correo electr&oacute;nico<th># comentario opcional
+Entrata:<th>alias<th>indirizzo e-mail<th># commento opzionale
+Položka:<th>alias<th>e-mailová adresa<th> volitelný komentář
+Entrée:<th>alias<th>adresse e-mail<th># comment optionnel
+
+Example:
+Beispiel:
+Beischbiel:
+Ejemplo:
+Exemplo:
+Esempio:
+Příklad
+Exemple:
+
+value="submit"
+value="Absenden"
+value="Verschicke"
+valor="enviar"
+valor="enviar"
+value="sottometti"
+value="potvrdit"
+value="soumettre"
+
+You may use these alias names as F*EX recipient addresses on 
+Sie k&ouml;nnen diese Alias-Namen als F*EX Empf&auml;nger-Adressen auf
+Du kosch selle Alias-Nome als F*EX Empf&auml;nger-Adresse uff
+Puede usar estos alias como direcciones de destinatarios en F*EX en
+Pode usar estes alias como enderezos de destinatarios do F*EX en
+Potresti usare questo alias come destinatario di F*EX
+Tyto aliasy můžete používat jako adresy F*EX příjemce na
+Vous pouvez utiliser ces alias comme destinataires F*EX sur
+
+'<a href="/fup?akey=$akey">fup</a>'
+'<a href="/fup?akey=$akey">fup</a> benutzen.'
+'<a href="/fup?akey=$akey">fup</a> nemme.'
+'<a href="/fup?akey=$akey">fup</a>'
+'<a href="/fup?akey=$akey">fup</a>'
+'<a href="/fup?akey=$akey">fup</a>'
+'<a href="/fup?akey=$akey">fup</a>'
+'<a href="/fup?akey=$akey">fup</a>'
+
+Alternatively you can fex a file ADDRESS_BOOK to yourself 
+Alternativ k&ouml;nnen Sie die Datei ADDRESS_BOOK an sich selbst 
+Du kosch au dui Datei ADDRESS_BOOK an De selber
+Tambi&eacute;n puede enviar v&iacute;a fex un fichero ADDRESS_BOOK a si mismo
+Tam&eacute;n pode enviar v&iacute;a fex un ficheiro ADDRESS_BOOK a si mesmo
+Alternativamente puoi inviare un file ADDRESS_BOOK a te stesso
+Nebo si můžete poslat soubor sami sobě
+Vous pouvez aussi vous envoyer un fichier ADDRESS_BOOK
+
+containing your alias definitions
+fexen, welche Ihre Alias-Definitionen enth&auml;lt
+fexe, wo Deine Alias-Definitione dren send
+que contenga sus definiciones de alias
+que conte&ntilde;a as s&uacute;as definici&oacute;ns de alias
+contiene le tue definizioni degli alias
+obsahuje definované aliasy
+contenant vos alias
+
+alias<th>e-mail address<th>options<th>comment
+Alias<th>E-Mail Adresse<th>Optionen<th>Kommentar
+Alias<th>E-Mail Adresse<th>Optionen<th>Kommendar
+alias<th>direcci&oacute;n de correo electr&oacute;nico<th>opciones<th>comentar
+alias<th>enderezo de correo electr&oacute;nico<th>opci&oacute;ns<th>comentar
+alias<th>indirizzo e-mail<th>opzioni<th>commento
+alias<th>e-mailová adresa<th>volby<th>komentář
+alias<th>adresse e-mail<th>options<th>commentaire
+
+back to fup (F*EX upload)
+zur&uuml;ck zu fup (F*EX Upload)
+zrigg zu fup (F*EX Nufflade)
+volver a fup (subida a F*EX)
+volver a fup (subida a F*EX)
+torna a fup (caricamento F*EX)
+zpět na fup (F*EX nahrání)
+retour à fup (F*EX upload)
+
+FEX config updated for
+FEX Konfiguration aktualisiert f&uuml;r
+Konfiguratio von F*EX uffm neieschte Schdand fier
+Actualizaci&oacute;n de la configuraci&oacute;n de F*EX para
+Actualizaci&oacute;n da configuraci&oacute;n de F*EX para
+Configurazione F*EX aggiornata per
+Nastavení FEX aktualizováno pro
+Configuration de FEX mise à jour pour
+
+You have to give these URLs to your subusers for fexing files to you
+Sie m&uuml;ssen diese URLs Ihren Subusers geben, damit sie Dateien an Sie fexen k&ouml;nnen
+Du musch selle URLs Deine Onderbenutzr gebba, damit se Dateia an Di fexe kenne
+Tiene que dar estas URLs a sus subusuarios para que puedan enviarle ficheros v&iacute;a F*EX
+Ten que dar estes URL aos seus subusuarios para que poidan enviarlle ficheiros v&iacute;a F*EX
+Devi dare questi URL ai tuoi sotto-utenti per spedirti file
+Aby vám mohli poduživatelé odesílat soubory, sdělte jim tyto URL
+Vous devez donner ces URLs à vos utilisateurs pour qu'ils puissent vous envoyer des fichiers
+
+Or click on the subuser's e-mail address link to send him an
+Oder klicken Sie auf den E-Mail Adressen-Link des Subusers, um ihm eine
+Oddr klick halt uff de E-Mail Adresse-Link von Deim Onderbenutzr, no kosch ihm a
+O pinche en el enlace a la direcci&oacute;n de correo electr&oacute;nico del subusuario para enviarle un
+Ou prema sobre a ligaz&oacute;n do enderezo de correo do subusuario para enviarlle un
+O clicca nel link dell'indirizzo e-mail del sotto-utente per spedirgli un
+Nebo klikněte na odkaz s e-mailovou adresou poduživatele k odeslání
+Ou cliquer sur l'adresse de messagerie de votre sous-utilisateurs pour lui envoyer un
+
+information e-mail by the F*EX server
+Benachrichtigungs-E-Mail mit Hilfe des F*EX-Servers zu senden
+Benochrichdigongs-E-Mail ieber de F*EX-Server schicke
+correo electr&oacute;nico informativo del servidor de F*EX
+correo electr&oacute;nico informativo v&iacute;a servidor do F*EX
+informazione spedita dal server F*EX
+informačního e-mailu pomocí F*EX serveru
+message d'information du server F*EX
+
+Beware!</b> On the next page, all IDs will be displayed in clear text
+Vorsicht!</b> Auf der n&auml;chsten Seite werden alle Passw&ouml;rter in Klartext dargestellt
+Uffpasse!</b> Uff dr n&auml;gschde Seit werdet &auml;lle Passw&ouml;rter em Klartext ozeigt
+&iexcl;Cuidado!</b> En la p&aacute;gina siguiente, todos los IDs se mostrar&aacute;n sin cifrar
+Atenci&oacute;n!</b> Na vindeira p&aacute;xina, todos os ID se amosar&aacute;n en texto limpo
+Attenzione!</b> Nella pagina successiva, tutti gli ID saranno mostrati in chiaro
+Pozor!</b> Všechna ID se na další stránce zobrazí jako prostý text
+Attention!</b> Sur la prochaine page, tous les IDs seront affichés en clair
+
+Your F*EX account:
+Ihr F*EX Account:
+Dei F*EX Konto:
+Su cuenta en F*EX:
+A s&uacute;a conta no F*EX:
+Il tuo utente F*EX:
+Váš F*EX účet:
+Votre compte F*EX:
+
+New auth-ID:
+Neue auth-ID:
+Neie auth-ID:
+Nuevo auth-ID:
+Novo auth-ID:
+Nuovo auth-ID:
+Nové ověřovací ID:
+Nouvel auth-ID:
+
+(Remember your auth-ID when you change it!)
+(Unbedingt die auth-ID merken wenn sie ge&auml;ndert wird!)
+(Merk Dir obedingd Dei auth-ID wenn Du se g&auml;ndert hosch!)
+(Recuerde su auth-ID cuando lo cambie)
+(Lembre o seu auth-ID cando o cambie)
+(Ricordati il tuo auth-ID quando lo cambi!)
+(Zapamatujte si své ověřovací ID, pokud jej změníte!)
+(Vous devez vous souvenir de votre auth-ID lorsque vous le changez)
+
+Allow special senders (= subusers) to fex files to you:
+Ihren ausgew&auml;hlten Partnern (= Subusers) erlauben, Daten an Sie zu senden:
+Deim erlesene Freindeskreis (= Onderbenutzr) erlaube, Data an Di zom schicka:
+Permitir a remitentes especiales (= subusuario) que le env&iacute;n v&iacute;a F*EX ficheros a usted:
+Permitirlles a remitentes especiais (= subusuarios) enviarlle a vostede ficheiros por F*EX:
+Permetti a utenti speciali (= sotto-utenti) di spedirti file:
+Povolit speciální odesilatele (= poduživatelé), kteří vám mohou zasílat soubory:
+Autoriser des expéditeurs particuliers (= sous-utilisateurs) à vous envoyer des fichiers:
+
+Allow
+Erlaube 
+Erlaub
+Permitir
+Permitir
+Permetti
+Povolit
+Autoriser
+
+"submit and continue"
+"Speichern und weiter"
+"Sbeichra ond weidermache"
+"enviar y continuar"
+"remitir e continuar"
+"sottometti e continua"
+"potvrdit a pokračovat"
+"soumettre et continuer"
+
+save and show upload URLs
+speichern und upload URLs anzeigen
+abschpeichra ond nufflad URLs ozeiga
+guardar y mostrar las direcciones URL de carga
+gardar e amosar URL enviado
+salva e mostra gli indirizzi di upload
+uložit a zobrazit URL pro nahrání
+sauvegarder et lister les URLs d'upload
+
+This list has entries in format:<td>&lt;e-mail address>:&lt;encryption-ID>
+Diese Liste besteht aus Eintr&auml;gen im Format:<td>&lt;E-Mail Adresse>:&lt;encryption-ID>
+Sell Lischt beschdoht aus Eidragonge vom Format:<td>&lt;E-Mail Adress>:&lt;encryption-ID>
+Esta lista tiene las entradas en formato:<td>&lt;e-mail address>:&lt;encryption-ID>
+Esta lista ten entradas co formato :<td>&lt;enderezo de correo>:&lt;ID-cifrado>
+Questa lista ha i contenuti nel formato: <td>&lt;e-mail address>:&lt;encryption-ID>
+PoloÅ¾ky seznamu jsou ve formÃ¡tu:<td>&lt;e-mailovÃ¡ adresa>:&lt;Å¡ifrovacÃ­ID>
+Les entrées de cette liste ont comme format:<td>&lt;adresse e-mail>:&lt;encryption-ID>
+
+These special senders may fex files <em>only</em> to you!
+Diese besonderen Sender k&ouml;nnen Dateien <em>nur</em> an Sie fexen!
+Selle Absender send was Bsonders ond kenne Dateia <em>blo&szlig;</em> an dich fexe!
+&iexcl;Estos remitentes especiales pueden enviar ficheros v&iacute;a F*EX <em>solo</em> a usted!
+Estes remitentes especiais poden enviar ficheiros v&iacute;a F*EX <em>s&oacute;</em> a vostede!
+Questi utenti speciali potrebbero spedire file <em>solo</em> a te!
+Tito speciální odesilatelé mohou odesílat soubory <em>pouze</em> vám!
+Ces expéditeurs particuliers peuvent <em>seulement<em> vous envoyer des fichiers
+
+It is not necessary to add regular fex users to your list,
+Es ist nicht notwendig, regul&auml;re FEX Benutzer zu Ihrer Liste hinzuzuf&uuml;gen
+'S isch net nedich, da&szlig; de regul&auml;re F*EX Benutzr uff Dei Lischde setzsch
+No es necesario a&ntilde;adir usarios de F*EX normales a su lista,
+Non &eacute; necesario engadir usuarios de F*EX normais &aacute; s&uacute;a lista,
+Non e' necessario aggiungere utenti regolari fex alla tua lista,
+Do tohoto seznamu není třeba přidávat běžné F*EX uživatele,
+Il n'est pas nécessaire d'ajouter des utilisateurs de F*EX à votre liste,
+
+because they already can fex
+weil diese bereits auch so fexen k&ouml;nnen
+weil dui kenned sowieso scho fexe
+porque ellos ya pueden enviar v&iacute;a F*EX
+porque eles xa poden enviar v&iacute;a F*EX
+perche' possono gia' spedire con F*EX
+protože ti vždy mohou odesílat soubory
+parce qu'ils peuvent déja utiliser fex
+
+The encryption-ID is necessary to generate a unique upload URL for this subuser
+Die encryption-ID wird f&uuml;r um eine eindeutige upload URL f&uuml;r diesen Subuser zu erzeugen
+Die encryption-ID isch notwendig um a eindeutig upload URL f&uuml;r den Subuser zom macha
+Hace falta una ID de codificaci&oacute;n para generarle a este sub-usuario un inequ&iacute;voco URL para subir
+Fai falta un ID de codificaci&oacute;n para xerarlle a este subusuario un inequ&iacute;voco URL para subir
+L'encryption-ID e' necessario per generare un unico URL di caricamento per questo sotto-utente
+Poduživatel musí mít k vytvoření unikátní URL pro nahrávání šifrovací ID
+L'encryption-ID est nécessaire pour générer une URL d'upload unique pour cet utilisateur
+
+If you omit the encryption-ID a random one will be used
+Wenn Sie die encryption-ID weglassen, wird eine zuf&auml;llige gew&auml;hlt
+Wenn Du die encryption-ID wegl&auml;scht, no wird a zuf&auml;lliga gnomma
+Si se omite el cifrado-ID un nombre cualquiera se utilizar&aacute;
+Se omite o ID-cifrado, utilizarase un aleatorio
+Se tu ometti l'ID crittato uno casuale verrà utilizzato
+Vynecháte-li šifrovací ID, použije se náhodně vygerenrované
+Si vous ne mentionnez pas l'encryption-ID, il sera généré aléatoirement
+
+A F*EX group is similar to a mailing list, but for files
+Eine F*EX Gruppe ist einem E-Mail-Verteiler &auml;hnlich, allerdings eben f&uuml;r Dateien
+A F*EX Grupp isch so was wie en E-Mail-Verdoiler, halt fier Dateia
+Un grupo F*EX es similar a una lista de correo, pero para ficheros
+Un grupo F*EX sem&eacute;llase a unha lista de correo, pero para ficheiros
+Un gruppo F*EX e' simile ad una lista di distribuzione, ma per i file
+F*EX skupina je podobná poštovní konferenci s tím rozdílem, že se odesílají soubory
+Un groupe F*EX est similaire à une adresse de diffusion (mailing-list), mais pour les fichiers
+
+Edit your F*EX groups:
+Editieren Sie Ihre F*EX Gruppen:
+Bearbeit Deine F*EX-Gruppa:
+Edite sus grupos F*EX:
+Edite os seus grupos F*EX:
+Edita i tuoi gruppi F*EX:
+Upravit F*EX skupiny:
+Éditez vos groupes F*EX:
+
+new group
+Neue Gruppe
+Neie Grupp
+Grupo nuevo
+Novo grupo
+nuovo gruppo
+nová skupina
+nouveau groupe
+
+Your F*EX account on
+Ihr F*EX Account auf
+Dei F*EX Konto auf
+Su cuenta F*EX
+A s&uacute;a conta F*EX
+Il tuo utente F*EX
+Váš účet pro F*EX
+Votre compte F*EX sur
+
+Your upload URL
+Ihre upload URL
+Dei nufflad URL
+su URL de subir
+O seu enderezo URL de carga
+Il tuo URL di caricamento
+URL pro nahrání
+Votre URL d'upload
+
+to upload one file to $user
+um eine Datei an $user zu schicken
+om a Datei an $user zom schicka
+para subir un fichero a $user
+para cargarlle un ficheiro a $user
+per caricare un file per $user
+jednoho souboru uživateli $user
+pour uploader un fichier à $user
+
+to upload files to $user
+um Dateien an $user zu schicken
+om Dateia an $user zom schicka
+para subir ficheros a $user
+para subir ficheiros a $user
+per caricare file a $user
+pro nahrávání souborů uživateli $user
+pour uploader des fichiers à $user
+
+to upload files to F*EX group $group
+um Dateien fuer F*EX-Gruppe $group bereitzustellen
+wenn De Dateia fier dui F*EX-Grupp $group nufflade willsch
+para subir ficheros al grupo F*EX $group
+para subir ficheiros ao grupo de F*EX $group
+per caricare file al gruppo F*EX $group
+pro nahrávání souborů F*EX skupině $group
+pour uploader des fichiers au groupe F*EX $group
+
+See http://$ENV{HTTP_HOST}/index.html for more information about
+Siehe http://$ENV{HTTP_HOST}/index.html fuer mehr Informationen ueber
+Guck halt uff http://$ENV{HTTP_HOST}/index.html wenn De meh wisse willsch ieber
+Vea http://$ENV{HTTP_HOST}/index.html para obtener m&aacute;s informaci&oacute;n sobre
+V&eacute;xase http://$ENV{HTTP_HOST}/index.html para obter m&aacute;s informaci&oacute;n sobre
+Vedi http://$ENV{HTTP_HOST}/index.html per ulteriori informazioni
+Více informací o svém účtu získáte na http://$ENV{HTTP_HOST}/index.html
+Voir http://$ENV{HTTP_HOST}/index.html pour plus d'informations sur
+
+Questions? ==> F*EX admin: $admin
+Fragen? ==> Kontaktieren Sie den F*EX Administrator: $admin
+Froga? ==> Belaeschtig ruhig dr F*EX Adminischdrator: $admin
+Preguntas? ==> Administrador de F*EX: $admin
+Preguntas? ==> Administrador do F*EX: $admin
+Domande? ==> Amministratore F*EX: $admin
+Máte otázky? ==> Kontaktujte F*EX správce: $admin
+Questions? ==> Administrateur F*EX: $admin
+
+Your F*EX account on
+Ihr F*EX Account auf
+Dei F*EX Konto auf
+Su cuenta F*EX  en
+A s&uacute; conta F*EX  en
+Il tuo account F*EX su
+Váš F*EX účet na
+Votre compte F*EX sur
+
+A F*EX (File EXchange) account has been created for you on
+Ein F*EX (File EXchange) Account ist fuer Sie angelegt worden auf
+Du hosch jetzt a F*EX (File EXchange) Konto auf
+Una cuenta F*EX (File EXchange) se ha creado para usted en
+Cre&oacute;uselle a vostede unha conta F*EX (File EXchange) 
+Un account F*EX (File EXchange) e' stato creato per te su
+Byl vám vytvořen F*EX (File EXchange) účet na
+Un compte F*EX a été créé pour vous sur
+
+'Use
+'Bitte benutzen Sie
+'Nemm
+'Usa
+'Use
+'Usa
+'Používání
+'Utilisez
+
+See http://$ENV{HTTP_HOST}/ for more information about
+Siehe http://$ENV{HTTP_HOST}/ fuer mehr Informationen ueber
+Guck halt uff http://$ENV{HTTP_HOST}/index.html wenn De meh wisse willsch ieber
+Vea http://$ENV{HTTP_HOST}/ para obtener m&aacute;s informaci&oacute;n sobre
+V&eacute;xase http://$ENV{HTTP_HOST}/ para obter m&aacute;s informaci&oacute;n sobre
+Vedi http://$ENV{HTTP_HOST}/ per ulteriori informazioni
+Informace, jak používat F*EX, naleznete na http://$ENV{HTTP_HOST}/
+Voir http://$ENV{HTTP_HOST}/ pour plus d'informations sur
+
+$notify not found in $gf
+$notify nicht gefunden in $gf
+$notify net gfonda in $gf
+$notify no se encontr&oacute; en $gf
+$notify non se atopou en $gf
+$notify non trovato in $gf
+$notify nebyl v $gf nalezen
+$notify non trouvé dans $gf
+
+Notification e-mail to $notify has been sent
+Benachrichtigungs-E-Mail an $notify wurde gesendet
+Benochrichdigongs-E-Mail an $notify isch verschickt worda
+Correo electr&oacute;nico de notificaci&oacute;n enviado a $notify
+Enviouse un correo de notificaci&oacute;n a $notify
+E-mail di notifica e' stata spedita a $notify
+E-mail s oznámením pro $notify byl odeslán
+Un message d'information a été envoyé à $notify
+
+bad addresses:</h2>\n<ul>
+Fehlerhafte Adressen:</h2>\n<ul>
+Was send au des fier Adresse? Die send grottefalsch::</h2>\n<ul>
+direcci&oacute;n err&oacute;nea: </h2>\n<ul>
+Os enderezos son incorrectos:</h2>\n<ul>
+indirizzo errato:</h2>\n<ul>
+chybné adresy:</h2>\n<ul>
+mauvaises adresses:</h2>\n<ul>
+
+you are already in group \@$group owned by $user
+Sie sind bereits in der Gruppe \@$group welche dem Benutzer $user geh&ouml;rt
+Du bisch doch scho l&auml;ngscht in derra Grupp \@$group von dem Benutzr $user
+ya pertenece al grupo \@$group propiedad de $user
+xa pertence ao grupo \@$group propiedade de $user
+sei gia' nel gruppo \@$group di proprieta' di $user
+ve skupině \@$group vlastněné uživatelem $user se již nacházíte 
+vous êtes déja dans le groupe \@$group de l'utilisateur $user
+
+Go back
+Zur&uuml;ck
+No mol von vorne
+Volver
+Volver
+Torna indietro
+Vrátit se
+Retour
+
+and enter another group name
+und geben Sie einen anderen Namen f&uuml;r die Gruppe ein
+ond geb en andra Noma fier dui Grupp ei
+y introduzca un nuevo grupo
+e introduza un novo grupo
+e inserisci un'altro nome del gruppo
+a zadat jiný název skupiny
+et saisissez un autre nom de groupe
+
+Group \@$group has members:
+Die Gruppe \@$group hat folgende Mitglieder:
+Zur Grupp \@$group ghered:
+Los miembros del grupo \@$group son:
+Os membros do grupo \@$group son:
+Il gruppo \@$group ha i componenti:
+Členové skupiny \@$group:
+Le groupe \@$group a comme membres:
+
+(click address to send a notification e-mail to this user)
+(Klicken Sie auf die Adresse um eine Benachrichtigungs-E-Mail an diesen Benutzer zu senden)
+(Schieb Dei Maus uff d' Adress ond klick. Dann wird a Benochrichdigongs-E-Mail an den Benutzr gschickt)
+(pinche en la direcci&oacute;n para enviar correo electr&oacute;nico de notificaci&oacute;n a este usuario)
+(prema sobre o enderezo de correo electr&oacute;nico de notificaci&oacute;n a este usuario)
+(clicca l'indirizzo per spedire una e-mail di notifica a questo utente) 
+(pro odeslání oznamovacího e-mailu uživateli, klikněte na jeho adresu)
+(cliquer sur l'adresse pour prevenir l'utilisateur avec un message)
+
+Edit F*EX group
+F*EX-Gruppe editieren
+F*EX-Grupp bearbeide
+Editar el grupo F*EX
+Editar o grupo F*EX
+Edita il gruppo F*EX
+Upravit F*EX skupinu
+Éditez le groupe F*EX
+
+A F*EX group is similar to a mailing list, but for files:
+Eine F*EX-Gruppe ist einem E-Mail-Verteiler &auml;hnlich, hier geht es jedoch um Daten-Verteilung:
+A F*EX-Grupp isch so was wie en E-Mail-Verdoiler, allerdengs werde do Date verdoilt:
+Un grupo F*EX es similar a una lista de correo, pero para ficheros:
+Un grupo F*EX &eacute; semellante a unha lista de correo, pero para ficheiros:
+Un gruppo F*EX e' simile ad una lista di distribuzione, ma per i file:
+F*EX skupina je podobná poštovní konferenci s tím rozdílem, že se odesílají soubory:
+Un groupe F*EX est similaire à une liste de diffusion (mailing-list), mais pour des fichiers
+
+When a member fexes a file to this list, 
+Wenn ein Mitglied eine Datei f&uuml;r die Gruppe bereitstellt, 
+Wenn oi Mitglied a Datei fier die reschdlich Grupp nuffl&auml;d
+Cuando un miembro env&iacute;a v&iacute;a F*EX un fichero a esta lista,
+Cando un membro env&iacute;a v&iacute;a F*EX un ficheiro a esta lista,
+Quando un componente spedisce un file a questa lista,
+Odešle-li člen soubor do konference,
+Lorsque un membre envoie un fichier à cette liste
+
+then all other members will receive it
+dann werden alle anderen Mitglieder diese Datei erhalten
+no krieget &auml;lle andere wo in derre Grupp send, selle Datei
+entonces todos los dem&aacute;s miembros lo recibir&aacute;n
+ent&oacute;n todos os dem&aacute;is membros o recibir&aacute;n
+allora tutti gli altri componenti la riceveranno
+obdrží jej všichni členové
+tous les autres membres vont le recevoir
+
+New group name: <input type="text" name="group"> (You MUST fill out this field!)
+Neuer Name f&uuml;r die Gruppe: <input type="text" name="group"> (Sie M&Uuml;SSEN dieses Feld ausf&uuml;llen!)
+Neier Nome fier d' Grupp: <input type="text" name="group"> (Des Feld MUSCH Du ausfille!)
+Nuevo nombre de grupo: <input type="text" name="group"> (&iexcl;DEBE rellenar este campo!)
+Novo nome de grupo: <input type="text" name="group"> (DEBE cubrir este campo!)
+Nuovo nome del gruppo: <input type="text" name="group"> (DEVI compilare questo campo!)
+Název nové skupiny: <input type="text" name="group"> (Toto políčko MUSÍTE vyplnit!)
+Nouveau nom du groupe: <input type="text" name="group"> (Ce champ ne peut pas être vide)
+
+This list has entries in format:<td>&lt;e-mail address>
+Diese Liste besteht aus Eintr&auml;ge in folgendem Format haben:<td>&lt;E-Mail Adresse>
+Die Lischde bschdohd aus Eitr&auml;g em Format:<td>&lt;E-Mail Adresse>
+Esta lista debe tener las entradas en el formato: <td>&lt;direcci&oacute;n de correo electr&oacute;nico>
+Esta lista debe ter as entradas no formato: <td>enderezo de correo electr&oacute;nico> 
+Questa lista deve avere le righe in questo formato:<td>&lt;indirizzo e-mail>
+Položky seznamu musí být ve formátu:<td>&lt;e-mailová adresa>
+Cette liste doit avoir des entrées de la forme:<td>&lt;Adresse e-mail>
+ 
+You define the auth-ID for this group member, which may not be a regular F*EX user
+Sie legen selbst die auth-ID f&uuml;r dieses Gruppen-Mitglied fest, das aber kein regul&auml;rer F*EX-Benutzer sein sollte
+Du beschdimmsch selber d' auth-ID von dem Gruppemitglied. Seller sodd abbr koin regul&auml;rer F*EX-Benutzr sei
+Usted establece el auth-ID para este miembro del grupo, que no puede ser un usuario normal de F*EX
+Vostede estabelece o auth-ID para este membro do grupo, que non pode ser un usuario normal de F*EX
+Definisci l'auth-ID per il membro di questo gruppo, il quale potrebbe non essere un utente F*EX regolare
+Definujete ověřovací ID pro člena skupiny, který zřejmě není běžným F*EX uživatelem
+Vous définissez l'auth-ID pour le membre de ce groupe, qui ne peut pas être un utilisateur F*EX ordinaire
+
+You can name any existing e-mail address
+Sie k&ouml;nnen hier eine beliebige g&uuml;ltige E-Mail Adresse angeben
+Du kosch do a giltige E-Mail-Adress nach Deim Guschto eigebba
+Puede nombrar cualquier direcci&oacute;n de correo electr&oacute;nico
+Pode nomear calquera enderezo de correo electr&oacute;nico
+Puoi nominare qualsiasi indirizzo e-mail esistente
+Jakoukoli existující e-mailovou adresu můžete pojmenovat
+Vous pouvez désigner n'importe quelle adresse e-mail existante
+
+delete file after download
+Datei nach dem Download l&ouml;schen
+Datie nachm Ronderlada l&ouml;sche
+borrar el fichero tras su descarga
+borrar o ficheiro trala s&uacute;a descarga
+cancella il file dopo il download
+smazat soubor po stažení
+effacer le fichier après le téléchargement
+
+do not delete file after download
+Datei nach dem Download nicht l&ouml;schen
+Datei nachm Ronderlada net l&ouml;sche
+no borrar el fichero tras su descarga
+non eliminar o ficheiro despois da descarga
+non cancellare il file dopo il download
+nemazat soubor po stažení
+ne pas supprimer le fichier après le téléchargement
+
+delete file after download with delay
+Datei nach dem Download mit Verz&ouml;gerung l&ouml;schen
+Datei nachm Ronderlada erscht schp&auml;ter l&ouml;sche
+borrar el fichero tras su descarga con retardo
+borrar o ficheiro tras a s&uacute;a descarga con atraso
+cancella il file dopo il download con ritardo
+smazat soubor po stažení až po
+effacer le fichier après un délai à la suite du téléchargement
+
+F*EX service
+F*EX-Service
+F*EX-Dienscht
+Servicio F*EX
+Servizo F*EX
+servizio F*EX
+Služba F*EX
+Service F*EX
+
+Your reqested F*EX auth-ID for $fup?from=$from is:
+Ihre angefragte F*EX auth-ID fuer $fup?from=$from ist:
+Dei nochgfrogte F*EX auth-ID fir $fup?from=$from isch:
+Su auth-ID de F*EX solicitada para $fup?from=$from es:
+O seu auth-ID de F*EX solicitado para $fup?from=$from &eacute;:
+Il tuo auth-ID di F*EX che hai richiesto per $fup?from=$from e':
+Požadované ověřovací ID pro $fup?from=$from je:
+Votre auth-ID F*EX pour $fup?from=$from est:
+
+Or use:
+Oder Sie verwenden:
+Odr du nemsch:
+Or use:
+Or use:
+Or use:
+Or use:
+Or use:
+
+Your reqested F*EX login is:
+Ihr angefragter F*EX login ist:
+Dei agfragte F*EX login isch:
+Su solicitada login de F*EX es:
+A seu login solicitado de de F*EX &eacute;:
+Il tuo login F*EX richiesto e':
+Požadované přihlašovací údaje pro F*EX:
+Votre login F*EX est:
+
+Mail has been sent to you
+Mail wurde gesendet an Sie
+Mail isch an Dich gschickt worde
+El mensaje de correo se le ha enviado 
+A mensaxe de correo xa se lle enviou
+Ti e' stata spedita una e-mail
+Zpráva vám byla odeslána
+Le message vous a été envoyé
+
+is not a regular F*EX user
+ist kein regul&auml;rer F*EX Benutzer
+isch koin ordnongsgem&auml;&szlig;er F*EX-Benutzr
+no es un usuario normal de F*EX
+non &eacute; un usuario normal de F*EX
+non e' un utente regolare F*EX
+není běžným F*EX uživatelem
+n'est pas un utilisateur F*EX ordinaire
+
+You are not in this group
+Sie sind nicht in dieser Gruppe
+Du ghersch net zu derra Grupp
+Nos es miembro de este grupo
+Non &eacute; membro deste grupo
+Non sei in questo gruppo
+Nejste členem této skupiny
+Vous n'êtes pas dans ce groupe
+
+Recipient group has no members
+Empf&auml;nger-Gruppe hat keine Mitglieder
+Dui Grupp wo des no soll hot koine Miglieder
+El grupo destinatario no tiene miembros
+O grupo de destinatarios non ten membros
+I gruppi di distribuzione non hanno membri
+Skupina příjemců nemá žádné členy
+Le groupe destinataire n'a pas de membre
+
+No such group
+Diese Gruppe existiert nicht
+Selle Grupp gibt's net. Huatsempel
+No existe tal grupo
+Non existe tal grupo
+Non esiste questo gruppo
+Tato skupina neexistuje
+Groupe non trouvé
+
+unknown dkey
+Unbekannter dkey
+Den dkey kenn i net
+dkey desconocido
+dkey desco&ntilde;ecido
+dkey sconosciuto
+neznámý dkey
+dkey inconnue
+
+has been deleted by %s at %s
+wurde gel&ouml;scht von %s um %s
+isch gl&ouml;scht worde von %s um %s
+ha sido borrado por %s a las %s
+eliminado por %s &eacute;s %s
+e' stato cancellato da %s a %s
+byl smazán uživatelem %s dne %s
+a été effacé par %s le %s
+
+$filename deleted
+$filename gel&ouml;scht
+$filename gl&ouml;scht
+$filename borrado
+$filename eliminado
+$filename cancellato
+$filename byl smazán
+$filename effacé
+
+$filename not deleted ($s)
+$filename nicht gel&ouml;scht ($s)
+$filename net gl&ouml;scht
+$filename no borrado ($s)
+$filename non eliminado ($s)
+$filename non cancellato ($s)
+$filename nebyl smazán ($s)
+$filename non effacé ($s)
+
+> continue
+> weiter
+> Weiterschaffe
+> continuar
+> continuar
+> continua
+> pokračovat
+> continuer
+
+Files from
+Dateien von
+Dateia von
+Ficheros de
+Ficheiros de
+File da
+Soubory od
+Fichiers de
+
+Files for $to (*):
+Dateien f&uuml;r $to (*):
+Dateia fier $to (*):
+Ficheros para %to (*):
+Ficheiros para %to (*):
+File per $to (*):
+Soubory pro $to (*):
+Fichiers pour $to (*):
+
+\nfrom $from 
+\nVon $from 
+\nVon $from 
+\nde $from
+\nde $from
+\nda $from
+\nod $from 
+\nde $from 
+
+>delete<
+>l&ouml;schen<
+>l&ouml;scha<
+>borrar<
+>eliminar<
+>cancella<
+>smazat<
+>effacer<
+
+>forward<
+>weiterleiten<
+>weiterleita<
+>forward<
+>forward<
+>forward<
+>forward<
+>forward<
+
+Files for other e-mail addresses you own will not be listed here!
+Dateien f&uuml;r Ihre andere E-Mail Adressen werden hier nicht aufgelistet!
+Dateia fier Deine andre E-Mail Adressa werded dohanne net uffglischtet!
+&iexcl;Los ficheros para otras direcciones de correo electr&oacute;nico suyas no son listadas aqu&iacute;!
+Os ficheiros para outros enderezos de correo electr&oacute;nico que te&ntilde; non se listan aqu&iacute;!
+File per altri indirizzi di e-mail che ti appartengono non saranno elencati qui!
+Soubory pro další e-mailové adresy, které vlastníte, zde nebudou uvedeny!
+Les fichiers associés à vos autres adresses ne vont pas être listés ici!
+
+you are overquota
+Sie haben Ihr Speichervolumen &uuml;berzogen
+Dei Schbeicherplatz isch rappelvoll
+ha excedido su cuota
+sobrepasou a s&uacute; cota
+Hai superato la quota
+překročili jste limit
+vous avez dépassé votre quota
+
+cannot receive files: is overquota
+Kann Dateien nicht annehmen: Speichervolumen &uuml;berzogen
+I ko die Dateia net onemme: Dein Schbeicher isch scho vollgschdopft
+no puede recibir ficheros: ha excedido su cuota
+non pode recibir ficheiros: sobrepasou a s&uacute;a cota
+non e' possibile ricevere il file: eccede la quota assegnata 
+soubory nelze přijmout: překračují limit
+ne peut pas recevoir de fichiers: quota dépassé
+
+You ($from) are not allowed to fex to $to
+Sie ($from) d&uuml;rfen nicht fexen an $to
+Du ($from) derfsch net fexa an $to
+Usted ($from) no puede enviar v&iacute;a F*EX a $to
+Vostede ($from) non est&aacute; autorizado para enviar, v&iacute;a F*EX, a $to
+Tu ($from) non hai il permesso di spedire via F*EX a $to
+Vy ($from), nemáte dovoleno odesílat soubory pro $to
+Vous ($from) n'êtes pas autorisé à envoyer un fichier à $to
+
+recipient <tt>$to</tt> is not a registered F*EX full or sub user
+Emp&auml;nger $to ist kein registrierter F*EX Voll- oder Subuser
+Dr Empf&auml;nger $to isch koin regischtrierder F*EX Voll-  oddr Onderbenutzr
+el destinatario $to no es un usuario normal de F*EX registrado o un subusuario
+o destinatario $to non &eacute; un usuario normal de F*EX rexistrado ou un subusuario
+il destinatario $to non e' un utente o sotto-utente F*EX registrato
+příjemce $to není zaregistrovaným plnohodnotným uživatelem či poduživatelem F*EX
+le destinataire <tt>$to</tt> n'est pas un utilisateur ou un sous-utilisateur F*EX
+
+no upload key
+kein upload-Einmalschl&uuml;ssel
+koi nufflad-Oimolschlissel
+ningun llave para subir
+non se cargou a chave
+no chiave di caricamento
+žádný klíč pro nahrání
+pas de clé d'upload
+
+request another one from
+fordern Sie einen neuen an von
+frog noch'm Neua bei
+pida otro de
+solicitar outra en
+richiedine un altro da
+požádat o jiný uživatele
+demander un autre de
+
+value="register"
+value="registrieren"
+value="regischtrier"
+value="registrado"
+value="rexistrado"
+value="registrato"
+value="zaregistrovat"
+value="inscription"
+
+Your client seems to be "$1" which is incompatible with F*EX and will probably not work
+Ihr Client scheint "$1" zu sein, das ist aber inkompatibel mit F*EX und wird vermutlich nicht funktionieren
+Dein Client isch scheints "$1", des isch abbr inkomatibel mit F*EX ond so wird des wahrscheinlich nix
+Su cliente parece ser "$1" que es incompatible con F*EX y probablemente no funcionar&aacute;
+O seu cliente parece ser "$1" que &eacute; incompat&iacute;bel con F*EX e probablemente non funcionar&aacute;
+Il vostro client sembra essere "$1", che e' incompatibile con F*EX e probabilmente non funzionera'
+Zřejmě používáte prohlížeč "$1", který není kompatibilní s F*EX a pravděpodobně nebude správně fungovat
+Votre client semble être "$1" qui est incompatible avec F*EX et ne va sans doute pas fonctionner
+
+We recommend firefox
+Wir empfehlen \"Firefox\"
+Mir empfehled \"Firefox\"
+Recomendamos firefox
+Recomendamos firefox
+Raccomandiamo firefox
+Doporučujeme používat Firefox
+Nous recommandons firefox
+
+sender:
+Absender:
+Absendr:
+remitente:
+remitente:
+mittente:
+odesilatel:
+expéditeur:
+
+recipient:
+Empf&auml;nger:
+Empf&auml;ngr:
+destinatario:
+destinatario:
+destinatario:
+příjemce:
+destinataire:
+
+recipient(s):
+Empf&auml;nger:
+Empf&auml;ngr:
+destinatario(s):
+destinatario(s):
+destinatario(i):
+příjemce(i):
+destinataire(s):
+
+recipient(s)<
+Empf&auml;nger<
+Empf&auml;ngr<
+destinatario(s)<
+destinatario(s)<
+destinatario(i)<
+příjemce(i)<
+destinataire(s)<
+
+e-mail address or alias
+E-Mail Adresse oder Alias
+E-Mail Adress oddr Alias
+direcci&oacute;n de correo electr&oacute;nico o alias
+enderezo de correo electr&oacute;nico ou alias
+indirizzo e-mail o alias
+e-mailová adresa či alias
+adresse e-mail ou alias
+
+or select from your address book
+oder aus Ihrem Adressbuch w&auml;hlen
+oddr aus Deim Adressb&uuml;chle raussuche
+o seleccione de su libro de direcciones
+ou seleccione da s&uacute;a axenda de enderezos
+o seleziona dal tuo rubrica
+nebo si vyberte ze svého adresáře
+ou sélectionner de votre carnet d'adresses
+
+and'
+und'
+ond'
+y'
+e'
+e
+a'
+et'
+
+add to recipients list
+zur Empf&auml;nger-Liste hinzuf&uuml;gen
+uff d' Empf&auml;ngerlischte setze
+a&ntilde;ada a la lista de destinatarios
+engadir &aacute; lista de destinatarios
+aggiungi alla lista di distribuzione
+přidejte jej (je) do seznamu příjemců
+ajouter à la liste des destinataires
+
+check recipient(s) and continue
+Empf&auml;nger &uuml;berpr&uuml;fen und fortsetzen
+Empf&auml;nger ieberpriafe ond weitermache
+compruebe el/los destinatario(s) y contin&uacute;e
+comprobe o/os destinatario(s) e contin&uacute;e
+controlla i/il destinatari(o) e continua
+zkontrolovat příjemce a pokračovat
+vérifier le ou les destinataires et continuer
+
+or <
+oder <
+odr <
+or <
+or <
+or <
+or <
+or <
+
+fex yourself
+eigene Adresse verwenden
+fex dir selbr
+fex yourself
+fex yourself
+fex yourself
+fex yourself
+fex yourself
+
+> user config & operation control
+> Benutzer Bedienungssteuerung
+> Benutzr Bdienongssteierong
+> configuraci&oacute;n de usuario y control de operaci&oacute;n
+> configuraci&oacute;n de usuario e control de operaci&oacute;n
+> configurazion utente & controllo operazioni
+> nastavení uživatele a řízení provozu
+> configuration utilisateur et gestion
+
+Alternate Java client</a> (for files > 2 GB or sending of more than one file)
+Alternativer Java Client</a> (f&uuml;r Dateien gr&ouml;&szlig;er als 2 GB oder zum Senden von mehr als einer Datei)
+Alternativer Java Client</a> (fier Dateia wo gr&ouml;&szlig;er send als 2 GB oder zum Sende von meh als oiner Datei)
+Cliente java alternativo</a> (par ficheros > 2 GB o env&iacute;o de m&aacute;s de un fichero)
+Cliente java alternativo</a> (para ficheiros > 2 GB ou env&iacute;o de m&aacute;s dun fichero)
+Client java alternativo</a> (per file > 2 GB o per spedizioni di piu' di un file)
+Alternativní Java klient</a> (pro soubory větší než 2 GB či pro odesílání více než jednoho souboru)
+Client Java alternatif</a> (pour les fichiers > 2 GB ou envoyer plusieurs fichiers d'un coup)
+
+You have to fill out this form completely to continue
+Sie m&uuml;ssen dieses Formular komplett ausf&uuml;llen um fortzufahren
+Du musch des Formular ganz ausff&uuml;lla sonsch kosch ned weitrmacha
+Hace falta cumplimentar este formulario completamente antes de continuar
+Fai falta cubrir este formulario completamente antes de continuar
+Devi riempire completamente questo form per continuare
+Pro pokračování musíte kompletně vyplnit formulář
+Merci de compléter ce formulaire pour continuer
+
+sender quota (used):<td>$quota ($du) MB
+Absender Quota (benutzt):<td>$quota ($du) MB
+Absendr Quota (benutzt):<td>$quota ($du) MB
+cuota de remitente (usada):<td>$quota ($du) MB
+cota de remitente (usada):<td>$quota ($du) MB
+quota utente (usata):<td>$quota ($du) MB
+limit pro odesílání (used):<td>$quota ($du) MB
+quota expéditeur (utilisé):<td>$quota ($du) MB
+
+autodelete:
+Automatisches L&ouml;schen:
+Automadischs L&ouml;sche:
+autoborrar:
+autoeliminaci&oacute;n:
+autocancellazione:
+automatické mazání:
+suppression automatique
+
+keep file max $keep days, then delete it"><td>keep:<td>$keep days
+Behalte die Datei f&uuml;r max. $keep Tage, dann l&ouml;sche sie"><td>Bleibt auf Server:<td>$keep Tage
+Bhalt die Datei fier h&ouml;chschdens $keep Tage, dann kosch se l&ouml;sche"><td>Bleibt uffm Server:<td>$keep Dag
+conserve el fichero un m&aacute;ximo de $keep d&iacute;as, a continuaci&oacute;n borrelo"><td>keep:<td>$keep d&iacute;as
+conserve o ficheiro un m&aacute;ximo de $keep d&iacute;as, a seguir b&oacute;rreo"><td>gardar:<td>$keep d&iacute;as
+conserva il file al massimo per $keep giorni, quindi cancellalo"><td>mantieni:<td>$keep giorni
+uchovat soubor maximálně $keep dnů, pak jej smazat"><td>uchovat:<td>$keep dnů
+garder les fichiers au maximum $keep jours et les supprimer"><td>keep:<td>$keep jours
+
+comment:
+Kommentar:
+Kommendar:
+comentario:
+comentario:
+commento:
+komentář:
+commentaire:
+
+bandwith limit
+Bandbreitenbeschr&auml;nkung
+Bandbroidebschr&auml;nkong
+anchura de banda
+largo de banda
+limite di banda
+omezení rychlosti
+limite de bande passante
+
+optional, full speed if empty
+optional, volle Geschwindigkeit wenn leer
+optional, volle Lotte wenn leer
+opcional, velocidad maximal en caso de vacia
+opcional, velocidade m&aacute;xima cando baleira
+opzionale, massima velocita' se vuoto
+volitelné, je-li prázdné, využije se plná rychlost
+optionnel, pas de limite si non renseignée
+
+optional, will be included in notification e-mail
+optional, wird in Benachrichtigungs-E-Mail mitgeschickt
+optional, isch no en dr Benochrichtigongs-Mail mit drbei
+optional, will be included in notification e-mail
+optional, will be included in notification e-mail
+optional, will be included in notification e-mail
+optional, will be included in notification e-mail
+optional, will be included in notification e-mail
+
+no notification e-mail will be send
+es wird keine Benachrichtigungs-E-Mail verschickt
+s\'wird koi Benochrichtigongs-Mail verschickt
+No se enviará ningún correo de notificación
+non se enviará notificación de correo
+nessuna notificazione via e-mail verrà spedita
+žádný e-mail s upozorněním se neodešle
+aucun message de notification ne sera envoyé
+
+(optional
+(optional
+(optional
+(opcional
+(opcional
+(opzionale
+(volitelné
+(optionnel
+
+If you want to send more than one file, then put them in a zip or tar archive
+Wenn Sie mehr als eine Datei senden m&ouml;chten, dann erzeugen Sie ein zip oder tar Archiv
+Wenn De meh als oi Datei verschigge willsch, no mach a zip oddr a tar Archiv
+Si desea enviar m&aacute;s de un fichero p&oacute;ngalos en un archivo zip
+De querer enviar m&aacute;s dun fichero p&oacute;&ntilde;aos nun arquivo zip
+Se vuoi spedire piu' di un file, mettili in un archivio zip o tar
+Chcete-li odeslat více jak jeden soubor, zkomprimujte jej do zip nebo tar archivu
+Si vous voulez envoyer plus d'un fichier, mettez les dans un zip ou une archive tar
+
+file:
+Datei:
+Datei:
+fichero:
+ficheiro:
+file:
+soubor:
+fichier:
+
+user config & operation control
+Benutzer Konfigurations- und Bedienungssteuerung
+Benutzr Konfigurations- ond Bedienongssteierong
+configuraci&oacute;n de usuario & control de operaciones
+configuraci&oacute;n de usuario e control de operaci&oacute;ns
+configurazione utente & controllo operazioni
+nastavení uživatele a řízení provozu
+configuration utilisateur & gestion
+
+I have lost my auth-ID! Send it to me by e-mail! 
+Habe meine auth-ID vergessen! Bitte mir diese per E-Mail zuschicken! 
+I hann mei auth-ID vrschlampt! Schick se mir no mol per E-Mail!
+&iexcl;He perdido mi auth-ID! &iexcl;Env&iacute;emelo por correo electr&oacute;nico!
+Perd&iacute;n o meu auth-ID! &iexcl;Env&iacute;emo por correo electr&oacute;nico!
+Ho perso il mio auth-ID! Spediscimelo via e-mail!
+Zapomněl jsem své ověřovací ID! Odešli mi jej na e-mail!
+J'ai perdu mon auth-ID ! Le recevoir par e-mail !
+
+I have lost my auth-ID
+Habe meine auth-ID vergessen
+I hann mei auth-ID vrschlampt
+He perdido mi auth-ID
+Perd&iacute;n o meu auth-ID
+Ho perso il mio auth-ID
+Zapomněl jsem své ověřovací ID
+J'ai perdu mon auth-ID
+
+you must fill out sender field above
+Sie m&uuml;ssen oben dazu das \"Absender\"-Feld ausf&uuml;llen
+Du musch drzu do obe des  \"Absendr\"-Feld ausfille
+debe rellenar el campo remitente anterior
+debe cubrir o campo remitente anterior
+devi riempire il campo mittente sopra
+musíte vyplnit políčko odesilatel výše
+vous devez renseigner le champ expéditeur
+
+check ID and continue
+weiter
+weider
+comprobar el ID y continuar
+comprobar o ID e continuar
+controlla ID e continua
+ověřit ID a pokračovat
+vérifier l'ID et continuer
+
+no file specified
+Keine Datei angegeben
+Koi Datei ogebbe
+no se espcific&oacute; el fichero
+non se espcific&oacute;u o ficheiro
+nessun file specificato
+nebyl uveden soubor
+aucun fichier spécifié
+
+no sender specified
+Kein Absender angegeben
+Koin Absendr ogebbe
+no se especific&oacute; el remitente
+non se especific&oacute;u o remitente
+nessun mittente specificato
+nebyl uveden odesilatel
+aucun expéditeur spécifié
+
+no recipient specified
+Kein Empf&auml;nger angegeben
+Koin Empf&auml;ngr ogebbe
+no se especific&oacute; el destinatario
+non se especific&oacute; o destinatario
+nessun destinatario specificato
+nebyl uveden příjemce
+aucun destinataire spécifié
+
+wrong auth-ID specified
+Falsche auth-ID angegeben
+Falsch auth-ID ogebbe
+auth-ID especificado err&oacute;neo
+o auth-ID especificado &eacute; incorrecto
+auth-ID indicato sbagliato
+bylo uvedeno chybné ověřovací ID
+auth-ID erroné
+
+address book updated
+Adressbuch aktualisiert
+Adressb&uuml;chle isch uffm neueschte Schdand
+libro de direcciones actualizado
+axenda de enderezos actualizada
+rubrica aggiornata
+adresář byl aktualizován
+carnet d'adresses mis à jour
+
+cannot rename $filed/upload to
+Konnte $filed/upload nicht umbenennen in
+I hab $filed/upload net umbenenne k&ouml;nne in
+no se puede renombrar $filed/upload a
+non se pode renomear $filed/upload como
+non posso rinominare $filed/upload in
+nepodařilo se přejmenovat $filed/upload na
+ne peut pas renommer $filed/upload en
+
+No file data received
+Keine Daten erhalten
+Koine Date kriegt
+No se ha recibido ning&uacute;n fichero de datos
+Non se recibiu ning&uacute;n ficheiro de datos
+Nessun file di dati ricevuto
+Data souboru nebyla přijata
+aucune donnée reçue
+
+File name correct?
+Stimmt der Dateiname?
+Isch der Dateinome richdig?
+&iquest;Nombre de fichero correcto?
+Nome de ficheiro correcto?
+Nome file corretto?
+Je název souboru správný?
+Est-ce que le nom du fichier est correct ?
+
+File too big (browser-limit: 2 GB!)?
+Datei zu gro&szlig; (Browser-Limit: 2 GB!)?
+Die Datei isch zu gro&szlig; (Browser-Limit: 2 GB!)?
+&iquest;Fichero demasiado grande (l&iacute;mite del navegador: &iexcl;2GB!)?
+Ficheiro demasiado grande (l&iacute;mite do navegador: 2GB!)?
+File troppo grande (limite-browser: 2 GB!)?
+Není soubor příliš velký (limit prohlížeče: 2 GB!)?
+Fichier trop volumineux (limite du navigateur: 2GB!)?
+
+is not allowed at beginning of 
+ist nicht erlaubt am Anfang von 
+des derfsch net mache am Ofang von
+no se permite al principio de
+non se permite ao principio de
+non e' consentito all'inizio di
+není povoleno na začátku
+n'est pas autorisé au début de
+
+is not allowed in 
+ist nicht erlaubt in 
+des derfsch net mache in
+no se permite en
+non se permite en
+non e' consentito in
+není povoleno v
+n'est pas autorisé dans
+
+is not allowed
+ist nicht erlaubt
+des derfsch net mache
+no se permite
+non se permite
+non e' consentito
+není povoleno
+n'est pas autorisé
+
+is not allowed at end of 
+ist nicht erlaubt am Ende von 
+des derfsch net mache am End von
+no se permite al final de
+non se permite ao final de
+non e' consentito alla fine di
+není povoleno na konci
+n'est pas autorisé à la fin de 
+
+invalid Content-Length
+Ung&uuml;ltiger Content-Length
+Ung&uuml;ltiger Content-Length
+Content-Length inv&aacute;lido
+O Content-Length &eacute; incorrecto
+Content-Length non valido
+Content-Length není platné
+Content-Length invalide
+
+not enough free space for this upload
+Nicht genug freier Speicher f&uuml;r diesen Upload
+'S isch net gnug Schbeicher frei om des nuffzulade
+no hay espacio libre suficiente para la subida
+non hai espazo libre suficiente para a subida
+non c'e' abbastanza spazio per questo caricamento
+pro nahrání není dost místa
+pas assez d'espace libre pour cet upload
+
+missing sender e-mail address
+E-Mail Adresse vom Sender fehlt
+koi E-Mail Adress vom Sender
+falta la direcci&oacute;n del remitente
+falt o enderezo do remitente
+manca l'indirizzo e-mail del mittente
+chybí e-mailová adresa odesilatele
+e-mail de l'expéditeur manquant
+
+is not a valid e-mail address
+ist keine g&uuml;ltige E-Mail Adresse
+des isch koi giltige E-Mail Adress
+no es una direcci&oacute;n de correo electr&oacute;nico v&aacute;lido
+non &eacute; un enderezo de correo electr&oacute;nico correcto
+non e' un indirizzo e-mail di posta valido
+není platná e-mailová adresa
+n'est pas une adresse e-mail valide
+
+no file data received - does your file exist or is it >2GB
+Keinen Datensatz erhalten - existiert die Datei wirklich oder ist es gr&ouml;&szlig;er als 2 GB
+I hab koine Date kriegt - Gibt's dui Datei ieberhaupt oddr isch se gr&ouml;&szlig;er als 2 GB
+no se ha recibido ning&uacute;n fichero - existe su fichero o es >2GB
+non se recibiu ning&uacute;n ficheiro - existe o seu ficheiro ou &eacute; >2GB
+non e' stato ricevuto nessun file - il tuo file esiste o e' >2GB
+data souboru nebyla přijata - zkontrolujte, zda soubor existuje nebo není větší než 2 GB
+pas de donnée reçue - est-ce que votre fichier existe or est-il >2GB
+
+file size unknown
+Dateigr&ouml;&szlig;e unbekannt
+Koi Ohnung, wie gro&szlig; dui Datei isch
+tama&ntilde;o del fichero desconocido
+tama&ntilde;o do ficheiro desco&ntilde;ecido
+dimensione file sconosciuta
+neznámá velikost souboru
+taille du fichier inconnue
+
+file size
+Dateigr&ouml;&szlig;e
+So fett isch des Doil
+tama&ntilde;o del fichero
+tama&ntilde;o do ficheiro
+dimensione file
+velikost souboru
+taille du fichier
+
+no filename?!
+Kein Dateiname?!
+Koin Dateinome?!
+&iexcl;&iquest;no hay nombre de fichero?!
+non hai nome de ficheiro?!
+manca il nome del file ?!
+zadali jste název souboru?!
+pas de nom de fichier ?!
+
+transfer is already in progress
+ein Transfer l&auml;uft gerade
+'S isch grad en Transfer am laufe
+la transferencia ya est&aacute; en curso
+a transferencia xa est&aacute; en marcha
+il trasferimento e' gia' in corso
+přenos již probíhá
+le transfert est déjà en cours.
+
+a download is currently in progress
+ein Download l&auml;uft gerade
+'S wird grad was ronderglade
+una descarga est&aacute; ahora en curso
+unha descarga est&aacute; agora en marcha
+un download e' al momento in corso
+probíhá stahování
+un téléchargement est en cours
+
+no file data for
+Keine Datei-Daten f&uuml;r
+Koine Datei-Date fier
+no ha fichero para
+non hai ficheiro para
+nessun file per
+žádná data souboru pro
+pas de données pour
+
+File "$filename" copy-forwarded to $to and notified
+Datei "$filename" wurde kopiert und an $to weitergeleitet. $to wurde benachrichtigt
+Datei "$filename" isch kopiert ond an $to weitergleided worde. $to isch benochrichdigt
+Fichero "$filename" copiada reenviada a $to y notificado
+Ficheiro "$filename" copiada reenviada a $to e notificada
+File "$filename" copia inoltrata a $to e notificata
+Soubor "$filename" kopie byla předána na $to a oznamovací e-mail byl odeslán
+Le fichier "$filename" a été retransmis à $to et un message a été envoyé
+
+forward a copy of "<tt>$filename</tt>" to:
+Eine Kopie von "<tt>$filename</tt>" weiterleiten an:
+A Kopie von "<tt>$filename</tt>" weiterschicke an:
+reenviada una copia de "<tt>$filename</tt>" a:
+reenviada unha copia de "<tt>$filename</tt>" a:
+inoltra una copia di "<tt>$filename</tt>" a:
+předat kopii souboru "<tt>$filename</tt>" na:
+Transmettre une copie de "<tt>$filename</tt>" à:
+
+F*EX user registration ERROR
+F*EX-Benutzer Registrierungsfehler
+F*EX-Benutzr Regischdrierongsfehler
+ERROR en el registro del usuario F*EX
+ERRO no rexistro do usuario F*EX
+ERRORE di registrazione utente F*EX
+Chyba při registraci F*EX uživatele
+ERREUR lors de l'enregistrement de l'utilisateur F*EX
+
+F*EX user registration
+F*EX-Benutzer Registrierung
+F*EX-Benutzr Regischdrierong
+registro del usuario de F*EX
+rexistro do usuario de F*EX
+registrazione utente F*EX
+registrace F*EX uživatele
+Enregistrement d'un utilisateur F*EX
+
+illegal registration key
+Illegaler Registrierungs-Schl&uuml;ssel
+Der Regischdrierongsschlissel gildet net
+clave de registro ilegal
+chave de rexistro ilegal
+chiave di registrazione illegale
+neplatný registrační klíč
+Clé d'enregistrement illégale
+
+no registration key
+Kein Registrierungs-Schl&uuml;ssel
+Koin Regischdrierongsschlissel
+sin clave de registro
+sen chave de rexistro
+non c'e' la chiave di registrazione
+žádný registrační klíč
+pas de clé d'enregistrement
+
+no registration data for key
+Keine Registrierungs-Daten f&uuml;r Schl&uuml;ssel
+Koine Regischdrierongsdate fier den Schlissel
+no hay datos de registro para la clave
+non hai datos de rexistro para a chave
+non ci sono dati di registrazione per la chiave
+žádná registrační data pro klíč
+pas de données d'enregistrement pour la clé
+
+Your registration was successful. Your new F*EX account is:
+Ihre Registrierung war erfolgreich. Ihr neuer F*EX-Account ist:
+Du hoschs gschafft. Dein neies F*EX-Konto isch:
+Su registro tuvo existo. Su nueva cuenta F*EX es:
+O rexistro foi correcto. A s&uacute;a nova conta F*EX &eacute;:
+La tua registrazione e' stata eseguita con successo. Il tuo nuovo utente F*EX e':
+Registrace proběhla úspěšně. Váš nový F*EX účet je:
+Votre enregistrement s'est bien déroulé. Votre nouveau compte F*EX est:
+
+bookmark this URL
+nehmen Sie diese URL in ihre Bookmarks auf
+des musch en deine Bookmarks aufnehma
+Crear marcador de este URL
+engadir este enderezo URL aos marcadores
+inserisci questo URL nei preferiti
+přidat URL k oblíbeným
+sauvegarder cette URL
+
+or you can use
+oder Sie verwenden
+oder du nemsch
+o puede usar
+ou pode utilizar
+o puoi usare
+nebo můžete
+ou vous pouvez utiliser
+
+Your domain <tt>$exd</tt> is not allowed for registration
+Ihre Domain <tt>$exd</tt> ist nicht zugelassen f&uuml;r Registrierung
+Dei Domain <tt>$exd</tt> ghod ned for d'Regischtrierong
+Your domain <tt>$exd</tt> is not allowed for registration
+Your domain <tt>$exd</tt> is not allowed for registration
+Your domain <tt>$exd</tt> is not allowed for registration
+Your domain <tt>$exd</tt> is not allowed for registration
+Your domain <tt>$exd</tt> is not allowed for registration
+
+Registrations from your host ($ra) are not allowed
+Registrierungen von Ihrem Host ($ra) sind nicht erlaubt
+Regischdrieronga von Deim Host ($ra) send net geschdaddet
+Los registros desde su equipo ($ra) no est&aacute;n permitidos
+Os rexistros desde o seu equipo ($ra) non est&aacute;n permitidos
+Registrazioni dal tuo host ($ra) non sono permesse
+Registrace z vašeho počítače ($ra) nejsou povoleny
+Les enregistrements à partir de votre poste ($ra) ne sont pas autorisés
+
+Contact $ENV{SERVER_ADMIN} for details
+Kontaktieren Sie $ENV{SERVER_ADMIN} f&uuml;r Details
+Wend De an $ENV{SERVER_ADMIN}, wenn De N&auml;heres wisse willsch
+Contacte con $ENV{SERVER_ADMIN} para obtner m&aacute;s detalles
+Contacte con $ENV{SERVER_ADMIN} para obter m&aacute;s detalles
+Contatta $ENV{SERVER_ADMIN} per i dettagli
+Pro více informací kontaktujte $ENV{SERVER_ADMIN}
+Contacter $ENV{SERVER_ADMIN} pour des détails supplémentaires
+
+$user is disabled
+$user ist gesperrt
+$user isch gschperrt
+$user is disabled
+$user is disabled
+$user is disabled
+$user is disabled
+$user is disabled
+
+new user:
+Neuer Benutzer:
+Neier Benutzr:
+nuevo usuario:
+novo usuario:
+nuovo utente:
+nový uživatel:
+nouvel utilisateur:
+
+new external user:
+Neuer externer Benutzer:
+Neier externer Benutzr:
+nuevo usuario externo:
+novo usuario externo:
+nuovo utente esterno:
+nový externí uživatel:
+nouvel utilisateur externe:
+
+or<p>
+oder<p>
+odr<p>
+o<p>
+ou<p>
+o<p>
+nebo<p>
+ou<p>
+
+must be a valid e-mail address!
+Mu&szlig; eine g&uuml;ltige E-Mail Adresse sein!
+des muss a giltige E-Mail-Adress sei!
+&iexcl;debe ser una direcci&oacute;n de correo electr&oacute;nico!
+debe ser un enderezo de correo electr&oacute;nico!
+deve essere un indirizzo e-mail valido!
+musí být platná e-mailová adresa!
+doit être une adresse e-mail valide !
+
+You are already registered
+Sie sind bereits registriert
+Du bisch doch scho l&auml;ngscht regischdriert
+ya est&aacute; registrado
+xa est&aacute; rexistrado
+sei gia' registrato
+již jste zaregistrovaní
+Vous êtes déjà enregistré
+
+new user (may send to internal or external users)
+neuer Benutzer (darf an interne oder externe Benutzer senden)
+neur Benutzr (darf an intern odr extern Benutzr senda)
+nuevo usuario (permitido a enviar a usuarios internos o externos)
+novo usuario (permitido enviar a usuarios internos ou externos)
+nuovo utente (potresti spedire ad utenti interni o esterni)
+nový uživatel (může odesílat interním či externím uživatelům)
+nouvel utilisateur (peut envoyer à des utilisateurs internes ou externes)
+
+new external user (may send only to internal users)
+neuer externer Benutzer (darf nur an interne Benutzer senden)
+neur externer Benutzr (darf bloss an interne Benutzr senda)
+nuevo usuario externo (solamente permitido a enviar a usuarios internos)   
+novo usuario externo (soamente pode enviar a usuarios internos)
+nuovo utente esterno (potrebbe spedire solo a utenti interni)
+nový externí uživatel (může odesílat pouze interním uživatelům)
+nouvel utilisateur externe (peut seulement envoyer à des utilisateurs internes)
+
+internal domains are
+interne Domains sind
+interne Domains senn
+dominio internos 
+son dominios internos
+domini interni sono
+interní domény jsou
+les domaines internes sont
+
+you must enter your e-mail address and
+Sie m&uuml;ssen Ihre E-Mail Adresse eingeben
+Du musch dei E-Mail Adress ogeba
+hace falta introducir su direcci&oacute;n de correo electr&oacute;nico
+debe escribir o seu enderezo de correo electr&oacute;nico e
+devi inserire un indirizzo e-mail e 
+musíte zadat svou e-mailovou adresu a
+vous devez donner votre adresse e-mail et
+
+your e-mail address
+Ihre E-Mail Adresse
+dei E-Mail Adresss
+s&uacute; direcci&oacute;n de correo electr&oacute;nico
+o s&eacute;u enderezo de correo electr&oacute;nico
+il tuo indirizzo e-mail
+vaše e-mailová adresa
+votre adresse e-mail
+
+Subject: F*EX user registration
+Subject: F*EX-Benutzer Registrierung
+Subject: F*EX-Benutzrregischdrierong
+Sujeto: Registro del usuario de F*EX
+Suxeito: Rexistro do usuario de F*EX
+Oggetto: registrazione utente F*EX
+Předmět: Registrace F*EX uživatele
+Sujet: Enregistrement F*EX
+
+$user has been auto-registrated with
+$user wurde auto-registriert mit
+$user isch auto-regischdriert worde mit
+$user ha sido autoregistrado con
+$user foi autorexistrado con
+$user e' stato autoregistrato con
+$user byl automaticky zaregistrován s
+l'utilisateur $user a été automatiquement enregistré avec
+
+Subject: F*EX user registration request
+Subject: F*EX-Benutzer Registrierungs-Anfrage
+Subject: F*EX-Benutzrregischdrierongsofrog
+Sujeto: Petici&oacute;n de registro de usuario F*EX
+Suxeito: Petici&oacute;n de rexistro de usuario F*EX
+Oggetto: richiesta registrazione utente F*EX
+Předmět: Požadavek na zaregistrování F*EX uživatele
+Sujet: Demande d'enregistrement d'utilisateur F*EX
+
+To activate your new F*EX account go to this URL:
+Um Ihren neuen F*EX-Account zu aktivieren oeffnen Sie diese URL:
+Om Die neis F*EX-Konto zu aktiviere, gang uff die URL:
+Para activar su nueva cuenta en F*EX vaya a esta URL:
+Para activar a s&uacute;a nova conta en F*EX vaia a este URL:
+Per attivare il tuo nuovo utente F*EX vai a questo URL:
+Pro aktivaci svého nového F*EX účtu přejděte na tuto URL:
+Pour activer votre nouveau compte F*EX, rendez vous à cette URL:
+
+The conditions of usage are:
+Die Benutzungsbedingungen sind:
+Die Mitmachregla senn:
+The conditions of usage are:
+The conditions of usage are:
+The conditions of usage are:
+The conditions of usage are:
+The conditions of usage are:
+
+confirmation e-mail has been sent to <tt>$user
+Best&auml;tigungs-E-Mail wurde gesendet an Benutzer <tt>$user
+Beschd&auml;digongs-E-Mail isch gschickt worde an Benutzr <tt>$user
+Un correo electr&oacute;nico de confirmaci&oacute;n se le ha enviado a <tt>$user
+Envi&oacute;uselle un correo electr&oacute;nico de confirmaci&oacute;n a <tt>$user
+e-mail di conferma e' stata spedita a <tt>$user
+potvrzovací e-mail byl odeslán uživateli <tt>$user
+Un message de confirmation a été envoyé à <tt>$user
+
+This is an automatically generated e-mail
+Dies ist eine maschinell generierte E-Mail
+Des isch a Automata-E-Mail
+Este e-mail ha sido generado automaticamente
+Este correo foi xerado automaticamente
+Questa e' una e-mail generata automaticamente
+Toto je automaticky vytvořený e-mail
+Ceci est un message généré automatiquement
+
+illegal domain for username
+illegale Domain fuuml;r Benutzernamen
+illegale Domain fier de Benutzrnome
+dominio ilegal para el nombre de usuario
+o dominio deste nome de usuario &eacute; irregular
+dominio illegale per l'utente
+neplatná doména pro uživatelské jméno
+domaine invalide pour l'utilisateur
+
+F*EX redirect ERROR
+F*EX Umadressierungs-FEHLER
+F*EX Bei der Omadressierong isch was schiefgloffe
+ERROR de redirecci&oacute;n de F*EX
+Produciuse un ERRO de redirecci&oacute;n de F*EX
+ERRORE di inoltro F*EX
+CHYBA při přesměrování F*EX
+ERREUR de redirection F*EX
+
+wrong user or auth-ID
+Falscher Benutzer oder falsche auth-ID
+Benutzr oddr auth-ID send falsch
+usuario o auth-ID err&oacute;neo
+o usuario ou o auth-ID son incorrectos
+utente o auth-ID sbagliato
+chybný uživatel nebo ověřovací ID
+utilisateur ou auth-ID invalide
+
+has no no files in spool from you
+hat keine Dateien in spool von Ihnen
+hat von Dir koine Dateia em spool
+no hay ficheros en la cola que haya enviado usted
+non hai ficheiros na cola da s&uacute;a parte
+non ci sono file nello spool per te
+nemá od vás ve frontě žádné soubory
+n'a pas de fichiers venant de vous
+
+F*EX redirect
+F*EX Umadressierung
+F*EX Omadressierong
+redirecci&oacute;n F*EX
+redirecci&oacute;n F*EX
+inoltro F*EX
+Přesměrování F*EX
+Redirection F*EX
+
+old (wrong) recipient:
+Alter (falscher) Empf&auml;nger:
+Alder (falscher) Empf&auml;ngr:
+viejo (err&oacute;neo) destinatario:
+antigo (incorrecto) destinatario:
+vecchio (sbagliato) destinatario:
+původní (chybný) příjemce:
+ancien (invalide) destinataire:
+
+new recipient:
+Neuer Empf&auml;nger:
+Neier Empf&auml;ngr:
+nuevo destinatario:
+novo destinatario:
+nuovo destinatario:
+nový příjemce:
+nouveau destinataire:
+
+filename:
+Dateiname:
+Nome von der Datei:
+nombre de fichero:
+nome de fichero:
+nome file:
+název souboru:
+nom de fichier:
+
+no upload data found for $file for $oto
+Keine bereitgestellen Daten gefunden f&uuml;r $file f&uuml;r $oto
+Koine nuffgladene Date gefonde fierr $file fier $oto
+no hay datos subidos para $file para $oto
+non se cargaron datos de $file para $oto
+nessun file di dati da caricare per $file per $oto
+u $oto nebyla pro soubor $file nalezena žádná nahraná data
+pas de données trouvées pour le fichier $file pour $oto
+
+notification of file upload \"$filename\" sent to $nto
+Benachrichtigung vom Datei-Upload \"$filename\" gesendet an $nto
+Benochrichdigong iber die nuffgladene Datei \"$filename\" gschickt an $nto
+notificaci&oacute;n de las subida del fichero \"$filename\" enviado a $nto
+enviada a notificaci&oacute;n da carga do ficheiro \"$filename\" enviado a $nto
+notifica del file caricato \"$filename\" spedita a $nto
+oznámení o nahrání souboru \"$filename\" odesláno na $nto
+un message d'information concernant le fichier uploadé \"$filename\" a été envoyé à $nto
+
+redirect $nto/$from/$fkey failed
+Umadressierung $nto/$from/$fkey fehlgeschlagen
+Bei dr omadressierung $nto/$from/$fkey isch was schiefgloffe
+redirecci&oacute;n a $nto/$from/$fkey  fall&oacute;
+fallou a redirecci&oacute;n a $nto/$from/$fkey
+inoltro $nto/$from/$fkey fallito
+přesměrování $nto/$from/$fkey selhalo
+la redirection vers $nto/$from/$fkey a échouée
+
+Please avoid download with Internet Explorer,
+Falls Sie zum Download Internet Explorer benutzen, koennte es
+Falls Du zom Ronderlada Internet Explorer nemmsch, waer's meglich, dass
+Por favor, evite usar Internet Explorer para las descargas,
+Por favor, evite usar Internet Explorer para as descargas,
+Per favore evita di fare il download con Internet Explorer
+Nestahujte prosím pomocí prohlížeče Internet Explorer,
+Merci d'éviter d'utiliser Internet Explorer,
+
+because it has too many bugs
+unter Umstaenden zu Problemen kommen
+Du a Problem hosch
+porque tiene demasiados errores
+porque ten demasiados defectos
+perche' ha troppi bug
+protože má příliš mnoho chyb
+parce qu'il a beaucoup trop de problèmes
+
+We recommend Firefox or wget
+Wir empfehlen Ihnen Firefox oder wget
+Nemm lieber Firefox oder wget
+Recomendamos Firefox o wget
+Recomendámoslle Firefox ou wget
+Raccomandiamo di usare Firefox o wget
+Doporučujeme použít Firefox či wget
+Nous reconmmandons Firefox ou wget
+
+After download (or view with a web browser!), 
+Nach Download (oder Ansicht mit dem Web Browser!) 
+Nachm Ronderlada (oddr wenn Du se mit Deim Webbrowser oguckt hosch!) 
+Tras la descarga,
+Tras a descarga,
+Dopo il download (o dopo essere stato visto con un browser WEB!)
+Po stažení (či zobrazení v prohlížeči!),
+Après le téléchargement (ou visualisation avec un navigateur web) 
+
+the file will be deleted!
+wird die Datei geloescht!
+wird dui Datei gloescht!
+¡el fichero se borrará!
+o ficheiro borrarase!
+il file sara' cancellato
+bude soubor smazán!
+le fichier a été effacé !
+
+When you download the file it will be deleted 
+Wenn Sie die Datei herunterladen dann wird diese eine kurze Zeit 
+Wenn Du die Datei ronderlaedsch, wird se bald drnoch 
+Cuando descargue el fichero se borrará
+Cando descargue o fichero, este borrarase;
+Quando scarichi il file sara' cancellato
+Jakmile si soubor stáhnete, bude po té 
+Lorsque vous téléchargez un fichier, celui-ci sera effacé 
+
+soon afterwards!
+danach geloescht werden!
+gloescht!
+en breve!
+moi axi&ntilde;a!
+poco dopo!
+ihned smazán!
+dans les instants qui suivent !
+
+is a container file
+ist ein Container
+isch a Schachtel
+es un archivo contenedor
+é un ficheiro contedor
+e' un archivio
+je soubor archivu
+est une archive
+
+You can unpack it for example with 7zip
+Sie koennen es z.B. mit 7zip oeffnen
+Du kosch's z.B. mit 7zip aufmacha
+Se puede descompactarlo con 7zip
+P&oacute;dese descomprimir con 7zip
+Puoi decomprimerlo con 7zip
+Rozbalit jej můžete pomocí programu 7zip
+Vous pourrez l'ouvrir avec 7zip par exemple
+
+This download link only works for you, you cannot distribute it
+Dieser Download Link funktioniert nur fuer Sie, Sie koennen ihn nicht weitergeben
+Sell Ronderlad Link isch fei bloss fir Di, du kosch\'n ned weitergaeba
+Este hipervínculo funciona solamente para tí, no puedes compartirlo
+Esta ligazón de descarga só funciona para vostede, non a difunda
+Questo link di download funziona solo per voi, non è possibile distribuire
+Odkaz je určen pouze vám, nemůžete jej dále šířit
+le lien de téléchargement ne fonctionnera que vous pour vous, vous ne pourrez pas le diffuser
+
+$receiver = 'you
+$receiver = 'Sie
+$receiver = 'Di
+$receiver = 'usted
+$receiver = 'vostede
+$receiver = 'te
+$receiver = 'vy
+$receiver = 'vous
+
+Comment:
+Kommentar:
+Kommendar:
+Comentario:
+Comentario:
+Commento:
+Komentář:
+Commentaire:
+
+" day"
+" Tag"
+" Dag"
+" día"
+" día"
+" giorno"
+" den"
+" jour"
+
+" days"
+" Tagen"
+" Dag"
+" días"
+" días"
+" giorni"
+" dnů"
+" jours"
+
+> days<
+> Tagen<
+> Dag<
+> días<
+> días<
+> giorni<
+> dnů<
+> jours<
+
+has uploaded the file
+hat die Datei
+hod dui Datei
+ha subido el fichero
+cargou o ficheiro
+ha caricato il file
+nahrál soubor
+a uploadé un fichier
+
+for $receiver. Use
+fuer $receiver bereitgestellt. Verwenden Sie die URL
+fier $receiver bereitgschdellt. Nemm
+para $receiver. Use
+para $receiver. Use
+per $receiver. Usa
+pro $receiver. Stáhnout si jej můžete zde
+pour $receiver. Utilisez
+
+to download this file within $days
+um die Datei innerhalb von $days herunterzuladen
+damit Du dui Datei ennerhalb von $days ronderlade kosch
+para descargar este fichero antes de $days
+para descargar este fichero antes de $days
+per scaricare questo file entro $days
+během $days
+pour télécharger ce fichier d'ici $days
+
+F*EX is not an archive, it is a transfer system for personal files
+F*EX ist kein Archiv, sondern ein Dateien-Uebertragungssystem
+F*EX isch koi Archiv sondern a Syschtem zom Dateia iebertraga
+F*EX no es un archivo, es un sistema personal de transferencia de ficheros
+F*EX non é un arquivo, é un sistema persoal de transferencia de ficheiros
+F*EX non e' un sistema di archiviazione, e' un sistema personale di trasferimento di file 
+F*EX není archiv, je to systém pro přenos souborů pro osobní použití
+F*EX n'est pas un système d'archivage, c'est un système de transfert de fichiers personnels
+
+For more information see $index
+Weitere Informationen finden Sie unter $index
+Gugsch au do: $index
+Para más informaciones vir a $index
+Para máis información, vexa $index
+Per ulteriori informazioni, vedere $index
+Pro více informací se podívejte na $index
+Voir $index pour plus d'informations
+
+Ehh... $ndata <b>BYTES</b>?! You are kidding
+Moment... $ndata <b>BYTES</b>?! Das ist wohl ein Witz
+Moment amole $ndata <b>BYTES</b>?! Wilsch me verarsche
+Un momento... &iexcl;&iquest;$ndata <b>BYTES</b>?! Est&aacute; bromeando
+Un intreo... <b>BYTES</b>?! Est&aacute; de broma
+Ehh... $ndata <b>BYTES</b>?! Stai scherzando
+Moment... $ndata <b>BYTŮ</b>?! Děláte si legraci
+Eh... $ndata <b>BYTES</b>?! Vous rigolez
+
+Using F*EX for less than 
+Verwendung von F*EX f&uuml;r weniger als 
+Du nemsch F*EX fir wenigr als 
+Usar F*EX por menos de
+Usar F*EX para menos de 
+Usare F*EX per meno di
+Používat F*EX pro tak malý soubor
+Utiliser F*EX pour moins de 
+
+ever heard of MIME e-mail
+Schon mal was von MIME E-Mail geh&ouml;rt
+Hosch scho mol was von MIME E-Mail gh&ouml;rt
+ha o&iacute;do hablar del correo electr&oacute;nico MIME
+non lle ser&aacute; mellor usar o correo electr&oacute;nico MIME?
+mai sentito parlare delle e-mail MIME
+určitě jste někdy slyšeli o e-mailu
+Vous avez déja entendu parlé de l'e-mail
+
+received and saved
+empfangen und abgespeichert
+empfanga ond abgschpeichert
+recibido y guardado
+recibido e gardado
+ricevuto e salvato
+přijato a uloženo
+reçu et sauvegardé
+
+Download URL for copy & paste
+Download URL zum Kopieren
+Nonderlad URL zom Kopiera
+URL de descarga para copiar y pegar
+Descargar o URL para copiar e pegar
+Scarica l'URL per il copia ed incolla
+URL pro stažení okopírovat a vložit
+URL de téléchargement pour copier/coller
+
+Link is valid for $keep days
+Dieser Link ist f&uuml;r $keep Tage g&uuml;ltig
+Sell Link isch fir $keep Dag giltig
+El enlace es válido durante $keep días
+A ligazón é válida durante $keep días
+Il link è valido per $keep giorni
+Odkaz je platný $keep dny(ů)
+Le lien restera valide $keep jours
+
+old $file for $to overwritten
+vorhandenes $file f&uuml;r $to &uuml;berschrieben
+alts $file fir $to iberschrieba
+El anterior $file para $to se ha sobreescrito
+Sobrescribiuse o anterior $file para $to
+vecchio file $file per $to sovrascritto
+původní soubor $file pro $to byl nahrazen
+$file pour $to reécrit.
+
+$to notified
+$to benachrichtigt
+$to bscheid gsagt
+$to ha sido notificado
+$to foi notificado
+$to notificato
+$to byl informován
+$to prévenu
+
+send another file
+eine weitere Datei schicken
+a weitere Datei schicka
+enviar otro fichero
+enviar outro fichero
+spedire un altro file
+odeslat další soubor
+envoyer un autre fichier
+
+Upload Status for
+Upload Status f&uuml;r
+Nufflad Schtatus fier
+Estado del proceso de subida para
+Estado do proceso de carga de
+Stato del processo di caricamento per
+Stav nahrávání pro
+Status d'upload pour
+
+file successfully transferred
+Datei erfolgreich &uuml;bertragen
+Datei nufflada hot klappt
+fichero transferido con &ecaute;xito
+o ficheiro transferiuse correctamente
+file trasferito con successo
+soubor byl úspěšně přenesen
+fichier transféré avec succès
+
+>close<
+>schlie&szlig;en<
+>fertig<
+>cerrar<
+>cerrar<
+>chiudi<
+>zavřít<
+>fermer<
+
+"upload"
+"upload"
+"nufflada"
+"subir"
+"cargar"
+"caricamento"
+"nahrát"
+"upload"
+
+value="logout"
+value="logout"
+value="adele"
+value="salir"
+value="sa&iacute;r"
+value="uscita"
+value="odhlásit"
+value="déconnexion"
+
+Using Microsoft Internet Explorer for download will probably
+Die Verwendung von Microsoft Internet Explorer f&uuml;r den Download wird wahrscheinlich
+Des Verwenda vom Microsoft Internet Explorer fier dr Download wird wahrscheinlich
+Usar Microsoft Internet Explorer para realizar las descargas probablemente
+Usar Microsoft Internet Explorer para realizar as descargas probablemente
+Usare Microsoft Internet Explorer per il download probabilmente
+Používání aplikace Microsoft Internet Explorer pro stahování pravděpodobně
+Utiliser Microsoft Internet Explorer pour le téléchargement
+
+lead to problems, because it is not Internet compatible (RFC 2616)
+zu Problemen f&uuml;hren, weil er nicht Internet kompatibel (RFC 2616) ist
+zu Problem fiehra, weil der hald ned Internet kompatibel (RFC 2616) isch
+le puede dar problemas, porque no es compatible con el est&aacute;ndar de Internet (RFC 2616)
+traer&aacute; problemas porque non &eacute; compat&iacute;bel co est&aacute;ndar de Internet (RFC 2616)
+genera problemi in quanto non e' compatibile con Internet (RFC 2616)
+povede k problémům, protože není Internetově kompatibilní (RFC 2616)
+entraînera probablement des problèmes, parce qu'il n'est pas compatible avec Internet (RFC 2616)
+
+We recommend
+Wir empfehlen
+Mir empfehlad
+Recomendamos
+Recomend&aacute;moslle
+Si raccomanda
+Doporučujeme
+Nous recommandons
+
+WARNING:
+WARNUNG:
+OBACHT:
+ADVERTIMIENTO:
+ATENCI&Oacute;N:
+ATTENZIONE:
+UPOZORNĚNÍ:
+ATTENTION:
+
+If you really want to continue with Internet Explorer, then
+Wenn Sie wirklich mit Internet Explorer weitermachen wollen, dann
+Wenn wirklich mitm Internet Explorer weiterwurschtla wilsch, no
+Si de verdad quiere continuar con Internet Explorer,
+Si de todas maneiras quere continuar co Internet Explorer,
+Se vuoi davvero continuare con Internet Explorer allora,
+Chcete-li skutečně pokračovat s aplikací Internet Explorer, potom
+Si vous souhaitez vraiment continuer avec Internet Explorer, alors
+
+click here with your right mouse button and select "save as"
+klicken Sie hier mit der rechten Maustaste und w&auml;hlen Sie an "speichern unter"
+klicksch hier mit dr rechta Maustascht ond w&auml;hlsch "speichern unter" aus
+pulse aqu&iacute; con el bot&oacute;n derecho del rat&oacute;n y seleccione "guardar como"
+prema aqu&iacute; co bot&oacute;n dereito do rat&oacute;n e seleccione "gardar como"
+cliccare qui con il tasto destro del mouse e selezionare "salva come"
+zde klikněte pravým tlačítkem myši a vyberte "Uložit jako"
+cliquez ici avec le bouton droit de la souris et sélectionner "save as"
+
+Meta questions
+Meta Fragen
+Meta Froga
+Meta Preguntas
+Meta Preguntas
+Meta Domande
+Všeobecné Máte otázky
+Questions générales
+
+User questions
+Benutzer Fragen
+Benutzr Froga
+Usario Preguntas
+Usuario Preguntas
+Utente Domande
+Uživatel Máte otázky
+Questions utilisateurs
+
+Admin questions
+Administratoren Fragen
+Adminischdrator Froga
+Admin Preguntas
+Admin Preguntas
+Amministratore Domande
+Správce Máte otázky
+Questions administrateur
+
+Misc questions
+Sonstige Fragen
+Vermischte Froga
+Misc Preguntas
+Misc Preguntas
+Misc Domande
+Misc Máte otázky
+Questions diverses
+
+Your F*EX account has been inactive for $expire days
+Ihr F*EX Account ist seit $expire Tagen inaktiv
+Du hosch dei F*EX Konto seit $expire Tag nemme bnutzt
+Su cuenta de F*EX ha estado inactivo $expire dias
+A s�a conta F*EX estivo inactiva durante $expire d�a
+Il tuo account F*EX � stato inattivo per $expire giorni
+Váš F*EX účet byl neaktivní $expire dnů
+Votre compte F*EX a été inactif pendant $expire days
+
+you must download this file to reactivate it
+Sie m&uuml;ssen diese Datei herunterladen um es zu reaktivieren
+Du musch sell Datei ronderlada drmit weiter mitmacha derfsch
+hace falta descargar este fichero para reactivarla
+debe descargar este ficheiro para reactivala
+devi scaricare questo file per riattivarlo
+pro jeho opětovnou aktivaci si musíte stáhnout tento soubor
+vous devez télécharger ce fichier pour le réactiver
+
+Otherwise your account will be deleted
+Ansonsten wird Ihr Account geloescht
+Ansoschda bisch den Account los
+De lo contrario, su cuenta será eliminada
+Otherwise your account will be deleted
+Otherwise your account will be deleted
+Otherwise your account will be deleted
+Otherwise your account will be deleted
+
+Account created:
+Account angelegt:
+Konto oglegt:
+Account created:
+Account created:
+Account created:
+Account created:
+Account created:

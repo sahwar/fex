@@ -1,0 +1,1042 @@
+#!/usr/bin/perl -wT
+
+# FEX CGI for user control 
+# (subuser, groups, address book, one time upload key, auth-ID)
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use CGI         qw(:standard);
+use CGI::Carp	qw(fatalsToBrowser);
+use Fcntl 	qw(:flock);
+use Digest::MD5	qw(md5_hex);
+
+# add fex lib
+($FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+# import from fex.pp
+our ($FEXHOME);
+our ($mdomain,$admin,$hostname,$sendmail,$akeydir,$skeydir,$docdir,$durl,$bcc);
+our ($nomail,$faillog);
+our $akey = '';
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+my ($CASE,$ESAC);
+
+my $error = 'F*EX user config ERROR';
+my $head = "$ENV{SERVER_NAME} F*EX user config";
+
+my $fup = $durl;
+$fup =~ s:/fop:/fup:;
+
+chdir $spooldir or die "$spooldir - $!\n";
+
+my $user = my $id = my $nid = my $ssid = my $comment = '';
+my $notification = my $reminder = '';
+
+my $qs = $ENV{QUERY_STRING};
+if ($qs) {
+  if ($qs =~ /akey=(\w+)/i) { $akey = $1 }
+  if ($qs =~ /ab=load/)     { $ab = 'load' }
+}
+
+# look for CGI POST parameters
+foreach my $v (param) {
+  my $vv = param($v);
+  debuglog("Param: $v=\"$vv\"");
+  $CASE =
+    $v =~ /^user$/i 		? $user		= fuc_normalize(lc $vv):
+    $v =~ /^subuser$/i		? $subuser	= fuc_normalize(lc $vv):
+    $v =~ /^otuser$/i		? $otuser	= fuc_normalize(lc $vv):
+    $v =~ /^notify$/i		? $notify	= fuc_normalize(lc $vv):
+    $v =~ /^notification$/i	? $notification	= $vv:
+    $v =~ /^reminder$/i		? $reminder	= $vv:
+    $v =~ /^comment$/i  	? $comment	= decode_utf8(normalize($vv)):
+    $v =~ /^id$/i   		? $id		= $vv:
+    $v =~ /^nid$/i  		? $nid		= $vv:
+    $v =~ /^ssid$/i		? $ssid		= $vv:
+    $v =~ /^group$/i		? $group	= fuc_normalize($vv):
+    $v =~ /^ab$/i		? $ab		= $vv:
+    $v =~ /^gm$/i		? $gm		= $vv:
+    $v =~ /^show$/i		? $tools	= $vv:
+  $ESAC;
+}
+
+$group = lc $group if $group and $group ne 'NEW';
+$group = '' if $nomail;
+$user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+
+if ($akey) {
+
+  # sid is not set with web browser
+  my $idf = "$akeydir/$akey/@";
+    
+  if (open $akey,'<',$idf and $id = getline($akey)) {
+    close $akey;
+    $idf =~ /(.*)\/\@/;
+    $user = readlink $1 
+      or http_die("internal server error: no $akey symlink $1");
+    $user =~ s:.*/::;
+    $user = untaint($user);
+    if ($akey ne md5_hex("$user:$id")) {
+      $user = $id = '';
+    }
+  }
+}
+
+&check_status($user) if $user;
+
+if ($user and $akey and $qs and $qs =~ /info=(.+?)&skey=(.+)/) {
+  $subuser = $1;
+  $skey = $2;
+  notify_subuser($user,$subuser,"$fup?skey=$skey",$comment);
+  http_header("200 OK");
+  print html_header($head);
+  pq(qq(
+    'An information e-mail has been sent to your subuser $subuser'
+    '<p><a href="javascript:history.back()">Go back</a>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+
+if ($user and $id) {
+  if (-e "$user/\@CAPTIVE") { html_error($error,"captive user") }  
+  unless (open $idf,'<',"$user/@") {
+    faillog("user $from, id $id");
+    html_error($error,"wrong user or auth-ID");
+  }
+  $rid = getline($idf);
+  close $idf;
+  if ($id eq $rid) {
+    unless ($akey) {
+      $akey = untaint(md5_hex("$user:$id"));
+      unlink "$akeydir/$akey";
+      symlink "../$user","$akeydir/$akey";
+    }
+  } else {
+    faillog("user $from, id $id");
+    html_error($error,"wrong user or auth-ID");
+  }
+} else {
+  my $login = -x "$FEXHOME/login" ? 'login' : 'fup';
+  nvt_print(
+    "HTTP/1.1 302 Found",
+    "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/$login",
+    'Expires: 0',
+    'Content-Length: 0',
+    ''
+  );
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+# empty POST? ==> back to foc
+if ($ENV{REQUEST_METHOD} eq 'POST' and not 
+    ($subuser or $notify or $nid or $ssid or $group or $ab or $gm or $tools)) {
+  nvt_print(
+    "HTTP/1.1 302 Found",
+    "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/foc",
+    'Expires: 0',
+    'Content-Length: 0',
+    ''
+  );
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+unlink $faillog if $faillog;
+
+http_header("200 OK");
+print html_header($head);
+# foreach $v (keys %ENV) { print $v,' = "',$ENV{$v},"\"<br>\n" };
+
+if ($gm and not $group) {
+  pq(qq(
+    '<h2>ERROR: no group name specified</h2>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+if ($tools) {
+  pq(qq(
+    'To use one of the following F*EX clients you must configure them after'
+    'download:'
+    '<p>'
+    '<table border=1>'
+    '  <tr><th align=left>F*EX server:<td><tt>$ENV{PROTO}://$ENV{HTTP_HOST}</tt></tr>'
+    '  <tr><th align=left>Proxy:<td>(your web proxy address, may be empty)</tr>'
+    '  <tr><th align=left>User:<td><tt>$user</tt></tr>'
+    '  <tr><th align=left>Auth-ID:<td><tt>$id</tt></tr>'
+    '</table>'
+  ));
+  if (open $tools,"$docdir/tools.html") {
+    while (<$tools>) {
+      while (/\$([\w_]+)\$/) {
+        my $var = $1;
+        my $env = $ENV{$var} || '';
+        s/\$$var\$/$env/g;
+      };
+      print;
+    }
+  }
+  exit;
+}
+
+if ($group) {
+  &handle_group;
+}
+
+# create one time upload key
+if ($subuser and $otuser) {
+  $otuser = $subuser;
+  if ($otuser !~ /^[^@]+@[\w.-]+[a-z]$/) {
+    pq(qq(
+      '<tt>$otuser</tt> is not a valid e-mail address'
+      '<p><a href="javascript:history.back()">Go back</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+  my $okey = randstring(8);
+  my $okeyd = "$user/\@OKEY";
+  mkdir $okeyd;
+  symlink $otuser,"$okeyd/$okey" 
+    or http_die("cannot create OKEY $okeyd/$okey : $!\n");
+  my $url = "$fup?to=$user&okey=$okey";
+  pq(qq(
+    'A one time upload URL for <tt>$otuser</tt> has been created:'
+    '<p>'
+    '<tt>$url</tt>'
+  ));
+  unless ($nomail) {
+    &notify_otuser($user,$otuser,$url,$comment);
+    pq(qq(
+      '<p>'
+      'and an information e-mail has been sent to this address.'
+      '<p>'
+    ));
+  }
+  print "</body></html>\n";
+  exit;
+}
+
+# direct single subuser entry
+if ($subuser and not $otuser) {
+  if (-f "$subuser/@") {
+    pq(qq(
+      '<tt>$subuser</tt> is already a registered F*EX full user'
+      '<p><a href="javascript:history.back()">Go back</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+  if ($subuser !~ /^[^@]+@[\w.-]+[a-z]$/) {
+    pq(qq(
+      '<tt>$subuser</tt> is not a valid e-mail address'
+      '<p><a href="javascript:history.back()">Go back</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+  $skey = '';
+  if (open $idf,'<',"$user/\@SUBUSER") {
+    while (<$idf>) {
+      chomp;
+      if (/^\Q$subuser:/) {
+        $skey = md5_hex("$user:$_");
+        last;
+      }
+    }
+    close $idf;
+  }
+  if ($skey) {
+    my $url = "$fup?skey=$skey";
+    if ($nomail) {
+      pq(qq(
+        '$subuser is already your subuser and has access URL:'
+        '<p>'
+        '<tt>$url</tt>'
+      ));
+    } else {
+      pq(qq(
+        '<a href=\"/fuc?akey=$akey&info=$subuser&skey=$skey\">$subuser</a>'
+        'is already your subuser and has access URL:'
+        '<p>'
+        '<tt>$url</tt>'
+        '<p>'
+        "Click on the subuser's e-mail address link to send him an"
+        "information e-mail by the F*EX server.<p>"
+      ));
+    }
+  } else {
+    my $sid = randstring(8);
+    my $skey = mkskey($user,$subuser,$sid);
+    $url = "$fup?skey=$skey";
+    open $idf,'>>',"$user/\@SUBUSER" or die "$user/\@SUBUSER - $!\n";
+    print {$idf} "$subuser:$sid\n";
+    close $idf;
+    pq(qq(
+      'Your subuser upload URL is:'
+      '<p>'
+      '<tt>$url</tt>'
+    ));
+    unless ($nomail) {
+      &notify_subuser($user,$subuser,$url,$comment);
+      pq(qq(
+        '<p>'
+        'An information e-mail has been sent to $subuser'
+      ));
+    }
+  }
+  print "</body></html>\n";
+  exit;
+}
+
+# modify addressbook
+if ($user and $akey and defined $ab) {
+  if ($ab eq 'load') {
+    $ab = '';
+    if (open $ab,'<',"$user/\@ADDRESS_BOOK") {
+      undef $/;
+      $_ = <$ab>;
+      s/\s*$/\n/;
+      close $ab;
+      $ab = $_;
+    }
+    my $rows = ($ab =~ tr/\n//) + 5;
+    pq(qq(
+      '<h2>Edit address book</h2>'
+      '<table border=1>'
+      '  <tr align="left"><th>Entry:<th>alias<th>e-mail address<th># optional comment</tr>'
+      '  <tr align="left"><td>Example:<td><tt>Framstag</tt><td><tt>framstag\@rus.uni-stuttgart.de</tt><td><tt># Ulli Horlacher</tt></tr>'
+      '</table>'
+      '<form action="$ENV{SCRIPT_NAME}?akey=$akey"'
+      '      method="post"'
+      '      accept-charset="UTF-8"'
+      '      enctype="multipart/form-data">'
+      '  <textarea name="ab" cols="80" rows="$rows">$ab</textarea><br>'
+      '  <input type="submit" value="submit">'
+      '</form>'
+      '<p>'
+      'You may use these alias names as F*EX recipient addresses on '
+      '<a href="/fup?akey=$akey">fup</a>'
+      '<p>'
+      'Alternatively you can fex a file ADDRESS_BOOK to yourself '
+      '($user) containing your alias definitions.'
+      '<p>'
+      '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+      '</body></html>'
+    ));
+  } else {
+    $ab =~ s/[\r<>]//g;
+    $ab =~ s/\s*$/\n/;
+    
+    foreach (split(/\n/,$ab)) {
+      s/^\s+//;
+      s/\s+$//;
+      if (s/\s*(#.*)//) { $comment = $1 }
+      else              { $comment = '' }
+      next if /^\s*$/;
+      @options = ();
+      push @options,$1 if s/(autodelete=\w+)//i;
+      push @options,$1 if s/(keep=\d+)//i;
+      s/[,\s]+$//;
+      if (s/([\S]+)\s+(\S+)//) {
+        $alias = $1;
+        $address = $2;
+        $options = join(',',@options);
+        push @abt,"<tr><td>$alias<td>$address<td>$options<td>$comment</tr>\n";
+      } else {
+        push @badalias,$_;
+      }
+    }
+    
+    if (@badalias) {
+      print "<h2>ERROR: bad aliases:</h2>\n<ul>";
+      foreach my $ba (@badalias) { print "<li>$ba" }
+      pq(qq(
+        '</ul>'
+        '<p>'
+        'Not in format: <tt>alias e-mail-address</tt>'
+        '<p>'
+        '<a href="javascript:history.back()">Go back</a>'
+        '</body></html>'
+      ));
+      exit;
+    }
+    
+    open my $AB,'>',"$user/\@ADDRESS_BOOK" 
+      or http_die("cannot open $user/\@ADDRESS_BOOK - $!\n");
+    print {$AB} $ab;
+    close $AB;
+    pq(qq(
+      '<h2><a href ="/fuc?AB=load&akey=$akey">address book</a></h2>'
+      '<table border=1>'
+      '<tr><th>alias<th>e-mail address<th>options<th>comment</tr>'
+      '@abt'
+      '</table>'
+      '<p>'
+      '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+      '<p>'
+      '<a href="/fup?akey=$akey">back to fup (F*EX upload)</a>'
+      '</body></html>'
+    ));
+  }
+  exit;
+}
+
+if ($user and $notification eq 'detailed') {
+  unlink "$user/\@NOTIFICATION";
+  pq(qq(
+    '<h3>Notification e-mails now come in detailed format.<h3>'
+    '<p>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit:
+}
+
+if ($user and $notification eq 'short') {
+  unlink "$user/\@NOTIFICATION";
+  symlink "short","$user/\@NOTIFICATION";
+  pq(qq(
+    '<h3>Notification e-mails now come in short format.<h3>'
+    '<p>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit:
+}
+
+if ($user and $reminder eq 'yes') {
+  unlink "$user/\@REMINDER";
+  pq(qq(
+    '<h3>You will now get reminder notification e-mails.<h3>'
+    '<p>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit:
+}
+
+if ($user and $reminder eq 'no') {
+  unlink "$user/\@REMINDER";
+  symlink "no","$user/\@REMINDER";
+  pq(qq(
+    '<h3>You will now get no reminder notification e-mails.<h3>'
+    '<p>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit:
+}
+
+if ($nid) {
+  $nid =~ s/^\s+//;
+  $nid =~ s/\s+$//;
+  
+  checkchars('auth-ID',$nid);
+  
+  $nid = randstring(6) if $nid eq '?';
+  
+  open $idf,'>',"$user/@" or die "$user/@ - $!\n";
+  print {$idf} $nid,"\n";
+  close $idf;
+  $akey = untaint(md5_hex("$user:$nid"));
+  unlink "$akeydir/$akey";
+  symlink "../$user","$akeydir/$akey";
+  
+  pq(qq(
+    '<h3>new auth-ID "<tt>$nid</tt>" for $user saved</h3>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+# empty subuser list POST
+if (defined(param('ssid')) and $ssid =~ /^\s*$/) {
+  unlink "$user/\@SUBUSER";
+  pq(qq(
+    '<h2>All subusers deleted</h2>\n<ul>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+# update sub-users
+if ($ssid) {
+  my ($subuser,$subid,$skey);
+  
+  # delete old skeys
+  if (open $idf,'<',"$user/\@SUBUSER") {
+    while (<$idf>) {
+      s/#.*//;
+      if (/(.+\@.+):(.+)/) {
+        ($subuser,$subid) = ($1,$2);
+        $skey = md5_hex("$user:$subuser:$subid");
+        unlink "$skeydir/$skey";
+        unlink "$subuser/\@MAINUSER/$user";
+      }
+    }
+    close $idf;
+  }
+
+  $ssid = strip($ssid);
+
+  # collect (new) subusers
+  foreach (split("\n",$ssid)) {
+    s/#.*//;
+    s/\s//g;
+    if (/(.+\@[\w.-]+)/) {
+      $subuser = lc $1;
+      push @badaddress,$subuser unless checkaddress($subuser);
+    }
+  }
+  
+  if (@badaddress) {
+    print "<h2>ERROR: bad addresses:</h2>\n<ul>";
+    foreach my $ba (@badaddress) { print "<li>$ba" }
+    pq(qq(
+      '</ul>'
+      '<a href="javascript:history.back()">Go back</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+  
+  if ($ssid =~ /\S\@\w/) {
+    open $idf,'>',"$user/\@SUBUSER" or die "$user/\@SUBUSER - $!\n";
+    print "Your subusers upload URLs are:<p><tt>\n";
+    print "<table>\n";
+    foreach (split("\n",$ssid)) {
+      s/#.*//;
+      s/\s//g;
+      if (/(\S+\@[\w.-]+)/) {
+        $subuser = lc $1;
+        if (/:(.+)/) { $subid = $1 }
+        else         { $subid = randstring(8) }
+        print {$idf} "$subuser:$subid\n";
+        $skey = mkskey($user,$subuser,$subid);
+        print "  <tr><td><a href=\"/fuc?akey=$akey&info=$subuser&skey=$skey\">$subuser</a> :",
+              "<td>$fup?skey=$skey</tr>\n";
+      }
+    }
+    pq(qq(
+      "</table>\n</tt><p>"
+      "You have to give these URLs to your subusers for fexing files to you."
+      "<br>"
+      "Or click on the subuser's e-mail address link to send him an"
+      "information e-mail by the F*EX server.<p>"
+    ));
+  }
+  print "<a href=\"/foc?akey=$akey\">back to F*EX operation control</a>\n";
+  print "</body></html>\n"; 
+  close $idf;
+  exit;
+}
+
+if (open my $subuser,'<',"$user/\@SUBUSER") {
+  local $/;
+  $ssid = <$subuser> || '';
+  close $subuser;
+}
+
+# display HTML form and request user data
+pq(qq(
+  '<form action="$ENV{SCRIPT_NAME}"'
+  '      method="post"'
+  '      accept-charset="UTF-8"'
+  '      enctype="multipart/form-data">'
+));
+
+# pq(qq(
+#   '  <input type="hidden" name="user" value="$user">'
+#   '  <input type="hidden" name="id"   value="$id">'
+#   '  Your F*EX account: <b>$user:$id</b><p>'
+#   '  New auth-ID: <input type="text" name="nid" value="$id">'
+#   '  (Remember your auth-ID when you change it!)'
+# ));
+
+if (-s "$user/\@ALLOWED_RECIPIENTS") {
+  pq(qq(
+    '  <p>'
+    '  <input type="submit" value="submit">'
+    '</form>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+$ssid = strip($ssid) if $ssid;
+
+pq(qq(
+  '  <p><hr><p>'
+  '  Allow special senders (= subusers) to fex files to you:<br>'
+  '  <textarea name="ssid" cols="60" rows="10">$ssid</textarea><br>'
+  '  <input type="submit" value="save and show upload URLs">'
+  '</form>'
+  '<p>'
+  '<table border=0>'
+  '  <tr align="left"><td>This list has entries in format:<td>&lt;e-mail address>:&lt;encryption-ID><td></tr>'
+  '  <tr align="left"><td>Example:<td><tt>framstag\@rus.uni-stuttgart.de:schwuppdiwupp</tt><td></tr>'
+  '</table>'
+  '<p>'
+  'These special senders may fex files <em>only</em> to you!<br>'
+  'It is not necessary to add regular fex users to your list,'
+  'because they already can fex.'
+  '<p>'
+  'The encryption-ID is necessary to generate a unique upload URL for this subuser.<br>'
+  'If you omit the encryption-ID a random one will be used.'
+));
+
+unless ($nomail) {
+  pq(qq(
+    '<p><hr><p>'
+    '<h3 title="A F*EX group is similar to a mailing list, but for files">'
+    'Edit your F*EX groups:</h3>'
+    '<ul>'
+  ));
+
+  foreach $group (glob "$user/\@GROUP/*") {
+    if (-f $group and not -l $group and $group !~ /~$/) {
+      $group =~ s:.*/::;
+      print "  <li><a href=\"$ENV{SCRIPT_NAME}?akey=$akey&group=$group\">\@$group</a>\n";
+    }
+  }
+
+  pq(qq(
+    '  <li><a href="$ENV{SCRIPT_NAME}?akey=$akey&group=NEW"><em>new group</em></a>'
+    '</ul>'
+  ));
+}
+
+pq(qq(
+  '<p><hr><p>'
+  '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+  '</body></html>'
+));
+
+exit;
+
+
+sub strip {
+  local $_ = shift;
+  s/[ \t]+//g;
+  s/\s*[\r\n]+\s*/\n/g;
+  return $_;
+}
+
+sub notify_otuser {
+  my ($user,$otuser,$url,$comment) = @_;
+  my $server = $hostname || $mdomain;
+  my $sf;
+  
+  return if $nomail;
+  
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $sf = $sender_from ? $sender_from : $user;
+  open my $mail,'|-',$sendmail,'-f',$sf,$otuser,$bcc
+    or http_die("cannot start sendmail - $!\n");
+  pq($mail,qq(
+    'From: $sf ($user via F*EX service $server)'
+    'To: $otuser'
+    'Subject: Your upload URL'
+    'X-Mailer: F*EX'
+    ''
+    'This is an automatically generated e-mail.'
+    ''
+    'Use'
+    ''
+    '$url'
+    ''
+    'to upload one file to $user'
+    ''
+    '$comment'
+    ''
+    'Questions? ==> F*EX admin: $admin'
+  ));
+  close $mail
+    or http_die("cannot send notification e-mail (sendmail error $!)\n");
+}
+
+
+sub notify_subuser {
+  my ($user,$subuser,$url,$comment) = @_;
+  my $server = $hostname || $mdomain;
+  my $sf;
+  
+  return if $nomail;
+  
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $sf = $sender_from ? $sender_from : $user;
+  open my $mail,'|-',$sendmail,'-f',$sf,$subuser,$user,$bcc
+    or http_die("cannot start sendmail - $!\n");
+  pq($mail,qq(
+    'From: $sf ($user via F*EX service $server)'
+    'To: $subuser'
+    'Cc: $user'
+    'Subject: Your F*EX account on $server'
+    'X-Mailer: F*EX'
+    ''
+    'This is an automatically generated e-mail.'
+    ''
+    'A F*EX (File EXchange) account has been created for you on $server'
+    'Use'
+    ''
+    '$url'
+    ''
+    'to upload files to $user'
+    ''
+    'See http://$ENV{HTTP_HOST}/index.html for more information about F*EX.'
+    ''
+    '$comment'
+    ''
+    'Questions? ==> F*EX admin: $admin'
+  ));
+  close $mail
+    or http_die("cannot send notification e-mail (sendmail error $!)\n");
+}
+
+
+sub notify_groupmember {
+  my ($user,$gm,$group,$id,$url) = @_;
+  my $server = $hostname || $mdomain;
+  my $sf;
+  
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $sf = $sender_from ? $sender_from : $user;
+  open my $mail,'|-',$sendmail,'-f',$sf,$gm,$user,$bcc
+    or http_die("cannot start sendmail - $!\n");
+  pq($mail,qq(
+    'From: $sf ($user via F*EX service $hostname)'
+    'To: $gm'
+    'Cc: $user'
+    'Subject: Your F*EX account on $server'
+    'X-Mailer: F*EX'
+    ''
+    'A F*EX (File EXchange) account has been created for you on $server'
+    'Use'
+    ''
+    '$url'
+    ''
+    'to upload files to F*EX group "$group"'
+    ''
+    'See http://$ENV{HTTP_HOST}/ for more information about F*EX.'
+    ''
+    'Questions? ==> F*EX admin: $admin'
+  ));
+  close $mail
+    or http_die("cannot send notification e-mail (sendmail error $!)\n");
+}
+
+
+sub fuc_normalize {
+  local $_ = shift;
+  
+  s/\s//g;
+  s/[^\w_.+=\@\-]//g;
+  s/^\./_/;
+  /(.*)/;
+  return $1;
+}
+
+
+sub mkskey {
+  my ($user,$subuser,$id) = @_;
+  my $skey = md5_hex("$user:$subuser:$id");
+  
+  open my $skf,'>',"$skeydir/$skey" or die "$skeydir/$skey - $!\n";
+  print {$skf} "from=$subuser\n",
+               "to=$user\n",
+               "id=$id\n";
+  close $skf or die "$skeydir/$skey - $!\n";
+  mkdirp("$subuser/\@MAINUSER");
+  symlink $skey,"$subuser/\@MAINUSER/$user";
+  return $skey;
+}
+
+
+sub mkgkey {
+  my ($user,$group,$gm,$id) = @_;
+  my $gkey = md5_hex("$user:$group:$gm:$id");
+  
+  open my $gkf,'>',"$gkeydir/$gkey" or die "$gkeydir/$gkey - $!\n";
+  print {$gkf} "from=$gm\n",
+               "to=\@$group\n",
+               "user=$user\n",
+               "id=$id\n";
+  close $gkf or die "$gkeydir/$gkey - $!\n";
+  return $gkey;
+}
+
+
+sub handle_group {
+  my ($gf,$gd,$gl,$gid,$gkey);
+  
+  $group =~ s/^@+//;
+
+  # $notify is group member
+  if ($notify) {
+    $gf = "$notify/\@GROUP/$group";
+    unless ($_ = readlink $gf) {
+      pq(qq(
+        '<h2>ERROR: cannot read $gf - $!</h2>'
+        '</body></html>'
+      ));
+      exit;
+    }
+    if (m{([^/]+\@[\w.-]+)/}) {
+      $user = lc $1;
+    } else {
+      pq(qq(
+        '<h2>INTERNAL ERROR: groupfile = $gf</h2>'
+        '</body></html>'
+      ));
+      exit;
+    }
+    if (open $gf,'<',$gf) {
+      while (<$gf>) {
+        if (/\Q$notify\E:(\S+)/i) {
+          $gid = $1;
+          last;
+        }
+      }
+      close $gf;
+    } else {
+      pq(qq(
+        '<h2>ERROR: cannot open $gf - $!</h2>'
+        '</body></html>'
+      ));
+      exit;
+    }
+    unless ($gid) {
+      pq(qq(
+        '<h2>ERROR: $notify not found in $gf</h2>'
+        '</body></html>'
+      ));
+      exit;
+    }
+    $gkey = md5_hex("$user:$group:$notify:$gid");
+    notify_groupmember(
+      $user,
+      $notify,
+      $group,
+      $gid,
+#      "$ENV{PROTO}://$ENV{HTTP_HOST}/fup?from=$notify&to=\@$group"
+      "$fup?gkey=$gkey"
+    );
+    pq(qq(
+      '<h2>Notification e-mail to $notify has been sent</h2>'
+      '<p><a href="javascript:history.back()">Go back</a>'
+      '</body></html>'
+    ));
+    exit;
+  }
+
+  $gf = "$user/\@GROUP/$group";
+  
+  if (defined $gm) {
+    if ($gm =~ /\S/) {
+      foreach (split /\n/,$gm) {
+        s/#.*//;
+        s/\s//g;
+        next if /^\w+=./;
+        next if /^$/;
+        if (s/:.+//) {
+          if (/(.+@[\w\.-]+)/ and checkaddress($_)) {
+            push @gm,lc $1;
+          } else {
+            push @badaddress,$_;
+          }
+        } else {
+          push @badformat,$_;
+        }
+      }
+      if (@badformat) {
+        print "<h2>ERROR: lines not in format &lt;e-mail address>:&lt;encryption-ID></h2>\n<ul>";
+        foreach my $ba (@badformat) { print "<li>$ba" }
+        print "</ul>\n";
+      }
+      if (@badaddress) {
+        print "<h2>ERROR: bad addresses:</h2>\n<ul>";
+        foreach my $ba (@badaddress) { print "<li>$ba" }
+        print "</ul>\n";
+      }
+      if (@badformat or @badaddress) {   
+        pq(qq(
+          '<a href="javascript:history.back()">Go back</a>'
+          '</body></html>'
+        ));
+        exit;
+      }
+      $gd = "$user/\@GROUP";
+      unless (-d $gd or mkdir $gd,0700) {
+        print "<h2>ERROR: cannot create $gd - $!</h2>\n";
+        print "</body></html>\n";
+        exit;
+      }
+      if (-l $gf) {
+        if ($_ = readlink $gf and m{([^/]+\@[\w.-]+)/}) {
+          $user = $1;
+          pq(qq(
+            '<h2>ERROR: you are already in group \@$group owned by $user</h2>'
+            '<a href="javascript:history.back()">Go back</a>'
+            'and enter another group name'
+            '</body></html>'
+          ));
+        } else {
+          print "<h2>INTERNAL ERROR: $gf is a symlink. but not readable</h2>\n";
+          print "</body></html>\n";
+        }
+        exit;
+      }
+      # delete old gkeys
+      if (open $gf,'<',$gf) {
+        # delete old group links and gkeys
+        while (<$gf>) {
+          s/#.*//;
+          if (/(.+\@.+):(.+)/) {
+            $gkey = md5_hex("$user:$group:$1:$2");
+            unlink "$gkeydir/$gkey";
+            unlink "$1/\@GROUP/$group" if -l "$1/\@GROUP/$group";
+          }
+        }
+        close $gf;
+      }
+      # write new group file and gkeys
+      if (open $gf,'>',$gf) {
+        $gm =~ s/[\r\n]+/\n/g;
+        foreach (split /\n/,$gm) {
+          print {$gf} "$_\n";
+          s/#.*//;
+          s/\s//g;
+          if (/^\s*([^\/]+):(.+)/) {
+            mkgkey(lc $user,$group,lc $1,$2);
+          }
+        }
+        close $gf;
+      } else {
+        print "<h2>ERROR: cannot write $gf - $!</h2>\n";
+        print "</body></html>\n";
+        exit;
+      }
+      if (@gm) {
+        foreach $gm (@gm) {
+          next if $gm eq $user;
+          unless (-d $gm or mkdir $gm,0700) {
+            print "<h2>ERROR: cannot create $gm - $!</h2>\n";
+            print "</body></html>\n";
+            exit;
+          }
+          $gd = "$gm/\@GROUP";
+          unless (-d $gd or mkdir $gd,0700) {
+            print "<h2>ERROR: cannot create $gd - $!</h2>\n";
+            print "</body></html>\n";
+            exit;
+          }
+          $gl = "$gm/\@GROUP/$group";
+          unless (-l $gl or symlink "../../$user/\@GROUP/$group",$gl) {
+            print "<h2>ERROR: cannot create $gl - $!</h2>\n";
+            print "</body></html>\n";
+            exit;
+          }
+        }
+        pq(qq(
+          '<h2>Group \@$group has members:</h2>'
+          '<ul>'
+        ));
+        foreach $gm (@gm) {
+          if ($gm ne $user) {
+            print "  <li><a href=\"$ENV{SCRIPT_NAME}?akey=$akey&group=$group&notify=$gm\">$gm</a>\n";
+          }
+        }
+        pq(qq(
+          '</ul>'
+          '(click address to send a notification e-mail to this user)'
+        ));
+      } else {
+        print "<h2>Group \@$group has no members</h2>\n";
+      }
+      pq(qq(
+        '<p>'
+        '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+      ));
+      print end_html();
+      exit;
+    } else {
+      # no group members -> delete group file
+      unlink $gf;
+    }
+  } else {
+    $gm = '';
+    pq(qq(
+      '<h2>Edit F*EX group</h2>'
+      'A F*EX group is similar to a mailing list, but for files:<br>'
+      'When a member fexes a file to this list, '
+      'then all other members will receive it.'
+      '<p>'
+      '<form action="$ENV{SCRIPT_NAME}?akey=$akey"'
+      '      method="post"'
+      '      accept-charset="UTF-8"'
+      '      enctype="multipart/form-data">'
+    ));
+    if ($group eq 'NEW') {
+      pq(qq(
+        '  <font color="red">'
+        '  New group name: <input type="text" name="group"> (You MUST fill out this field!)'
+        '  </font>'
+      ));
+    } else {
+      if (open $gf,'<',$gf) {
+        local $/;
+        $gm = <$gf>||'';
+      }
+      close $gf;
+      pq(qq(
+        '  <input type="hidden" name="group" value="$group">'
+        '  F*EX group <b>\@$group</b>:'
+      ));
+    }
+    my $rows = ($gm =~ tr/\n//) + 5;
+    pq(qq(
+      '  <br><textarea name="gm" cols="80" rows="$rows">$gm</textarea><br>'
+      '  <input type="submit" value="submit">'
+      '</form>'
+      '<p>'
+      '<table border=0>'
+      '  <tr align="left"><td>This list must have entries in format:<td>&lt;e-mail address>:&lt;encryption-ID><td></tr>'
+      '  <tr align="left"><td>Example:<td><tt>framstag\@rus.uni-stuttgart.de:schwuppdiwupp</tt><td></tr>'
+      '</table>'
+      '<p>'
+      'The encryption-ID is necessary to generate a unique upload URL for this subuser.'
+      'You can name any existing e-mail address.'
+    ));
+    if (open my $ab,'<',"$user/\@ADDRESS_BOOK") {
+      pq(qq(
+        "<p><hr><p>"
+        "<h3>Your address book:</h3>"
+        "<pre>"
+      ));
+      while (<$ab>) {
+        s/#.*//;
+        print "$1\n" if /([\S]+\@[\S]+)/;
+      }
+      close $ab;
+      print "</pre>\n";
+    }
+    print "</body></html>\n";
+    exit;
+  }
+}

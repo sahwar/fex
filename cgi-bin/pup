@@ -1,0 +1,201 @@
+#!/usr/bin/perl -wT
+
+# F*EX CGI for public upload
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use CGI::Carp qw(fatalsToBrowser);
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+$| = 1;
+
+our $error = 'F*EX public upload ERROR';
+our $head = "$ENV{SERVER_NAME} F*EX public upload";
+our $locale = '';
+
+# import from fex.ph
+our (@public_recipients);
+
+# import from fex.pp
+our ($FEXHOME);
+
+# load common code, local config: $FEXLIB/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+$from = $to = '';
+
+chdir $spooldir or http_die("$spooldir - $!\n");
+
+&check_maint;
+
+my $qs = $ENV{QUERY_STRING};
+(my $multi) = $qs =~ s/(^|&)multi//;
+  
+# parse HTTP QUERY_STRING (parameter=value pairs)
+if ($qs) {
+  foreach (split '&',$qs) {
+    if (s/^(\w+)=//) {
+      my $x = $1;
+      # decode URL-encoding
+      s/%([a-f0-9]{2})/chr(hex($1))/gie;
+      if (/([<>])/) {
+        $_ = sprintf("\"&#%s;\" is not allowed in URL parameter",ord($1));
+        http_die($_);
+      }
+      setparam($x,$_); 
+    }
+  }
+}
+
+# parse HTTP POST body
+if ($ENV{REQUEST_METHOD} eq 'POST') {
+  if ($ENV{CONTENT_TYPE} =~ /boundary=\"?([\w\-\+\/_]+)/) {
+    $boundary = $1;
+  } else {
+    http_die("malformed HTTP POST (no boundary found)");
+  }
+
+  binmode(STDIN,':raw');
+    
+  READPOST: while (&nvt_read) {
+    if (/^Content-Disposition:\s*form-data;\s*name="([a-z]\w*)"/i) {
+      my $x = $1;
+      while (&nvt_read) { last if /^\s*$/ }
+      &nvt_read;
+      setparam($x,$_);
+      NEXTPART: while (&nvt_read) {
+        last READPOST if /^--\Q$boundary--/;
+        last NEXTPART if /^--\Q$boundary/;
+      }
+    }
+  }
+}
+
+unless (@public_recipients) {
+  html_error($error,"No public recipients defined by administrator");
+}
+
+if ($to and not grep /^\Q$to\E$/i,@public_recipients) {
+  html_error($error,"$to is not a public recipient");
+}
+
+if ($to and $from and checkaddress($from)) {
+  nvt_print(
+    "HTTP/1.1 302 Found",
+    "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/fup?from=$from&to=$to&id=PUBLIC",
+    'Content-Length: 0',
+    ""
+  );
+  exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+  
+http_header('200 ok');
+print html_header($head);
+
+my @locales;
+foreach my $locale (glob "$FEXHOME/locale/*") {
+  if (-f "$locale/cgi-bin/pup") {
+    my $langf = "$locale/lang.html";
+    $locale =~ s:.*/::;
+    $lang = $locale;
+    if (open $langf,'<',$langf) {
+      $lang = getline($langf);
+      close $langf;
+    }
+    push @locales,"<a href=\"/pup?to=$to&locale=$locale\">$lang</a>";
+  }
+}
+print "<h3>@locales</h3>\n" if @locales > 1;
+
+
+pq(qq(
+  '<form name="upload"'
+  '      action="/fup"'
+  '      method="post"'
+  '      accept-charset="UTF-8"'
+  '      enctype="multipart/form-data">'
+  '  <input type="hidden" name="id" value="PUBLIC">'
+  '  <input type="hidden" name="autodelete" value="no">'
+  '  <table border="1">'
+));
+
+if ($from) {
+  pq(qq(
+    '    <tr><td>your e-mail address:<td>$from</tr>'
+    '    <input type="hidden" name="from" value="$from">'
+  ));
+} else {
+  pq(qq(
+    '    <tr><td>your e-mail address:<td><input type="text" name="from" size="80"></tr>'
+  ));
+}
+
+if ($to) {
+  pq(qq(
+    '    <tr><td>recipient:<td>$to</tr>'
+    '    <input type="hidden" name="to" value="$to">'
+  ));
+} else {
+  if ($multi) {
+    foreach my $pr (@public_recipients) {
+      push @pr,qq(<input type="checkbox" name="to" value="$pr">)
+               ."<tt>$pr</tt><br>";
+    }
+    pq(qq(
+      '    <tr><td>recipient:<td>@pr</tr>'
+    ));
+  } else {
+    foreach my $pr (@public_recipients) {
+      push @pr,"<option>$pr</option>";
+    }
+    pq(qq(
+      '    <tr><td>recipient:<td><select name="to" size="1">@pr</select></tr>'
+    ));
+  }
+}
+
+pq(qq(
+  '  </table>'
+  '  <p>'
+  '  <input type="submit" name="continue" value="continue">'
+  '</form>'
+));
+
+
+# set parameter variables
+sub setparam {
+  my ($v,$vv) = @_;
+  
+  $v = uc(despace($v));
+  if ($v eq 'LOCALE' and $vv =~ /^(\w+)$/) {
+    $locale = $1;
+  } elsif ($v eq 'FROM') { 
+    $from = lc(normalize(despace($vv)));
+    $from =~ s:/:_:g;
+    $from =~ s:^\.:_:;
+    $from =~ s:\s::g;
+  } elsif ($v eq 'TO') {
+    $to	= lc(normalize(despace($vv)));
+    $to =~ s:/:_:g;
+    $to =~ s:^\.:_:;
+  }
+}
+
+
+# read one line from STDIN (net socket) and assign it to $_
+# returns number of read bytes
+sub nvt_read {
+  my $len = 0;
+
+  if (defined ($_ = <STDIN>)) {
+    debuglog($_);
+    $len = length;
+    s/\r?\n//;
+  }
+  return $len;
+}

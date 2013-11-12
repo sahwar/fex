@@ -1,0 +1,2697 @@
+#!/usr/bin/perl -w
+
+# CLI client for the F*EX service (send, list, delete)
+#
+# see also: fexget
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+# Copyright: Perl Artistic
+
+use 5.006;
+use strict qw'vars subs';
+use Encode;
+use Config;
+use Socket;
+use IO::Handle;
+use IO::Socket::INET;
+use Getopt::Std;
+use File::Basename;
+use Cwd qw'abs_path';
+use Fcntl qw':flock :mode';
+use Digest::MD5 qw'md5_hex';  # encrypted ID / SID
+use Time::HiRes qw'time';
+# use Smart::Comments;
+use constant k => 2**10;
+use constant M => 2**20;
+
+eval 'use Net::INET6Glue::INET_is_INET6';
+
+our ($SH,$fexhome,$idf,$tmpdir,$windoof,$sigpipe,$useragent,$editor,$nomail);
+our ($anonymous,$public);
+our ($FEXID,$FEXXX,$HOME);
+our $chunksize = 0;
+our $version = 20130805;
+our $_0 = $0;
+
+$version ||= mtime($0);
+  
+if ($Config{osname} =~ /^mswin/i) {
+  $windoof = $Config{osname};
+  $HOME = $ENV{USERPROFILE};
+  $fexhome = $ENV{FEXHOME} || $HOME.'\fex';
+  $tmpdir = $ENV{FEXTMP} || $ENV{TEMP} || "$fexhome\\tmp";
+  $idf = "$fexhome\\id";
+  $editor = $ENV{EDITOR} || 'notepad.exe';
+  $useragent = sprintf("fexsend-$version (%s %s)",
+                       $Config{osname},$Config{archname});
+} else {
+  $0 =~ s:.*/::;
+  $HOME = (getpwuid($<))[7]||$ENV{HOME};
+  $fexhome = $HOME.'/.fex';
+  $tmpdir = $ENV{FEXTMP} || "$fexhome/tmp";
+  $idf = "$fexhome/id";
+  $editor = $ENV{EDITOR} || 'vi';
+  $_ = `(lsb_release -d||uname -a)2>/dev/null`||'';
+  chomp;
+  s/^Description:\s+//;
+  $useragent = "fexsend-$version ($_)";
+}
+
+$| = 1;
+
+my $from = '';
+my $to = '';
+my $id = '';
+my $skey = '';
+my $gkey = '';
+my $atype = '';		# archive type
+my $fexcgi;		# F*EX CGI URL
+my @files;		# files to send
+my $transferfile;	# intermediate transport file
+my %AB = ();		# server based address book
+my ($server,$port,$sid);
+my $proxy = '';
+my $proxy_prefix = '';
+my $features = ''; 
+my $timeout = 30; 	# server timeout
+my $fexlist = "$tmpdir/fexlist";
+my ($usage,$hints);
+
+my $xx = $0 =~ /^xx/;
+
+if ($xx) {
+  $usage = "usage: send file(s):               xx [:slot] file...\n".
+           "   or: send STDIN:                 xx [:slot] -\n".
+           "   or: send pipe:                  ... | xx [:slot] \n".
+           "   or: get file(s) or STDIN:       xx [:slot] \n".
+           "   or: get file(s) no-questions:   xx [:slot] --\n".
+           "examples: dmesg | xx\n".
+           "          xx project\n".
+           "          xx --\n".
+           "          xx :conf /etc /boot\n";
+} else {
+  $usage = <<EOD;
+usage: $0 [options] file(s) [@] recipient(s)
+   or: $0 [special options]
+   or: $0 -f \# recipient(s)
+   or: $0 -x \# [-C -k -D -K]
+options: -v           verbose mode
+         -d           delete file on fex server
+         -c           compress file
+         -g           encrypt file with gpg
+         -m limit     limit throughput (kB/s)
+         -i tag       use ID data [tag] from ID file
+         -C comment   add comment to notification e-mail
+         -k max       keep file max days on fex server
+         -D           delay auto-delete after download
+         -K           no auto-delete after download
+         -M           MIME-file (to be displayed in recipient\'s webbrowser)
+         -o           overwrite mode, do not resume
+         -a archive   put files in archive (.zip .7z .tar .tgz)
+         -s stream    read data from pipe and upload it with stream name
+special options: -I      initialize ID file or show ID
+                 -I tag  add alternate ID data (secondary logins) to ID file
+                 -l      list sent files numbered (# needed for -b -x -d)
+                 -f \#    forward already uploaded file to another recipient
+                 -x \#    modify options -C -k -D -K for already uploaded file
+                 -d \#    delete file on fex server
+                 -Q      check quotas
+                 -A      edit server address book (aliases)
+                 -U      show authorized URL
+                 -H      show hints, examples and more options
+                 -V      show version
+                 (\# is a file number, see output from $0 -l)
+examples: $0 visualization.mpg framstag\@rus.uni-stuttgart.de
+          $0 -a images.zip *.jpg webmaster\@flupp.org,metoo
+          lshw | $0 -s hardware.list admin\@flupp.org
+EOD
+#   or: $0 -R FEX-URL e-mail
+#         -R FEX mail  self-register your e-mail address at FEX server
+
+  $hints = <<EOD;
+$0 Hints and more options:
+  
+usage: $0 [options] file recipient(s)
+
+Recipient can be a comma separated address list. Example:
+  $0 big.file framstag\@rus.uni-stuttgart.de,webmaster\@flupp.org
+
+Recipient can be an alias from your server address book 
+(use "$0 -A" to edit it). Example:
+  $0 big.file framstag
+
+Recipient can be a SKEY URL, which you have received from a regular F*EX user.
+When using this URL you are a subuser of this full user and the file will be 
+sent to him. Example:
+  $0 big.file http://fex.rus.uni-stuttgart.de/fup?skey=4285f8cdd881626524fba686d5f0a83a
+
+Recipient can be a GKEY URL, which you have received from a regular F*EX user.
+Using this URL you are a member of his group and the file will be sent to all
+members of this group. Example:
+  $0 big.file http://fex.rus.uni-stuttgart.de/fup?gkey=50d26547b1e8c1110beb8748fc1d9444
+
+When you use "FEX-URL/anonymous" as recipient and your F*EX administrator has 
+allowed anonymous upload for your IP address then no auth-ID is needed.
+    
+"." as recipient means fex to yourself and show immediately the download URL 
+(no notification e-mail will be sent). Example:
+  $0 software.tar .
+
+"//" as recipient means fex to yourself and create extra short download URL.
+Example:
+  $0 software.tar //
+
+If you want a Bcc of the notification e-mail then add '!bcc!' to the comment:
+fexsend -C '!bcc! for me and you' ...
+
+Option -. sends a short instead of a detailed notification e-mail
+Option -/ does not upload the file, but tells the server to link it
+Option -= uses an alias name as file name
+Option -n sends no notification e-mail, but shows the download URL immediately
+Option -q is quiet mode
+Option -r ADDRESS sets e-mail Reply-To ADDRESS
+Option -F activates female mode
+    
+To manage your subuser and groups or forward or redirect files, use a 
+webbrowser with the URL from "$0 -U", e.g.:  firefox \$($0 -U)
+
+If you want to copy-forward an already uploaded file to another recipient,
+then you first have to query the file number with:
+  $0 -l
+and then copy-forward it with:
+  $0 -b # other\@address
+Where # is the file number.
+
+If you want to modify the keep time, comment or auto-delete behaviour of an
+already uploaded file then you first have to query the file number with:
+  $0 -l
+and then for example set the keep time to 30 days with:
+  $0 -x # -k 30
+Where # is the file number.
+
+With option -a you can send several files or whole directories within a single
+archive file. The archive types tar and tgz are build on-the-fly (streaming) 
+whereas archive types zip and 7z need a temporary archive file on local disk.
+
+With option -s you can send any data coming from a pipe (STDIN) as a file
+without wasting local disc space.
+  
+Partner program xx is an internet clipboard. See: xx -h
+  
+Partner program fexget is for downloading. See: fexget -h
+  
+For temporary usage of a HTTP proxy use: 
+  $0 -P your_proxy:port:chunksize_in_MB file recipient
+Example:
+  $0 -P wwwproxy.uni-stuttgart.de.de:8080:1024 4GB.tar .
+  
+For temporary usage of an alternative F*EX server or user use: 
+  FEXID="FEXSERVER USER AUTHID" $0 file recipient
+Example:
+  FEXID="fex.flupp.org gaga\@flupp.org blubb" $0 big.file framstag\@rus.uni-stuttgart.de
+    
+EOD
+}
+
+my @rcamel = (
+'[A
+     _  _  c*_)
+    / \/ \//
+ *=(  __  /
+    \\\\/\\\\/
+',
+'[A    \\\\/\\\\/ 
+',
+'[A   //\\\\//\\\\
+');
+
+autoflush STDERR;
+
+if ($windoof and not @ARGV and not $ENV{PROMPT}) {
+  # restart with cmd.exe to have mouse cut+paste
+  exec qw'cmd /k',$0,'-W';
+  exit;
+}
+
+unless (-d $fexhome) {
+  mkdir $fexhome,0700 or die "$0: cannot create FEXHOME $fexhome - $!\n";
+}
+
+unless (-d $tmpdir) {
+  mkdir $tmpdir,0700 or die "$0: cannot create tmpdir $tmpdir - $!\n";
+}
+
+my @_ARGV = @ARGV; # save arguments
+
+our ($opt_q,$opt_h,$opt_H,$opt_v,$opt_m,$opt_c,$opt_k,$opt_d,$opt_l,$opt_I,
+     $opt_K,$opt_D,$opt_u,$opt_f,$opt_a,$opt_C,$opt_R,$opt_M,$opt_L,$opt_Q,
+     $opt_A,$opt_i,$opt_z,$opt_Z,$opt_b,$opt_P,$opt_x,$opt_X,$opt_V,$opt_U,
+     $opt_s,$opt_o,$opt_g,$opt_F,$opt_n,$opt_r);
+
+if ($xx) {
+  $opt_q = 1 if @ARGV and $ARGV[-1] eq '--' and pop @ARGV or not -t STDOUT;
+  $opt_h = $opt_v = $opt_m = $opt_I = 0;
+  $opt_X = '';
+  getopts('hvIm:') or die $usage;
+} else {
+  $opt_h = $opt_v = $opt_m = $opt_c = $opt_k = $opt_d = $opt_l = $opt_I = 0;
+  $opt_H = $opt_K = $opt_D = $opt_R = $opt_M = $opt_L = $opt_Q = $opt_A = 0;
+  $opt_x = $opt_o = $opt_g = $opt_V = $opt_U = $opt_F = $opt_n = $opt_q = 0;
+  ${'opt_@'} = ${'opt_!'} = ${'opt_+'} = ${'opt_.'} = ${'opt_/'} = 0;
+  ${'opt_='} = '';
+  $opt_u = $opt_f = $opt_a = $opt_C = $opt_i = $opt_b = $opt_P = $opt_X = '';
+  $opt_s = $opt_r = '';
+  getopts('hHvcdognVDKlILUARWMFzZqQ@!+./r:m:k:u:f:a:s:C:i:b:P:x:X:=:') 
+    or die $usage;
+
+  if ($opt_H) {
+    print $hints;
+    exit;
+  }
+  
+  if ($opt_V) {
+    print "Version: $version\n";
+  }
+  
+  if ($opt_K and $opt_D) {
+    die "$0: you cannot use both options -D and -K\n";
+  }
+
+  if ($opt_a and $opt_c) {
+    die "$0: you cannot use both options -a and -c\n";
+  }
+
+  if ($opt_a and $opt_s) {
+    die "$0: you cannot use both options -a and -s\n";
+  }
+
+  if ($opt_g and $opt_c) {
+    $opt_c = 0;
+  }
+
+  $opt_f ||= $opt_b;
+  if ($opt_f and $opt_f !~ /^\d+$/) {
+    die "$0: option -f needs a number, see $0 -l\n";
+  }
+
+  if ($opt_I and $opt_R) {
+    die "$0: you cannot use both options -I and -R\n";
+  }
+
+  if ($opt_R) {
+    &register;
+    exit;
+  }
+
+  # $opt_C is COMMENT command in F*EX protocol
+  $opt_C =    
+    ($opt_d)		? 'DELETE':
+    ($opt_l or $opt_L)	? 'LIST':
+    ($opt_Q)		? 'CHECKQUOTA':
+    ($opt_Z)		? 'RECEIVEDLOG':
+    ($opt_z)		? 'SENDLOG':
+    (${'opt_!'})	? 'FOPLOG':
+  $opt_C;
+  
+  $opt_D =     
+    ($opt_D) ? 'DELAY':
+    ($opt_K) ? 'NO':
+  $opt_D;
+}
+
+if ($opt_h) {
+  female_mode("show help?") if $opt_F;
+  print $usage;
+  exit;
+}
+
+die $usage if $opt_m and $opt_m !~ /^\d+/;
+
+if ($opt_P) { 
+  if ($opt_P =~ /^([\w.-]+:\d+)(:(\d+))?/) {
+    $proxy = $1;
+    $chunksize = $3 || 0;
+  } else {
+    die "$0: proxy must be: SERVER:PORT\n";
+  }
+}
+
+if ($FEXID = $ENV{FEXID}) {
+  $FEXID = decode_b64($FEXID) if $FEXID !~ /\s/;
+  ($fexcgi,$from,$id) = split(/\s+/,$FEXID);
+} else {
+  if ($windoof and not -f $idf) { &init_id }
+  if (open $idf,$idf) {
+    &get_id($idf);
+    close $idf;
+  }
+}
+
+if ($xx) {
+  # convert old idxx file
+  if ($idf and open $idf,$idf.'xx') {
+    &get_id($idf);
+    close $idf;
+    if (open $idf,'>>',$idf) {
+      print {$idf} "\n[xx]\n",
+                   "$fexcgi\n",
+                   "$from\n",
+                   "$id\n";
+      close $idf;
+      unlink $idf.'xx';
+    }
+  }
+  
+  # special xx ID?
+  if ($FEXXX = $ENV{FEXXX}) {
+    $FEXXX = decode_b64($FEXXX) if $FEXXX !~ /\s/;
+    ($fexcgi,$from,$id) = split(/\s+/,$FEXXX);
+  } elsif (open $idf,$idf) {
+    while (<$idf>) {
+      if (/^\[xx\]/) {
+        $proxy = $proxy_prefix = '';
+        &get_id($idf);
+        last;
+      }
+    }
+    close $idf;
+  }
+  
+} else {
+
+  # alternativ ID?
+  if ($opt_i) {
+    $proxy = $proxy_prefix = '';
+    open $idf,$idf or die "$0: cannot open $idf - $!\n";
+    while (<$idf>) {
+      if (/^\[$opt_i\]/) {
+        &get_id($idf);
+        last;
+      }
+    }
+    close $idf;
+    die "$0: no [$opt_i] in $idf\n" unless $_;
+  }
+}
+
+if ($opt_I) {
+  if ($xx) { &show_id } 
+  else     { &init_id }
+  exit;
+}
+
+if (@ARGV > 1 and $ARGV[-1] =~ /(^|\/)anonymous/) {
+  $fexcgi = $1 if $ARGV[-1] =~ s:(.+)/::;
+  die "usage: $0 [options] file FEXSERVER/anonymous\n" unless $fexcgi;
+  $anonymous = $from = 'anonymous';
+  $sid = $id = 'ANONYMOUS';
+} elsif (@ARGV > 1 and $id eq 'PUBLIC') {
+  $public = $sid = $id;
+} elsif (@ARGV > 1 and $ARGV[-1] =~ m{^(https?://[\w.-]+(:\d+)?/fup\?[sg]key=\w+)}) {
+  $fexcgi = $1;
+  $skey = $1 if $fexcgi =~ /skey=(\w+)/;
+  $gkey = $1 if $fexcgi =~ /gkey=(\w+)/;
+} else {
+
+  $fexcgi = $opt_u if $opt_u;
+  
+  if (not -e $idf and not ($fexcgi and $from and $id)) {
+    die "$0: no ID file $idf found, use \"fexsend -I\" to create it\n";
+  }
+  
+  unless ($fexcgi) {
+    die "$0: no FEX URL found, use \"$0 -u URL\" or \"$0 -I\"\n";
+  }
+  
+  unless ($from and $id) {
+    die "$0: no sender found, use \"$0 -f FROM:ID\" or \"$0 -I\"\n";
+  }
+
+  if ($fexcgi !~ /^http/) {
+    if ($fexcgi =~ /:443/) { $fexcgi = "https://$fexcgi" }
+    else                   { $fexcgi = "http://$fexcgi" }
+  }
+
+}
+
+$server = $fexcgi;
+
+$port = 80;
+$port = 443 if $server =~ s{https://}{};
+$port = $1  if $server =~ s/:(\d+)//;
+
+$server =~ s{http://}{};
+$server =~ s{/.*}{};
+
+# $chunksize = 4*k unless $chunksize;
+$chunksize *= M;
+
+if ($proxy) {
+  if    ($port == 80)  { $proxy_prefix = "http://$server" }
+  elsif ($port != 443) { $proxy_prefix = "http://$server:$port" }
+}
+
+# xx: special file exchange between own accounts
+if ($xx) {
+  my $transferfile = "$tmpdir/STDFEX";
+  # slot?
+  if ($0 eq 'xxx') {
+    $transferfile = "$tmpdir/xx:xxx";
+  } elsif (@ARGV and $ARGV[0] =~ /^:([\w.=+-]+)$/) {
+    $transferfile = "$tmpdir/xx:$1";
+    shift @ARGV;
+  }
+  open my $lock,'>>',$transferfile 
+    or die "$0: cannot write $transferfile - $!\n";
+  flock($lock,LOCK_EX|LOCK_NB)
+    or die "$0: $transferfile is locked by another process\n";
+  truncate $transferfile,0;
+  if (not @ARGV and -t) {
+    &get_xx($transferfile);
+  } else {
+    &send_xx($transferfile);
+  }
+  exit;
+} 
+
+# regular fexsend
+
+&inquire if $windoof and not @ARGV and not
+            ($opt_l or $opt_L or $opt_Q or $opt_A or $opt_U or $opt_I or
+             $opt_f or $opt_x);
+
+if (${'opt_.'}) {
+  $opt_C = "!SHORTMAIL! $opt_C";
+}
+
+if ($opt_n or $opt_C =~ /NOMAIL|!#!/) {
+  $nomail = 'NOMAIL';
+}
+
+unless ($skey or $gkey or $anonymous) {
+  if ($opt_v) {
+    if ($FEXID) {
+      warn "ID data from \$FEXID: $fexcgi $from $id\n";
+    } elsif (-f $idf) {
+      warn "ID data from $idf: $fexcgi $from $id\n";
+    }
+  }
+  warn "Server/User: $fexcgi/$from\n" unless $opt_q;
+}
+
+if    ($opt_V and not @ARGV)    	{ exit }
+if    ($opt_f) 				{ &forward } 
+elsif ($opt_x) 				{ &modify } 
+elsif ($opt_Q) 				{ &query_quotas } 
+elsif ($opt_l or $opt_L)		{ &list } 
+elsif ($opt_U)				{ &show_URL } 
+elsif ($opt_z or $opt_Z or ${'opt_!'})	{ &get_log } 
+elsif ($opt_A)				{ edit_address_book($from) }
+elsif (${'opt_@'})			{ &show_address_book } 
+elsif ($opt_d and $anonymous)		{ &purge }
+elsif ($opt_d and $ARGV[-1] =~ /^\d+$/)	{ &delete }
+else 					{ &send_fex }
+
+exit;
+
+
+# initialize ID file
+sub init_id {
+  my $tag;
+  my $proxy = '';
+  
+  if ($opt_I) {
+    $tag = shift @ARGV;
+    die $usage if @ARGV;
+  }
+  
+  $fexcgi = $from = $id = '';
+  
+  unless (-d $fexhome) {
+    mkdir $fexhome,0700 or die "$0: cannot create FEXHOME $fexhome - $!\n";
+  }
+  
+  if (not $tag and open $idf,$idf) {
+    $fexcgi = <$idf>;
+    $from   = <$idf>;
+    $id     = <$idf>;
+    close $idf;
+    if ($id) {
+      chomp($fexcgi);
+      chomp($from);
+      chomp($id);
+      $FEXID = encode_b64("$fexcgi $from $id");
+      if (-t STDIN) {
+        print "# hint: to edit the ID file $idf use \"$0 -I .\" #\n";
+        print "export FEXID=$FEXID\n";
+        print "history -d \$((HISTCMD-1));history -d \$((HISTCMD-1))\n";
+      } else {
+        print "FEXID=$FEXID\n";
+      }
+      exit;
+    }
+  }
+
+  if ($tag and $tag eq '.') { exec $ENV{EDITOR}||'vi',$idf }
+  
+  if ($tag) { print "F*EX server URL for [$tag]: " }
+  else      { print "F*EX server URL: " }
+  $fexcgi = <STDIN>;
+  $fexcgi =~ s/[\s\n]//g;
+  die "you MUST provide a FEX-URL!\n" unless $fexcgi;
+  if ($fexcgi =~ /\?/) {
+    $from = $1 if $fexcgi =~ /\bfrom=(.+?)(&|$)/i;
+    $id   = $1 if $fexcgi =~ /\bid=(.+?)(&|$)/i;
+    $skey = $1 if $fexcgi =~ /\bskey=(.+?)(&|$)/i;
+    $gkey = $1 if $fexcgi =~ /\bgkey=(.+?)(&|$)/i;
+    $fexcgi =~ s/\?.*//;
+  }
+  unless ($fexcgi =~ /^[_:=\w\-\.\/\@\%]+$/) {
+    die "\"$fexcgi\" is not a legal FEX-URL!\n";
+  }
+  $fexcgi =~ s:/fup/*$::;
+  print "proxy address (hostname:port or empty if none): ";
+  $proxy = <STDIN>;
+  $proxy =~ s/[\s\n]//g;
+  if ($proxy =~ /^[\w.-]+:\d+$/) { 
+    $proxy = "!$proxy";
+  } elsif ($proxy =~ /\S/) { 
+    die "wrong proxy address format\n";
+  } else { 
+    $proxy = "";
+  }
+  if ($proxy) {
+    print "proxy POST limit in MB (use 2048 if unknown): ";
+    $_ = <STDIN>;
+    if (/(\d+)/) {
+      $proxy .= "[$1]";
+    }
+  }
+  if ($skey) {
+    $from = 'SUBUSER';
+    $id = $skey;
+  } elsif ($gkey) {
+    $from = 'GROUPMEMBER';
+    $id = $gkey;
+  } else {
+    unless ($from) {
+      print "Your e-mail address as registered at $fexcgi: ";
+      $from = <STDIN>;
+      $from =~ s/[\s\n]//g;
+      die "you MUST provide your e-mail address!\n" unless $from;
+    }
+    unless ($from =~ /^[_:=\w\-\.\/\@\%\+]+$/) {
+      die "\"$from\" is not a legal e-mail address!\n";
+    }
+    unless ($id) {
+      print "Your auth-ID for $from at $fexcgi: ";
+      $id = <STDIN>;
+      $id =~ s/[\s\n]//g;
+      die "you MUST provide your ID!\n" unless $id;
+    }
+  }
+  if (open $idf,'>>',$idf) {
+    print {$idf} "\n[$tag]\n" if $tag and -s $idf;
+    print {$idf} "$fexcgi$proxy\n",
+                 "$from\n",
+                 "$id\n";
+    close $idf;
+    print "data written to $idf\n";
+  } else {
+    die "$0: cannot write to $idf - $!\n";
+  }
+}
+
+
+sub show_id {
+  my ($fexcgi,$from,$id);
+  if (open $idf,$idf) {
+    $fexcgi = <$idf>;
+    $from   = <$idf>;
+    $id     = <$idf>;
+    while (<$idf>) {
+      if (/^\[xx\]/) {
+        $fexcgi = <$idf>;
+        $from   = <$idf>;
+        $id     = <$idf>;
+      }
+    }
+    close $idf;
+    die "$0: too few data in $idf" unless defined $id;
+    chomp($fexcgi);
+    chomp($from);
+    chomp($id);
+    $FEXXX = encode_b64("$fexcgi $from $id");
+    if (-t STDIN) {
+      print "export FEXXX=$FEXXX\n";
+      print "history -d \$((HISTCMD-1));history -d \$((HISTCMD-1))\n";
+    } else {
+      print "FEXXX=$FEXXX\n";
+    }
+  } else {
+    die "$0: cannot read $idf - $!\n";
+  }
+}
+
+
+sub register {
+  my $fs = shift @ARGV or die $usage;
+  my $mail = shift @ARGV or die $usage;
+  my $port;
+  my ($server,$user,$id);
+
+  die "$0: $idf does already exist\n" if -e $idf;
+
+  if ($fs =~ /^https/) {
+    die "$0: cannot handle https at this time\n";
+  }
+
+  $fs =~ s{^http://}{};
+  $fs =~ s{/.*}{};
+  if ($fs =~ s/:(\d+)//) { $port = $1 }
+  else                   { $port = 80 }
+
+  tcpconnect($fs,$port);
+  sendheader("$fs:$port","GET $proxy_prefix/fur?user=$mail&verify=no HTTP/1.1");
+  http_response();
+
+  while (<$SH>) {
+    s/\r//;
+    printf "<-- $_"if $opt_v;
+    last if /^\s*$/;
+  }
+
+  while (<$SH>) {
+    s/\r//;
+    printf "<-- $_"if $opt_v;
+    if (m{http://(.*)/fup\?from=(.+)&ID=(.+)}) {
+      $server = $1;
+      $user = $2;
+      $id = $3;
+
+      if (open F,">$idf") {
+        print F "$server\n",
+                "$user\n",
+                "$id\n";
+        close F;
+        chmod 0600,$idf;
+        print "user data written to $idf\n";
+        print "you can now fex!\n";
+        exit;
+      } else {
+        die "$0: cannot write to $idf - $!\n";
+      }
+    }
+  }
+
+  die "$0: no account data received from F*EX server\n";
+
+}
+
+
+sub send_xx {
+  my $transferfile = shift;
+  my $file = '';
+  my (@r,@tar);
+  
+  $SIG{PIPE} = $SIG{INT} = sub {
+    unlink $transferfile;
+    exit 3;
+  };
+  
+  if ($0 eq 'xxx') { @tar = qw'tar -cv' }
+  else             { @tar = qw'tar -cvz' }
+
+  if (-t) {
+    if ("@ARGV" eq '-') {
+      # store STDIN to transfer file
+      shelldo("cat >> $transferfile");
+    } elsif (@ARGV) {
+      print "making tar transfer file $transferfile :\n";
+      # single file? then add this directly 
+      if (scalar @ARGV == 1) {
+        my ($dir,$file);
+        # strip path if not ending with /
+        if ($ARGV[0] =~ m:(.+)/(.+): and $2 !~ m:/$:) {
+          ($dir,$file) = ($1,$2);
+          chdir $dir or die "$0: $dir - $!\n";
+        } else {
+          $file = $ARGV[0];
+        }
+        if (-l $file) {
+          shelldo(@tar,qw'--dereference -f',$transferfile,$file);
+        } else {
+          shelldo(@tar,'-f',$transferfile,$file);
+        }
+      } else {
+        shelldo(@tar,'-f',$transferfile,@ARGV);
+      }
+      if ($?) {
+        unlink $transferfile;
+        if ($? == 2) {
+          die "$0: interrupted making tar transfer file\n";
+        } else {
+          die "$0: error while making tar transfer file\n";
+        }
+      }
+    }
+  } else {
+    # write input from pipe to transfer file
+    shelldo("cat >> $transferfile");
+  }
+
+  die "$0: no transfer file\n" unless -s $transferfile;
+  
+  serverconnect($server,$port);
+  query_sid($server,$port);
+  
+  @r = formdatapost(
+    from	=> $from,
+    to		=> $from,
+    id		=> $sid,
+    file	=> $transferfile,
+    comment	=> 'NOMAIL',
+    autodelete	=> $transferfile =~ /STDFEX/ ? 'NO' : 'DELAY',
+  );
+  
+  # open P,'|w3m -T text/html -dump' or die "$0: w3m - $!\n";
+  # print P @r;
+  http_response(@r);
+  if ($transferfile =~ /:/ and $0 ne 'xxx') {
+    if ("@r" =~ /\s(X-)?Location: (http.*)\s/) {
+      print "wget -O- $2 | tar xvzf -\n";
+    }
+  }
+  
+  unlink $transferfile;
+}
+
+
+sub query_quotas {
+  my (@r,$r);
+  local $_;
+
+  female_mode("query quotas?") if $opt_F;
+
+  @r = formdatapost(
+    from	=> $from,
+    to		=> $from,
+    id		=> $sid,
+    comment	=> $opt_C, 
+  );
+  die "$0: no response from fex server $server\n" unless @r;
+  $_ = shift @r;
+  unless (/^HTTP.* 2/) {
+    s:HTTP/[\d\. ]+::;
+    die "$0: server response: $_\n";
+  }
+  if (($_) = grep(/^X-Sender-Quota/,@r) and /(\d+)\s+(\d+)/) {
+    print "sender quota (used): $1 ($2) MB\n";
+  } else {
+    print "sender quota: unlimited\n";
+  }
+  if (($_) = grep(/^X-Recipient-Quota/,@r) and /(\d+)\s+(\d+)/) {
+    print "recipient quota (used): $1 ($2) MB\n";
+  } else {
+    print "recipient quota: unlimited\n";
+  }
+}
+
+
+# list spool
+sub list {
+  my (@r,$r);
+  my ($data,$dkey,$n);
+  local $_;
+
+  female_mode("list spooled files?") if $opt_F;
+
+  if ($opt_l and $n = shift @ARGV and $n =~ /^\d+$/) {
+    open $fexlist,$fexlist or die "$0: $fexlist - $!\n";
+    while (<$fexlist>) {
+      if (/^\s*(\d+)\) (\w+) (.+)/ and $1 eq $n) {
+        serverconnect($server,$port) unless $SH;
+        sendheader(
+          "$server:$port",
+          "GET $proxy_prefix/fop/$2/$2?LIST HTTP/1.1",
+          "User-Agent: $useragent",
+        );
+        $_ = <$SH>||'';
+        s/\r//;
+        print "<-- $_" if $opt_v;
+        if (/^HTTP.* 200/) {
+          print "<-- $_" if $opt_v;
+          while (<$SH>) {
+            s/\r//;
+            if (/^\n/) {
+              print;
+              print while <$SH>;
+            }
+          }
+        } elsif (s:HTTP/[\d\. ]+::) {
+          die "$0: server response: $_";
+        } else {
+          die "$0: no response from fex server $server\n";
+        }
+        exit;
+      }
+    }
+    die "$0: file \#$n not found in fexlist\n";
+  } else {
+    @r = formdatapost(
+      from	=> $from,
+      to	=> $opt_l ? '*' : $from,
+      command	=> $opt_C, 
+    );
+  }
+  die "$0: no response from fex server $server\n" unless @r;
+  $_ = shift @r;
+  unless (/^HTTP.* 200/) {
+    s:HTTP/[\d\. ]+::;
+    die "$0: server response: $_\n";
+  }
+  
+  # list sent files
+  if ($opt_l) {
+    open $fexlist,">$fexlist" or die "$0: cannot write $fexlist - $!\n";
+    foreach (@r) {
+      next unless /<pre>/ or $data;
+      $data = 1;
+      last if m:</pre>:;
+      if (/<a href=".*dkey=(\w+).*?">/) { $dkey = $1 }
+      else                              { $dkey = '' }
+#      $_ = encode_utf8($_);
+      s/<.*?>//g;
+      if (/^(to .* :)/) {
+        print "\n$1\n";
+        print {$fexlist} "\n$1\n";
+      } elsif (m/(\d+) MB (.+)/) {
+        $n++;
+        printf "%4s) %8d MB %s\n","#$n",$1,$2;
+        printf {$fexlist} "%3d) %s %s\n",$n,$dkey,$2;
+      }
+    }
+    close $fexlist;
+  } 
+  
+  # list received files
+  if ($opt_L) {
+    foreach (@r) {
+      next unless /<pre>/ or $data;
+      $data = 1;
+      next if m:<pre>:;
+      last if m:</pre>:;
+      if (/(from .* :)/) {
+        print "\n$1\n";
+      }
+      if (m{(\d+) (MB.*)<a href="(https?://.*/fop/\w+/.+)">(.+)</a>( ".*")?}) {
+        printf "%8d %s%s%s\n",$1,$2,$3,($5||'');
+      }
+    }
+  }
+}
+
+
+sub show_URL {
+  printf "%s/fup/%s\n",$fexcgi,encode_b64("from=$from&id=$id");
+  exit;
+}
+
+
+sub get_log {
+  my (@r);
+  local $_;
+  
+  @r = formdatapost(
+    from	=> $from,
+    to		=> $from,
+    id		=> $sid,
+    comment	=> $opt_C, 
+  );
+  die "$0: no response from fex server $server\n" unless @r;
+  $_ = shift @r;
+  unless (/^HTTP.* 200/) {
+    s:HTTP/[\d\. ]+::;
+    die "$0: server response: $_\n";
+  }
+  while (shift @r) {}
+  foreach (@r) { print "$_\n" }
+}
+
+
+sub show_address_book {
+  my (%AB,@r);
+  my $alias;
+  local $_;
+  
+  %AB = query_address_book($server,$port,$from);
+  foreach $alias (sort keys %AB) {
+    next if $alias eq 'ADDRESS_BOOK';
+    $_ = sprintf "%s = %s (%s) # %s\n",
+                 $alias,
+                 $AB{$alias},
+                 $AB{$alias}->{options},
+                 $AB{$alias}->{comment};
+    s/ \(\)//;
+    s/ \# $//;
+    print;
+  }
+}
+
+
+sub purge {
+  die "$0: not yet implemented\n";
+}
+
+
+sub delete {
+  my ($to,$file);
+
+  while (@ARGV) {
+    $opt_d = shift @ARGV;
+    die "$usage: $0 -d #\n" if $opt_d !~ /^\d+$/;
+  
+    open $fexlist,$fexlist or die "$0: $fexlist - $!\n";
+    while (<$fexlist>) {
+      if (/^to (.+\@.+) :/) {
+        $to = $1;
+      } elsif (/^\s*(\d+)\) (\w+) (.+)/ and $1 eq $opt_d) {
+        serverconnect($server,$port) unless $SH;
+        sendheader(
+          "$server:$port",
+          "GET $proxy_prefix/fop/$2/$2?DELETE HTTP/1.1",
+          "User-Agent: $useragent",
+        );
+        $_ = <$SH>||'';
+        s/\r//;
+        print "<-- $_" if $opt_v;
+        if (/^HTTP.* 200/) {
+          while (<$SH>) {
+            s/\r//;
+            last if /^\n/; # ignore HTML output
+            print "<-- $_" if $opt_v;
+            if (/^X-File:.*\/(.+)/) {
+              printf "%s deleted\n",decode_utf8(urldecode($1));
+            }
+          }
+          undef $SH;
+        } elsif (s:HTTP/[\d\. ]+::) {
+          die "$0: server response: $_";
+        } else {
+          die "$0: no response from fex server $server\n";
+        }
+        last;
+      }
+    }
+    close $fexlist;
+    sleep 1; # do not overrun server
+  }
+
+  exit;
+}
+
+
+sub send_fex {
+  my @to;
+  my $file = '';
+  my @files = ();
+  my ($data,$aname,$alias);
+  my (@r,$r);
+  my $ma = $HOME.'/.mutt/aliases';
+  my $t0 = time;
+  my @transferfiles;
+  local $_;
+  
+  if ($from =~ /^SUBUSER|GROUPMEMBER$/) {
+    $to = '_';
+  } else {
+    # look for single @ in arguments
+    for (my $i=1; $i<$#ARGV; $i++) {
+      if ($ARGV[$i] eq '@') {
+        $ARGV[$i] = join(',',@ARGV[$i+1 .. $#ARGV]);
+        $#ARGV = $i;
+        last;
+      }
+    }
+    $to = pop @ARGV or die $usage;
+    if ($to eq '.') {
+      $to = $from;
+      $opt_C ||= 'NOMAIL';
+    }
+    if ($to eq ':') {
+      $to = $from;
+      $opt_C ||= 'NOMAIL';
+    }
+    if ($opt_g and $to =~ /,/) {
+      die "$0: encryption is supported to only one recipient\n";
+    }
+    if ($to =~ m{^https?://.*/fup\?skey=(\w+)}) {
+      $from = 'SUBUSER';
+      $to = '_';
+      $id = $1;
+    }
+    if ($to =~ m{^https?://.*/fup\?gkey=(\w+)}) {
+      $from = 'GROUPMEMBER';
+      $to = '_';
+      $id = $1;
+    }
+  }
+  @to = split(',',lc($to));
+  
+  die $usage unless @ARGV or $opt_a or $opt_s;
+  die $usage if $opt_s and @ARGV;
+
+  # early serverconnect necessary for X-Features info
+  serverconnect($server,$port);
+
+  if ($anonymous) {
+    my $aok;
+    sendheader("$server:$port","OPTIONS FEX HTTP/1.1");
+    $_ = <$SH>||'';
+    s/\r//;
+    die "$0: no response from fex server $server\n" unless $_;
+    print "<-- $_" if $opt_v;
+    if (/^HTTP.* 201/) {
+      while (<$SH>) {
+        s/\r//;
+        print "<-- $_" if $opt_v;
+        last unless /\w/;
+        $aok = $_ if /X-Features:.*ANONYMOUS/;
+      }
+      die "$0: no anonymous support on server $server\n" unless $aok;
+    } else {
+      die "$0: bad response from server $server : $_\n";
+    }
+  } elsif ($public) {
+  } else {
+    
+    query_sid($server,$port);
+    
+    if ($from eq 'SUBUSER') {
+      $skey = $sid;
+      # die "skey=$skey\nid=$id\nsid=$sid\n";
+    }
+
+    if ($from eq 'GROUPMEMBER') {
+      $gkey = $sid;
+    }
+    
+    if ($to eq '.') {
+      @to = ($from);
+      $opt_C ||= 'NOMAIL';
+    } elsif ($to =~ m:^(//.*):) {
+      my $xkey = $1;
+      if ($features =~ /XKEY/) {
+        @to = ($from);
+        $opt_C = $xkey;
+      } else {
+        die "$0: server does not support XKEY\n";
+      }
+    } elsif (grep /^[^@]*$/,@to and not $skey and not $gkey) {
+      %AB = query_address_book($server,$port,$from);
+      if ($proxy) {
+        serverconnect($server,$port);
+        query_sid($server,$port);
+      }
+      foreach $to (@to) {
+        # alias in server address book?
+        if ($AB{$to}) {  
+          # do not substitute alias with expanded addresses because then 
+          # keep and autodelete options from address book will get lost
+          # $to = $AB{$to};
+        } 
+        # look for mutt aliases
+        elsif ($to !~ /@/ and $to ne $from and open $ma,$ma) {
+          $alias = $to;
+          while (<$ma>) {
+            if (/^alias \Q$to\E\s/i) {
+              chomp;
+              s/\s*#.*//;
+              s/\(.*?\)//;
+              s/\s+$//;
+              s/.*\s+//;
+              s/[<>]//g;
+              if (/,/) {
+                warn "$0: ignoring mutt multi-alias $to = $alias\n";
+                last;
+              }
+              if (/@/) {
+                $alias = $_;
+                warn "$0: found mutt alias $to = $alias\n";
+                last;
+              }
+            }
+          }
+          close $ma;
+          $to = $alias;
+        }
+      }
+    }
+  
+    $to = join(',',@to);
+  
+    if (
+      not $skey and not $gkey
+      and $features =~ /CHECKRECIPIENT/ 
+      and $opt_C !~ /^(DELETE|LIST|RECEIVEDLOG|SENDLOG|FOPLOG)$/
+      and not($to =~ /@(.+)/ and $from =~ /@$1$/)
+    ) {
+      checkrecipient($from,$to);
+      if ($proxy) {
+        serverconnect($server,$port);
+        query_sid($server,$port);
+      }
+    }
+  }
+
+  if (@ARGV > 1 and not ($opt_a or $opt_s or $opt_d)) {
+    print "Archive name (name.tar, name.tgz or name.zip) or [ENTER] to send file for file:\n";
+    $opt_a = <STDIN>;
+    $opt_a =~ s/^\s+//;
+    $opt_a =~ s/\s+$//;
+  }
+
+  if ($opt_s) {
+    $opt_s =~ s/^=//;
+    $opt_s =~ s:.*/::;
+    $opt_s =~ s/[^\w_.+-]/_/g;
+    @files = ($opt_s);
+  } elsif ($opt_a) {
+    $opt_a =~ s/^=//;
+    $opt_a =~ s:.*/::;
+    $opt_a =~ s/[^\w_.+-]/_/g;
+    if ($opt_a =~ /(.+)\.(zip|tar|tgz|7z)$/) {
+      $aname = $1;
+      $atype = $2;
+    } else {
+      die "$0: archive name must be one of ".
+          "$opt_a.tar $opt_a.tgz $opt_a.zip\n";
+    }
+    # no file argument left?
+    unless (@ARGV) {
+      # use file name as archive name
+      push @ARGV,$aname;
+      $opt_a =~ s:/+$::g;
+      $opt_a =~ s:.*/::g;
+    }
+    foreach my $file (@ARGV) {
+      die "$0: cannot read $file\n" unless -l $file or -r $file;
+    }
+    $opt_a .= ".$atype" if $opt_a !~ /\.$atype$/;
+    $transferfile = "$tmpdir/$opt_a";
+    unlink $transferfile;
+    print "Making fex archive ($opt_a):\n";
+    if ($atype eq 'zip') {
+      if ($windoof) {
+        # if ($opt_c) { system(qw'7z a -tzip',$transferfile,@ARGV) }
+        # else        { system(qw'7z a -tzip -mm=copy',$transferfile,@ARGV) }
+        system(qw'7z a -tzip',$transferfile,@ARGV);
+        @files = ($transferfile);
+      } else {
+        # zip archives must be < 2 GB, so split as necessary
+        @files = zipsplit($transferfile,@ARGV);
+        if (scalar(@files) == 1) {
+          $transferfile = $files[0];
+          $transferfile =~ s/_1.zip$/.zip/;
+          rename $files[0],$transferfile;
+          @files = ($transferfile);
+        }
+      }
+      @transferfiles =  @files;
+    } elsif ($atype eq '7z') {
+      # http://www.7-zip.org/
+      if ($opt_c) { system(qw'7z a',$transferfile,@ARGV) }
+      else        { system(qw'7z a -t7z -mx0',$transferfile,@ARGV) }
+      @transferfiles = @files = ($transferfile);
+    } elsif ($atype eq 'tar') {
+      if ($windoof) {
+        system(qw'7z a -ttar',$transferfile,@ARGV);
+        @transferfiles = @files = ($transferfile);
+      } else {
+        ## tar is now handled by formdatapost()
+        # system(qw'tar cvf',$transferfile,@ARGV);
+        @files = ($opt_a);
+      }
+    } elsif ($atype eq 'tgz') {
+      if ($windoof) {
+        die "$0: archive type tgz not available, use tar, zip or 7z\n";
+      } else {
+        ## tgz is now handled by formdatapost()
+        # system(qw'tar cvzf',$transferfile,@ARGV);
+        @files = ($opt_a);
+      }
+    } else {
+      die "$0: unknown archive format \"$atype\"\n";
+    }
+    
+    if (@transferfiles) {
+      
+      # error in making transfer archive?
+      if ($?) {
+        unlink @transferfiles;
+        die "$0: $! - aborting upload\n";
+      }
+      
+      # maybe timeout, so make new connect
+      if (time-$t0 >= $timeout) {
+        serverconnect($server,$port);
+        query_sid($server,$port) unless $anonymous;
+      }
+      
+    }
+    
+  } else {
+    
+    unless (@ARGV) {
+      if ($windoof) {
+        &inquire;
+      } else {
+        die $usage;
+      }
+    }
+    
+    foreach (@ARGV) {
+      my $file = $_;
+      unless ($opt_d) {
+        unless (-f $file) {
+          if (-e $file) {
+            die "$0: $file is not a regular file, try option -a\n"
+          } else {
+            die "$0: $file does not exist\n";
+          }
+        }
+        die "$0: cannot read $file\n" unless -r $file;
+      }
+      push @files,$file;
+    }
+  }
+
+  if (${'opt_/'}) {
+    foreach my $file (@files) {
+      my @s = stat($file);
+      unless (@s and ($s[2] & S_IROTH) and -r $file) {
+        die "$0: $file is not world readable\n";
+      }
+    }
+  }
+  
+  foreach my $file (@files) {
+    sleep 1;    # do not overrun server!
+    unless (-s $file or $opt_d or $opt_a or $opt_s) {
+      die "$0: cannot send empty file $file\n";
+    }
+    female_mode("send file $file?") if $opt_F;
+    @r = formdatapost(
+      from		=> $from,
+      to		=> $to,
+      replyto		=> $opt_r,
+      id		=> $sid,
+      file		=> $file,
+      keep		=> $opt_k,
+      comment		=> $opt_C,
+      autodelete	=> $opt_D, 
+    );
+  
+    if (not @r or not grep /\w/,@r) {
+      die "$0: no response from server\n";
+    }
+    if (($r) = grep /^ERROR:/,@r) {
+      if ($anonymous and $r =~ /purge it/) {
+        die "$0: file is already on server for $to - use another anonymous recipent\n";
+      } else {
+        $r =~ s/.*?:\s*//;
+        $r =~ s/<.+?>//g;
+        die "$0: server error: $r\n";
+      }
+    }
+    if (($r) = grep /<h3>\Q$file/,@r) {
+      $r =~ s/<.+?>//g;
+      print "$r\n";
+    }
+    if ($opt_a !~ /^afex_\d+\.tar$/ and $file !~ /afex_\d+\.tar$/ and
+        ($from eq $to or $from =~ /^\Q$to\E@/i or $nomail or $anonymous)) {
+      print grep({s/^(X-Recipient:.*\((.+)\))/Parameters: $2\n/i} @r);
+      print grep({s/^(X-)?(Location:.*)/$2\n/i} @r);
+    }
+  }
+
+  # delete transfer tmp file
+  unlink $transferfile if $transferfile;
+}
+
+
+sub forward {
+  my (@r);
+  my ($to,$n,$dkey,$file,$req);
+  my $status = 1;
+  local $_;
+  
+  # look for single @ in arguments
+  for (my $i=1; $i<$#ARGV; $i++) {
+    if ($ARGV[$i] eq '@') {
+      $ARGV[$i] = join(',',@ARGV[$i+1 .. $#ARGV]);
+      $#ARGV = $i;
+      last;
+    }
+  }
+
+  # if ($windoof and not @ARGV) { &inquire }
+  $to = pop @ARGV or die $usage;
+  $to = $from if $to eq '.';
+
+  open $fexlist,$fexlist or die "$0: $fexlist - $!\n";
+  while (<$fexlist>) {
+    if (/^\s*(\d+)\) (\w+) \[\d+ d\] (.+)/ and $1 eq $opt_f) {
+      $n = $1;
+      $dkey = $2;
+      $file = $3;
+      if ($file =~ s/ "(.*)"$//) {
+        $opt_C ||= $1;
+      }
+      last;
+    }
+  }
+  close $fexlist;
+  
+  unless ($n) {
+    die "$0: file #$opt_f not found in fexlist\n";
+  }
+
+  female_mode("forward file #$opt_f?") if $opt_F;
+
+  serverconnect($server,$port);
+  query_sid($server,$port);
+  
+  $req = "GET $proxy_prefix/fup?"
+        ."from=$from&ID=$sid&to=$to&dkey=$dkey&command=FORWARD";
+  $req .= "&comment=$opt_C"	if $opt_C;
+  $req .= "&keep=$opt_k"	if $opt_k;
+  $req .= "&autodelete=$opt_D"	if $opt_D;
+  $req .= "&$opt_X"		if $opt_X;
+  $req .= " HTTP/1.1";
+  sendheader("$server:$port",$req);
+  http_response();
+  while (<$SH>) { 
+    if ($opt_v) {
+      print;
+    } else {
+      print if /\Q"$file"/;
+      $status = 0;
+    }
+  }
+  
+  exit $status;
+}
+
+
+sub modify {
+  my (@r);
+  my ($n,$dkey,$file,$req);
+  local $_;
+  
+  die $usage if @ARGV;
+  die $usage unless $opt_C or $opt_k or $opt_D;
+  
+  open $fexlist,$fexlist or die "$0: $fexlist - $!\n";
+  while (<$fexlist>) {
+    if (/^\s*(\d+)\) (\w+) \[\d+ d\] (.+)/ and $1 eq $opt_x) {
+      $n = $1;
+      $dkey = $2;
+      $file = $3;
+      $file =~ s/ "(.*)"$//;
+      last;
+    }
+  }
+  close $fexlist;
+  
+  unless ($n) {
+    die "$0: file #$opt_x not found in fexlist\n";
+  }
+
+  female_mode("modify file #$opt_x?") if $opt_F;
+  
+  serverconnect($server,$port);
+  query_sid($server,$port);
+  
+  $req = "GET $proxy_prefix/fup?"
+        ."from=$from&ID=$sid&dkey=$dkey&command=MODIFY";
+  $req .= "&comment=$opt_C"	if $opt_C;
+  $req .= "&keep=$opt_k"	if $opt_k;
+  $req .= "&autodelete=$opt_D"	if $opt_D;
+  $req .= " HTTP/1.1";
+  sendheader("$server:$port",$req);
+  http_response();
+  while (<$SH>) { 
+    if ($opt_v) {
+      print "<-- $_";
+    } else {
+      print if /\Q$file/;
+    }
+  }
+  
+  exit;
+}
+
+
+sub get_xx {
+  my $transferfile = shift;
+  my $ft = '';
+  local $_;
+  
+  # get transfer file from FEX server
+  unless ($SH) {
+    serverconnect($server,$port);
+    query_sid($server,$port);
+  }
+  
+  xxget($from,$sid,$transferfile);
+  
+  # empty file?
+  unless (-s $transferfile) {
+    unlink $transferfile;
+    exit;
+  }
+  
+  # no further processing if delivering to pipe
+  exec 'cat',$transferfile unless -t STDOUT;
+  
+  if ($ft = `file $transferfile 2>/dev/null`) {
+    if ($ft =~ /compressed/) {
+      rename $transferfile,"$transferfile.gz";
+      shelldo(ws("gunzip $transferfile.gz"));
+    }
+    $ft = `file $transferfile`;
+  } 
+  # file command failed, so we look ourself into the file...
+  elsif (open $transferfile,$transferfile) {
+    read $transferfile,$_,4;
+    close $transferfile;
+    # gzip magic?
+    if (/\x1F\x8B\x08\x00/) {
+      rename $transferfile,"$transferfile.gz";
+      shelldo(ws("gunzip $transferfile.gz"));
+      # assuming tar
+      $ft = 'tar archive';
+    }
+  }
+  if ($ft =~ /tar archive/) {
+    rename $transferfile,"$transferfile.tar";
+    $transferfile .= '.tar';
+    if ($opt_q) {
+      $_ = 'y';
+    } else {
+      print "Files in transfer-container:\n\n";
+      shelldo(ws("tar tvf $transferfile"));
+      print "\nExtract these files? [Yn] ";
+      $_ = <STDIN>;
+    }
+    if (/^n/i) {
+      print "keeping $transferfile\n";
+    } else {
+      system("tar xvf $transferfile && rm $transferfile");
+      die "$0: error while untaring, see $transferfile\n" if -f $transferfile;
+    }
+  } else {
+    exec 'cat',$transferfile;
+  }
+  exit;
+}
+
+
+sub formdatapost {
+  my %P = @_; 
+  my ($boundary,$filename,$filesize,$length,$buf,$file,$fpsize,$resume,$seek);
+  my ($flink);
+  my (@hh,@hb,@r,@pv,$to);
+  my ($bytes,$t,$bt);
+  my ($t0,$t1,$t2,$tt,$tc);
+  my $bs = 2**16;        # blocksize for reading and sending file
+  my $fileid = int(time);
+  my $chunk = 0;
+  my $connection = '';
+  my $pct = '';
+  my ($pid,$tar,$aname,$atype,$tarlist,$tarerror,$location);
+  local $_;
+
+  if (defined($file = $P{file})) {
+    
+    $to = $AB{$P{to}} || $P{to}; # for gpg
+    
+    # special file: stream from STDIN
+    if ($opt_s) {
+      $filename = encode_utf8($file);
+      $filesize = -1;
+    }
+    
+    # compression?
+    if ($opt_c and not $transferfile) {
+      my ($if,$of);
+      $if = $file;
+      $if =~ s/([^_\w\.\-])/\\$1/g;
+      $transferfile = $tmpdir . '/' . basename($file) . '.gz';
+      $of = $transferfile;
+      $of =~ s/([^_\w\.\-])/\\$1/g;
+      shelldo("gzip <$if>$of");
+      die "$0: cannot gzip $file\n" unless -s $file;
+    } 
+    
+    # special file: tar-on-the-fly
+    if (not $windoof and $opt_a and $file =~ /(.+)\.(tar|tgz)$/) {
+      $aname = $1;
+      $atype = $2;
+      $tarlist  = "$tmpdir/$aname.list";
+      $tarerror = "$tmpdir/$aname.error";
+      $tar = 'tar -cv';
+      $tar .= 'z' if $atype eq 'tgz';
+      if (`tar --help 2>/dev/null` =~ /--index-file/) {
+        $tar .= " --index-file=$tarlist -f-";
+      } else {
+        $tar .= " -f-";
+      }
+      foreach (@ARGV) {
+        $file = $_;
+        $file =~ s/([^\w\-\@\#%,.=+~_:])/\\$1/g;
+        $tar .= ' '.$file;
+      }
+      # print "calculating archive size... ";
+      open $tar,"$tar 2>$tarerror|" or die "$0: cannot run tar - $!\n";
+      $t0 = int(time) if -t STDOUT;
+      while ($b = read $tar,$_,$bs) {
+        $filesize += $b;
+        if ($t0) {
+          $t1 = int(time);
+          if ($t1>$t0) {
+            printf "Archive size: %d MB\r",int($filesize/M);
+            $t0 = $t1;
+          }
+        }
+      }
+      printf "Archive size: %d MB\n",int($filesize/M) if -t STDOUT;
+      unless (close $tar) {
+        $_ = '';
+        if (open $tarerror,$tarerror) {
+          local $/;
+          $_ = <$tarerror>;
+          close $tarerror;
+        }
+        unlink $tarlist,$tarerror;
+        die "$0: tar error:\n$_";
+      }
+      $file = "$aname.$atype";
+      $filename = encode_utf8($file);
+      undef $SH; # force reconnect (timeout!)
+    } 
+    
+    # single file
+    else {
+      $filename = encode_utf8(${'opt_='} || $file);
+    
+      if ($windoof) {
+        $filename =~ s/^[a-z]://;
+        $filename =~ s/.*\\//;
+      }
+      $filename =~ s:.*/::;
+      $filename =~ s:[\r\n]+: :g;
+      if ($opt_d) {
+        $filesize = 0;
+      } elsif (not $opt_g and not $opt_s) {
+        $filesize = -s $file or die "$0: $file is empty or not readable\n";
+      }
+    }
+
+    $filename .= '.gpg' if $opt_g;
+
+    unless ($opt_d) {
+      if ($opt_g) {
+        $filesize = -1;
+        $fileid = int(time);
+      } else {
+        if ($opt_a) {
+          $fileid = md5_hex(fmd(@ARGV));
+        } else {
+          $fileid = fileid($file);
+        }
+      }
+    }
+  
+  } else {
+    $file = $filename = '';
+    $filesize = 0;
+  }
+
+  FORMDATAPOST:
+    
+  @hh = (); # HTTP header
+  @hb = (); # HTTP body
+  @r = ();
+  $seek = 0;
+  $resume = '';
+  $chunk++;
+
+  unless ($SH) {
+    serverconnect($server,$port);
+    query_sid($server,$port) unless $anonymous;
+  }
+  
+  $P{id} = $sid;
+  
+  # ask server if this file has been already sent
+  if ($file and not $xx and not 
+      ($opt_s or $opt_g or $opt_o or $opt_d or $opt_l or $opt_L or ${'opt_/'}))
+  {
+    ($seek,$location) = query_file($server,$port,$P{to},$P{from},$P{id},
+                                   $filename,$fileid);
+    if ($filesize == $seek) {
+      print "Location: $location\n" if $location and $nomail;
+      die "$0: $file has been already transferred\n";
+    } elsif ($seek and $seek < $filesize) {
+      $resume = " (resuming at byte $seek)";
+    } elsif ($filesize <= $seek) {
+      $seek = 0;
+    }
+    if ($proxy) {
+      sleep 1;    # do not overrun proxy
+      serverconnect($server,$port);
+    }
+  }
+  
+  # file part size
+  if ($chunksize and $proxy and $port != 443 
+      and $filesize - $seek > $chunksize - $bs) {
+    if ($features !~ /MULTIPOST/) {
+      die sprintf("$0: server does not support chunked multi-POST needed for"
+                  ." files > %d MB via proxy\n",$chunksize/M);
+    }
+    $opt_o = 0; # no overwriting mode for next chunks
+    $fpsize = $chunksize - $bs;
+  } else {
+    $fpsize = $filesize - $seek;
+  }
+
+  $boundary = randstring(48);
+  
+  $P{seek} = $seek;
+  $P{filesize} = $filesize;
+
+  # send HTTP POST variables
+  if ($skey) {
+    $P{skey} = $skey;
+    @pv = qw'from to skey keep autodelete comment seek filesize';
+  } elsif ($gkey) {
+    $P{gkey} = $gkey;
+    @pv = qw'from to gkey keep autodelete comment seek filesize';
+  } else {
+    @pv = qw'from to id replyto keep autodelete comment command seek filesize';
+  }
+  foreach my $v (@pv) {
+    if ($P{$v}) {
+      my $name = uc($v);
+      push @hb,"--$boundary";
+      push @hb,"Content-Disposition: form-data; name=\"$name\"";
+      push @hb,"";
+      push @hb,encode_utf8($P{$v});
+    }
+  }
+  
+  # at last, POST the file
+  if ($file) {
+    push @hb,"--$boundary";
+    push @hb,"Content-Disposition: form-data; name=\"FILE\"; filename=\"$filename\"";
+    unless ($opt_d) {
+      if ($opt_M) { push @hb,"Content-Type: application/x-mime" }
+      else        { push @hb,"Content-Type: application/octet-stream" }
+      if (${'opt_/'}) {
+        $flink = abs_path($file);
+        push @hb,"Content-Location: $flink";
+      } else {
+        # push @hb,"Content-Length: " . ((-s $file||0) - $seek); # optional header!
+        push @hb,"Content-Length: $fpsize"; # optional header! NOT filesize!
+        push @hb,"X-File-ID: $fileid";
+      }
+      push @hb,"";
+    }
+    push @hb,"";
+    # prevent proxy chunked mode reply
+    $connection = "close";
+  }
+
+  push @hb,"--$boundary--";
+
+  if ($fpsize < 0) {
+    $length = $fpsize;
+  } else {
+    $length = length(join('',@hb)) + scalar(@hb)*2 + $fpsize;
+  }
+
+  if ($file and not $opt_d) {
+    if ($flink) { $hb[-2] = $flink }
+    else        { $hb[-2] = '(file content)' }
+  }
+  # any other extra URL arguments
+  my $opt_X = '';
+  $opt_X = "?$::opt_X" if $::opt_X and $file;
+
+  # HTTP header
+  push @hh,"POST $proxy_prefix/fup$opt_X HTTP/1.1";
+  push @hh,"Host: $server:$port";
+  push @hh,"User-Agent: $useragent";
+  push @hh,"Content-Length: $length";
+  push @hh,"Content-Type: multipart/form-data; boundary=$boundary";
+  push @hh,"Connection: $connection" if $connection;
+  push @hh,'';
+
+  if ($opt_v) {
+    print "--> $_\n" foreach (@hh,@hb);
+  }
+
+  $SIG{PIPE} = \&sigpipehandler;
+#    foreach $sig (keys %SIG) {
+#      eval '$SIG{$sig} = sub { print "\n!!! SIGNAL '.$sig.' !!!\n"; exit; }';
+#    }
+
+  if ($file) {
+    pop @hb;
+    pop @hb unless $flink;
+    nvtsend(@hh,@hb) or do {
+      warn "$0: server has closed the connection, reconnecting...\n";
+      sleep 3;
+      goto FORMDATAPOST; # necessary: new $sid ==> new @hh
+    };
+    
+    unless ($opt_d or $flink) {
+      
+      $t0 = $t2 = int(time);
+      $tt = $t0-1;
+      $t1 = 0;
+      $tc = 0;
+      
+      if ($opt_s) {
+        if ($opt_g) {
+          open $file,"gpg -e -r $to|" or die "$0: cannot run gpg - $!\n";
+        } else {
+          open $file,'>&=STDIN' or die "$0: cannot open STDIN - $!\n";
+        }
+      } elsif ($tar) {
+        if ($opt_g) {
+          open $file,"$tar|gpg -e -r $to|" or die "$0: cannot run tar&gpg - $!\n";
+        } else {
+          open $file,"$tar|" or die "$0: cannot run tar - $!\n";
+        }
+        if (-t STDOUT) {
+          $pid = fork();
+          if (defined $pid and $pid == 0) {
+            sleep 1;
+            if (open $tarlist,$tarlist) {
+              # print "\n$tar|\n"; system "ls -l $tarlist";
+              while ($tarlist) {
+                while (<$tarlist>) {
+                  print ' 'x(length($file)+40),"\r",$_;
+                }
+                sleep 1;
+              }
+            }
+            exit;
+          }
+          $SIG{CHLD} = 'IGNORE';
+        }
+        if ($seek) {
+          print "Fast forward to byte $seek (resuming)\n";
+          readahead($file,$seek);
+        }
+      } else {
+        if ($opt_g) {
+          my $fileq = $file;
+          $fileq =~ s/([^\w\-\@\#%,.=+~_:])/\\$1/g;
+          open $file,"gpg -e -r $to <$fileq|" or die "$0: cannot run gpg - $!\n";
+        } else {
+          open $file,$file or die "$0: cannot read $file - $!\n";
+          seek $file,$seek,0;
+        }
+        binmode $file;
+      }
+      
+      $bytes = 0;
+      autoflush $SH 0;
+      
+      print $rcamel[0] if ${'opt_+'};
+
+      while (my $b = read $file,$buf,$bs) {
+        print {$SH} $buf or &sigpipehandler;
+        $bytes += $b;
+        if ($filesize > 0 and $bytes+$seek > $filesize) {
+          die "$0: $file filesize has grown while uploading\n";
+        }
+        $bt += $b;
+        $t2 = time;
+        if (${'opt_+'} and int($t2*10)>$tc) {
+          print $rcamel[$tc%2+1];
+          $tc = int($t2*10);
+        }
+        if (not $opt_q and -t STDOUT and int($t2)>$t1) {
+          &sigpipehandler unless $SH->connected;
+          # smaller block size is better on slow links
+          $bs = 4096 if $t1 and $bs>4096 and $bytes/($t2-$t0)<65536;
+          if ($filesize > 0) {
+            $pct = sprintf "(%d%%)",int(($bytes+$seek)/$filesize*100);
+          }
+          if ($bytes>2*M and $bs>4096) {
+            printf STDERR "%s: %d MB of %d MB %s %d kB/s        \r",
+                   $opt_s||$opt_a||$file,
+                   int(($bytes+$seek)/M),
+                   int($filesize/M),
+                   $pct,
+                   int($bt/k/($t2-$tt));
+          } else {
+            printf STDERR "%s: %d kB of %d MB %s %d kB/s        \r",
+                   $opt_s||$opt_a||$file,
+                   int(($bytes+$seek)/k),
+                   int($filesize/M),
+                   $pct,
+                   int($bt/k/($t2-$tt));
+          }
+          $t1 = $t2;
+          # time window for transfer rate calculation
+          if ($t2-$tt>10) {
+            $bt = 0;
+            $tt = $t2;
+          }
+        }
+        last if $filesize > 0 and $bytes >= $fpsize;
+        sleep 1 while ($opt_m and $bytes/k/(time-$t0||1) > $opt_m);
+      }
+      close $file; # or die "$0: error while reading $file - $!\n";
+      $tt = ($t2-$t0)||1;
+      
+      print $rcamel[2] if ${'opt_+'};
+      
+      # terminate tar verbose output job
+      if ($pid) {
+        sleep 2;
+        kill 9,$pid;
+        unlink $tarlist;
+      }
+    
+      unless ($opt_q) {
+        if (not $chunksize and $bytes+$seek < $filesize) {
+          die "$0: $file filesize has shrunk while uploading\n";
+        }
+        
+        if ($seek or $chunksize and $chunksize < $filesize) {
+          if ($fpsize>2*M) {
+            printf STDERR "%s: %d MB in %d s (%d kB/s)",
+                           $opt_s||$opt_a||$file,
+                           int($bytes/M),
+                           $tt,
+                           int($bytes/k/$tt);
+            if ($bytes+$seek == $filesize) {
+              printf STDERR ", total %d MB\n",int($filesize/M);
+            } else {
+              printf STDERR ", chunk #%d : %d MB\n",
+                            $chunk,int(($bytes+$seek)/M);
+            }
+          } else {
+            printf STDERR "%s: %d kB in %d s (%d kB/s)",
+                          $opt_s||$opt_a||$file,
+                          int($bytes/k),
+                          $tt,
+                          int($bytes/k/$tt);
+            if ($bytes+$seek == $filesize) {
+              printf STDERR ", total %d kB\n",int($filesize/k);
+            } else {
+              printf STDERR ", chunk #%d : %d kB\n",
+                            $chunk,int(($bytes+$seek)/k);
+            }
+          }
+        } else {
+          if ($bytes>2*M) {
+            printf STDERR "%s: %d MB in %d s (%d kB/s)        \n",
+                          $opt_s||$opt_a||$file,
+                          int($bytes/M),
+                          $tt,
+                          int($bytes/k/$tt);
+          } else {
+            printf STDERR "%s: %d kB in %d s (%d kB/s)        \n",
+                          $opt_s||$opt_a||$file,
+                          int($bytes/k),
+                          $tt,
+                          int($bytes/k/$tt);
+          }
+        }
+        
+        print STDERR "waiting for server ok..." if -t STDOUT;
+      }
+    }
+    
+    autoflush $SH 1;
+    print {$SH} "\r\n--$boundary--\r\n";
+    shutdown($SH,1) if $opt_s or $opt_g;
+    
+    if ($flink) {
+      $bytes = -s $flink;
+      if ($bytes>2*M) {
+        printf STDERR "%s: %d MB\n",$flink,int($bytes/M);
+      } else {
+        printf STDERR "%s: %d kB\n",$flink,int($bytes/k);
+      }
+    }
+  } else {
+    autoflush $SH 1;
+    nvtsend(@hh,@hb);
+  }
+
+  # SuSe: Can't locate object method "BINMODE" via package "IO::Socket::SSL::SSL_HANDLE"
+  # binmode $SH,':utf8'; 
+  
+  if (not $opt_q and $file and -t STDOUT) {
+    print STDERR "\r                         \r";
+  }
+  while (<$SH>) {
+    s/[\r\n]+//;
+    print "<-- $_\n" if $opt_v;
+    last if @r and $r[0] =~ / 204 / and /^$/ or /<\/html>/i;
+    push @r,decode_utf8($_);
+  }
+  
+  if ($file) {
+    close $SH;
+    undef $SH;
+    if ($proxy and $fpsize+$seek < $filesize) {
+      goto FORMDATAPOST;
+    }
+  }
+  
+  return @r;
+}
+
+
+sub randstring {
+    my $n = shift;
+    my @rc = ('A'..'Z','a'..'z',0..9 );
+    my $rn = @rc;
+    my $rs;
+
+    for (1..$n) { $rs .= $rc[int(rand($rn))] };
+    return $rs;
+}
+
+
+sub zipsplit {
+  my $zipbase = shift;
+  my @files = @_;
+  my @zipfiles = ();
+  my $file;
+  my ($zsize,$size,$n);
+
+  $zipbase =~ s/\.zip$//;
+  map { s/([^_\w\+\-\.])/\\$1/g } @files;
+
+  open my $ff,"find @files -type f|" or die "$0: cannot search for @_ - $!\n";
+  @files = ();
+
+  zipfile: for (;;) {
+    $n++;
+    if ($n eq 10) {
+      unlink @zipfiles;
+      die "$0: too many zip-archives\n";
+    }
+    $zsize = 0;
+    while ($file = <$ff>) {
+      chomp $file;
+      next if -l $file or not -f $file;
+      $size = -s $file;
+      if ($size > 2147480000) {
+        unlink @zipfiles;
+        die "$0: $file too big for zip\n";
+      }
+      if ($zsize + $size > 2147000000) {
+        push @zipfiles,zip($zipbase.'_'.$n.'.zip',@files);
+        @files = ($file);
+        next zipfile;
+      } else {
+        push @files,$file;
+        $zsize += $size;
+      }
+    }
+    close $ff;
+    last;
+  }
+  push @zipfiles,zip($zipbase.'_'.$n.'.zip',@files);
+  return @zipfiles;
+}
+
+
+sub zip {
+  no strict 'refs';
+  my $zip = shift;
+  my $cmd;
+  local $_;
+
+  unlink $zip;
+  # if ($opt_c) { $cmd = "zip -@ $zip" }
+  # else        { $cmd = "zip -0 -@ $zip" }
+  $cmd = "zip -@ $zip";
+  print $cmd,"\n" if $opt_v;
+  open $cmd,"|$cmd" or die "$0: cannot create $zip - $!\n";
+  foreach (@_) { print {$cmd} $_."\n" }
+  close $cmd or die "$0: zip failed - $!\n";
+
+  return $zip;
+}
+
+
+sub getline {
+  my $file = shift;
+  local $_;
+  
+  while (<$file>) {
+    chomp;
+    s/^#.*//;
+    s/\s+#.*//;
+    s/^\s+//;
+    s/\s+$//;
+    return $_ if length($_);
+  }
+  return '';
+}
+
+
+sub serverconnect {
+  my ($server,$port) = @_;
+  my $connect = "CONNECT $server:$port HTTP/1.1";
+  local $_;
+  
+  if ($proxy) {
+    tcpconnect(split(':',$proxy));
+    if ($port == 443) {
+      printf "--> %s\n",$connect if $opt_v;
+      nvtsend($connect,"");
+      $_ = <$SH>;
+      s/\r//;
+      printf "<-- $_"if $opt_v;
+      unless (/^HTTP.1.. 200/) {
+        die "$0: proxy error : $_";
+      }
+      eval "use IO::Socket::SSL";
+      die "$0: cannot load IO::Socket::SSL\n" if $@;
+      $SH = IO::Socket::SSL->start_SSL($SH);
+    }
+  } else {
+    tcpconnect($server,$port);
+  }
+}
+
+
+# set up tcp/ip connection
+sub tcpconnect {
+  my ($server,$port) = @_;
+  
+  if ($SH) {
+    close $SH;
+    undef $SH;
+  }
+  
+  if ($port == 443) {
+    eval "use IO::Socket::SSL";
+    die "$0: cannot load IO::Socket::SSL\n" if $@;
+    $SH = IO::Socket::SSL->new(
+      PeerAddr => $server,
+      PeerPort => $port,
+      Proto    => 'tcp',
+    );
+  } else {
+    $SH = IO::Socket::INET->new(
+      PeerAddr => $server,
+      PeerPort => $port,
+      Proto    => 'tcp',
+    );
+  }
+  
+  if ($SH) {
+    autoflush $SH 1;
+  } else {
+    die "$0: cannot connect $server:$port - $@\n";
+  }
+  
+  print "TCPCONNECT to $server:$port\n" if $opt_v;
+}
+
+
+sub query_file {
+  my ($server,$port,$to,$from,$id,$filename,$fileid) = @_;
+  my $seek = 0;
+  my $qfileid = '';
+  my ($head,$location);
+  local $_;
+  
+  $to =~ s/,.*//;
+  $to =~ s/:\w+=.*//;
+  $to = $AB{$to} if $AB{$to};
+  $filename =~ s/([^_=:,;<>()+.\w\-])/'%'.uc(unpack("H2",$1))/ge; # urlencode
+  if ($skey) {
+    $head = "HEAD $proxy_prefix/fop/$to/$from/$filename??SKEY=$id HTTP/1.1";
+  } elsif ($gkey) {
+    $head = "HEAD $proxy_prefix/fop/$to/$from/$filename??GKEY=$id HTTP/1.1";
+  } else {
+    $head = "HEAD $proxy_prefix/fop/$to/$from/$filename??ID=$id HTTP/1.1";
+  }
+  sendheader("$server:$port",$head);
+  $_ = <$SH>;
+  unless (defined $_ and /\w/) {
+    die "$0: no response from server\n";
+  }
+  s/\r//;
+  print "<-- $_" if $opt_v;
+  unless (/^HTTP.* 200/) {
+    s:HTTP/[\d\. ]+::;
+    die "$0: server response: $_" unless /no such file/;
+  }
+  while (<$SH>) {
+    s/\r//;
+    print "<-- $_" if $opt_v;
+    last if /^$/;
+    if (/^Content-Length:\s+(\d+)/)	{ $seek = $1 }
+    if (/^X-File-ID:\s+(.+)/)		{ $qfileid = $1 }
+    if (/^X-Features:\s+(.+)/)		{ $features = $1 }
+    if (/^X-Location:\s+(.+)/)		{ $location = $1 }
+  }
+
+  # return true seek only if file is identified
+  $seek = 0 if $qfileid and $qfileid ne $fileid;
+  
+  return ($seek,$location);
+}
+
+
+sub edit_address_book {
+  my ($user) = @_;
+  my $alias;
+  my $ab = "$fexhome/ADDRESS_BOOK";
+  my (%AB,@r);
+  local $_;
+  
+  die "$0: address book not available for subusers\n"      if $skey;
+  die "$0: address book not available for group members\n" if $gkey;
+
+  female_mode("edit your address book?") if $opt_F;
+
+  %AB = query_address_book($server,$port,$user);
+  if ($AB{ADDRESS_BOOK} !~ /\w/) {
+    $AB{ADDRESS_BOOK} = 
+      "# Format: alias e-mail-address # Comment\n".
+      "# Example:\n".
+      "framstag framstag\@rus.uni-stuttgart.de\n";
+  }
+  open $ab,">$ab" or die "$0: cannot write to $ab - $!\n";
+  print {$ab} $AB{ADDRESS_BOOK};
+  close $ab;
+  
+  system $editor,$ab;
+  exit unless -s $ab;
+  
+  serverconnect($server,$port);
+  query_sid($server,$port);
+  
+  @r = formdatapost(
+ 	from		=> $user,
+        to		=> $user,
+        id		=> $sid,
+        file		=> $ab,
+  );
+  
+  unlink $ab,$ab.'~';
+}
+
+
+sub query_address_book {
+  my ($server,$port,$user) = @_;
+  my ($req,$alias,$address,$options,$comment,$cl,$ab,$b);
+  my %AB;
+  local $_;
+
+  unless ($SH) {
+    serverconnect($server,$port);
+    query_sid($server,$port);
+  }
+  
+  $req = "GET $proxy_prefix/fop/$user/$user/ADDRESS_BOOK?ID=$sid HTTP/1.1";
+  sendheader("$server:$port",$req);
+  $_ = <$SH>;
+  unless (defined $_ and /\w/) {
+    die "$0: no response from server\n";
+  }
+  s/\r//;
+  print "<-- $_" if $opt_v;
+  unless (/^HTTP.* 200/) {
+    if (/^HTTP.* 404/) {
+      while (<$SH>) { last if /^\r?\n/ }
+      return;
+    } else {
+      # s:HTTP/[\d\. ]+::;
+      # die "$0: server response: $_";
+      close $SH;
+      undef $SH;
+      return ();
+    }
+  }
+  while (<$SH>) {
+    s/\r//;
+    print "<-- $_" if $opt_v;
+    last if /^$/;
+    $cl = $1 if /^Content-Length: (\d+)/;
+  }
+  
+  if ($cl) {
+    while (<$SH>) {
+      $b += length;
+      $ab .= $_;
+      s/[\r\n]//g;
+      s/^\s+//;
+      s/\s+$//;
+      print "<-- $_\n" if $opt_v;
+      s/\s*#\s*(.*)//;
+      if ($_) {
+        $comment = $1||'';
+        ($alias,$address,$options) = split;
+        if ($address) {
+          if ($options) { $options =~ s/[()]//g }
+          else          { $options = '' }
+          $AB{$alias} = $address;
+          $AB{$alias}->{options} = $options||'';
+          $AB{$alias}->{comment} = $comment||'';
+          if ($options and $options =~ /keep=(\d+)/i) {
+            $AB{$alias}->{keep} = $1;
+          }
+          if ($options and $options =~ /autodelete=(\w+)/i) {
+            $AB{$alias}->{autodelete} = $1;
+          }
+        }
+      }
+      last if $b >= $cl;
+    }
+  }
+  
+  $AB{ADDRESS_BOOK} = $ab;
+  
+  return %AB;
+}
+
+
+# sets global $sid $features $timeout
+sub query_sid {
+  my ($server,$port) = @_;
+  my ($req);
+  local $_;
+
+  $sid = $id;
+
+  if ($port eq 443) {
+    return if $features;    # early return if we know enough
+    $req = "OPTIONS FEX HTTP/1.1";
+  } elsif ($proxy) {
+    return if $features;    # early return if we know enough
+    $req = "GET $proxy_prefix/SID HTTP/1.1";
+  } else {
+    $req = "GET SID HTTP/1.1";
+  }
+  
+  sendheader("$server:$port",$req,"User-Agent: $useragent");
+  $_ = <$SH>;
+  unless (defined $_ and /\w/) {
+    print "\n" if $opt_v;
+    die "$0: no response from server\n";
+  }
+  s/\r//;
+  print "<-- $_" if $opt_v;
+    
+  if (/^HTTP.* [25]0[01] /) {
+    if (not $proxy and $port ne 443 and /^HTTP.* 201 (.+)/) {
+      $sid = 'MD5H:'.md5_hex($id.$1);
+    }
+    while (<$SH>) {
+      s/\r//;
+      print "<-- $_" if $opt_v;
+      $features = $1 if /^X-Features: (.+)/;
+      $timeout = $1  if /^X-Timeout: (\d+)/;
+      last if /^\n/;
+    }
+  } elsif (/^HTTP.* 301 /) {
+    while (<$SH>) { last if /Location/ }
+    die "$0: cannot use $server:$port because server has a redirection to\n".$_;
+  } else {
+    # no SID support - perhaps transparent web proxy?
+    serverconnect($server,$port);
+    $sid = $id;
+  }
+  
+  # warn "proxy: $proxy\n";
+  if ($proxy) {
+    serverconnect($server,$port);
+    $sid = $id;
+  }
+  
+}
+
+
+sub xxget {
+  my ($from,$id,$save) = @_;
+  my $bs = 4096;
+  my $xx = $save;
+  my ($url,$B,$b,$t0,$t1,$cl);
+  my ($ts,$tso);
+  local $_;
+
+  $xx =~ s:.*/::;
+  $url = "$proxy_prefix/fop/$from/$from/$xx?ID=$id";
+
+  sendheader("$server:$port","GET $url HTTP/1.1","User-Agent: $useragent");
+  http_response();
+  while (<$SH>) {
+    s/\r//;
+    print "<-- $_" if $opt_v;
+    $cl = $1 if /^Content-Length:\s(\d+)/;
+    # $ft = $1 if /^X-File-Type:\s(.+)/;
+    last if /^$/;
+  }
+
+  die "$0: no Content-Length in server-reply\n" unless $cl;
+  
+  open F,">$save" or die "$0: cannot write to $save - $!\n";
+  binmode F;
+  
+  $t0 = $t1 = int(time);
+  $tso = '';
+  
+  while ($b = read($SH,$_,$bs)) {
+    $B += $b;
+    print F;
+    if (int(time) > $t1) {
+      $t1 = int(time);
+      $ts = ts($B,$cl);
+      if ($ts ne $tso) {
+        print STDERR $ts,"\r";
+        $tso = $ts;
+      }
+    }
+    sleep 1 while ($opt_m and $B/k/(time-$t0||1) > $opt_m);
+  }
+  
+  print STDERR ts($B,$cl),"\n";
+  close F;
+}
+
+
+sub sendheader {
+  my $sp = shift;
+  my @head = @_;
+  my $head;
+  
+  push @head,"Host: $sp";
+  
+  foreach $head (@head) {
+    print "--> $head\n" if $opt_v;
+    print {$SH} $head,"\r\n";
+  }
+  print "-->\n" if $opt_v;
+  print {$SH} "\r\n";
+}
+
+
+sub nvtsend {
+  local $SIG{PIPE} = sub { $sigpipe = "@_" };
+  
+  $sigpipe = '';
+  
+  die "$0: internal error: no active network handle\n" unless $SH;
+  die "$0: remote host has closed the link\n" unless $SH->connected;
+  
+  foreach my $line (@_) {
+    print {$SH} $line,"\r\n";
+    if ($sigpipe) {
+      undef $SH;
+      return 0;
+    }
+  }
+  
+  return 1;
+}
+
+
+# transfer status
+sub ts {
+  my ($b,$tb) = @_;
+  return sprintf("transferred: %d MB (%d%%)",int($b/M),int($b/$tb*100));
+}
+  
+
+sub sigpipehandler {
+  $SIG{ALRM} = sub { };
+  if (fileno $SH) {
+    alarm(1);
+    @_ = <$SH>;
+    alarm(0);
+    if (@_ and $opt_v) {
+      die "\n$0: server error: @_\n";
+    }
+    if (@_ and $_[0] =~ /^HTTP.* \d+ (.*)/) {
+      die "\n$0: server error: $1\n";
+    }
+  }
+  $timeout *= 2;
+  warn "\n$0: connection to $server died\n";
+  warn "retrying after $timeout seconds...\n";
+  sleep $timeout;
+  if ($windoof) { exec $^X,$0,@_ARGV }
+  else          { exec $_0,@_ARGV }
+  die $!;
+}
+
+
+sub checkrecipient {
+  my ($from,$to) = @_;
+  my @r;
+  local $_;
+  
+  @r = formdatapost(
+	from	=> $from,
+        to	=> $to,
+        id	=> $sid,
+        command	=> 'CHECKRECIPIENT',
+  );
+
+  $_ = shift @r or die "$0: no reply from server\n";
+
+  if (/ 2\d\d /) {
+    foreach (@r) {
+      last if /^$/;
+      if (s/X-(Recipient: .+)/$1\n/) {
+        s/autodelete=\w+/autodelete=$opt_D/ if $opt_D;
+        s/keep=\d+/keep=$opt_k/             if $opt_k;
+        print;
+      }
+    }
+  } else {
+    http_response($_,@r);
+  }
+}
+
+
+# get ID data from ID file
+sub get_id {
+  my $idf = shift;
+
+  $fexcgi = getline($idf) || die "$0: no FEX-URL in $idf\n";
+  $from   = getline($idf) || die "$0: no FROM in $idf\n";
+  $id     = getline($idf) || die "$0: no ID in $idf\n";
+  if ($fexcgi =~ s/!([\w.-]+:\d+)(:(\d+))?//) {
+    $proxy = $1;
+    $chunksize = $3 || 0;
+  }
+  unless ($fexcgi =~ /^[_:=\w\-\.\/\@\%]+$/) {
+    die "$0: illegal FEX-URL \"$fexcgi\" in $idf\n";
+  }
+  unless ($from =~ /^[_:=\w\-\.\/\@\%\+]+$/) {
+    die "$0: illegal FROM \"$from\" in $idf\n";
+  }
+  $fexcgi =~ s:/+$::;
+}
+
+
+# for windows
+sub inquire {
+  my ($file,$to);
+  for (;;) {
+    print "file to send: ";
+    chomp($file = <STDIN>);
+    $file =~ s/^\"//;
+    $file =~ s/\"$//;
+    last if -e $file;
+    warn "$file does not exist\n";
+  }
+  print "recipient (e-mail address): ";
+  chomp($to = <STDIN>);
+  die $usage unless $to;
+  unless ($opt_n) {
+    print "comment: ";
+    chomp($opt_C = <STDIN>);
+  }
+  @ARGV = ($file,$to);
+}
+
+
+sub shelldo {
+  if (system(@_) < 0) { die "failed: @_\n" }
+}
+
+
+sub mtime {
+  my @d = localtime((stat shift)[9]);
+  return sprintf('%d%02d%02d',$d[5]+1900,$d[4]+1,$d[3]);
+}
+
+
+# emulate seek on a pipe
+sub readahead {
+  my $fh = shift; # filehandle
+  my $ba = shift; # bytes ahead
+  my $bs = 2**16;
+  my $s = 0;
+  my $n;
+  local $_;
+  
+  while ($s < $ba) { 
+    $n = $ba-$s;
+    $n = $bs if $n > $bs; 
+    $s += read $fh,$_,$n; 
+  }
+}
+
+
+# fileid is inode and mtime
+sub fileid {
+  my @s = stat(shift);
+  return @s ? $s[1].$s[9] : int(time);
+}
+
+
+# collect file meta data (filename, inode, mtime)
+sub fmd {
+  my @files = @_;
+  my ($file,$dir);
+  my $fmd = '';
+  
+  foreach $file (@files) {
+    if (not -l $file and -d $file) {
+      $dir = $file;
+      if (opendir $dir,$dir) {
+        while (defined ($file = readdir($dir))) {
+          next if $file eq '..';
+          if ($file eq '.') {
+            $fmd .= $file.fileid($dir);
+          } else {
+            $fmd .= fmd("$dir/$file");
+          }
+        }
+        closedir $dir;
+      }
+    } else {
+      $fmd .= $file.fileid($file);
+    }
+  }
+  
+  return $fmd;
+}
+
+
+# from MIME::Base64::Perl
+sub decode_b64 {
+  local $_ = shift;
+  my $uu = '';
+  my ($i,$l);
+  
+  tr|A-Za-z0-9+=/||cd;
+  s/=+$//;
+  tr|A-Za-z0-9+/| -_|;
+  return "" unless length;
+
+  $l = (length)-60;
+  for ($i = 0; $i <= $l; $i += 60) {
+    $uu .= "M" . substr($_,$i,60);
+  }
+  $_ = substr($_,$i);
+  if (length) {
+    $uu .= chr(32+(length)*3/4) . $_;
+  }
+  return unpack("u",$uu);
+}
+
+
+# from MIME::Base64::Perl
+sub encode_b64 {
+  my $res = "";
+  my $eol = "\n";
+  my $padding;
+  
+  pos($_[0]) = 0;
+  $res = join '',map(pack('u',$_)=~ /^.(\S*)/, ($_[0]=~/(.{1,45})/gs));
+  $res =~ tr|` -_|AA-Za-z0-9+/|;
+  $padding = (3-length($_[0])%3)%3;
+  $res =~ s/.{$padding}$/'=' x $padding/e if $padding;
+  return $res;
+}
+
+
+sub female_mode {
+  local $_;
+  if (open my $tty,'/dev/tty') {
+    print "@_\n";
+    print "  [y] yes\n",
+          "  [n] no\n",
+          "  [p] perhaps - don't know\n",
+          "your choice: ";
+    $_ = <$tty> || '';
+    close $tty;
+    if (/^y/i) { return }
+    if (/^n/i) { exit }
+    if (/^p/i) { int(rand(2)) ? return : exit }
+    female_mode(@_);
+  }
+}
+
+
+sub http_response {
+  local $_ = shift || <$SH>;
+  my @r = @_;
+
+  $_ = <$SH> unless $_;
+  unless (defined $_ and /\w/) {
+    die "$0: no response from server\n";
+  }
+  s/\r?\n//;
+  # CGI fatalsToBrowser
+  if (/^HTTP.* 500/) {
+    @r = <$SH> unless @r;
+    @r = ()    unless @r;
+    die "$0: server error: $_\n@r\n";
+  }
+  unless (/^HTTP.* 200/) {
+    s/HTTP.[\s\d.]+//;
+    die "$0: server error: $_\n";
+  }
+
+  print "<-- $_\n" if $opt_v;
+  return $_;
+}
+
+
+sub urldecode {
+  local $_ = shift;
+  s/\%([a-f\d]{2})/chr(hex($1))/ige;
+  return $_;
+}
+
+
+sub ws {
+  local $_ = shift;
+  return split;
+}

@@ -1,0 +1,408 @@
+#!/usr/bin/perl -w
+
+use 5.006;
+use Getopt::Std;
+use Socket;
+use IO::Socket::INET;
+use Digest::MD5	qw(md5_hex);
+
+$ENV{PATH} .= ':/sbin:/usr/sbin';
+
+$usage = "usage: $0 [-p port] [IP-address]\n";
+$xinetd = '/etc/xinetd.d/fex';
+
+umask 022;
+  
+if ($<) {
+  die "you must be root to install F*EX\n";
+}
+
+goto INSTALL if $0 =~ /upgrade$/;
+
+$fex = 'fex.rus.uni-stuttgart.de';
+if (system("host $fex >/dev/null") != 0) {
+  die "host $fex is not resolvable - check /etc/resolv.conf\n";
+}
+
+if (`uname` =~ /^SunOS/) {
+  die "Solaris is currently not supported. "
+     ."Please contact framstag\@rus.uni-stuttgart.de for details.\n";
+}
+
+$opt_p = 80;
+
+if (open $xinetd,$xinetd) {
+  while (<$xinetd>) {
+    if (/^\s*port\s*=\s*(\d+)/) {
+      $opt_p = $fexport = $1;
+    }
+    if (/^\s*bind\s*=\s*([\d.]+)/) {
+      $fexip = $ip = $1;
+    }
+  }
+  close $xinetd;
+}
+
+getopts('p:') or die $usage;
+
+$arg = shift;
+if ($arg and -f "locale/$arg/lib/fup.pl") {
+  exec 'locale/translate',$arg;
+} else {
+  $ip = $arg || $fexip || 0;
+}
+
+
+# if (not $ip and open P,"ifconfig 2>/dev/null |") {
+if (not $ip and open P,'host $(hostname)|') {
+  $guessed_ip = 0;
+  while (<P>) {
+    if (/(\d+\.\d+\.\d+\.\d+)/) { 
+      $guessed_ip = $1;
+      last;
+    }
+  }
+  close P;
+  print "Your IP [$guessed_ip] : ";
+  chomp($ip = <STDIN>);
+  $ip = $guessed_ip unless $ip;
+}
+
+$ip =~ /^\d+\.\d+\.\d+\.\d+$/ or die $usage;
+
+($hostname) = gethostbyaddr(gethostbyname($ip),AF_INET);
+die "cannot find hostname for IP $ip\n" unless $hostname;
+
+print "checking prerequisites\n";
+
+if (`which xinetd` =~ m{^/}) {
+  print "found xinetd\n";
+} else {
+  print "xinetd executable NOT found\n";
+  $premiss++;
+}
+
+if ( -x '/usr/lib/sendmail') {
+  print "found /usr/lib/sendmail\n";
+} elsif ( -x '/usr/sbin/sendmail') {
+  print "found /usr/sbin/sendmail\n";
+} else {
+  print "sendmail NOT found\n";
+  $premiss++;  
+}
+
+if ($premiss) {
+  print "installation aborted, nothing has been touched yet\n";
+  print "what now? ==> see doc/installation\n";
+  exit 1;
+}
+
+unless ($fexport) {
+  
+  $SH = IO::Socket::INET->new(
+    PeerAddr => $ip,
+    PeerPort => $opt_p,
+    Proto    => 'tcp',
+  );
+  
+  if ($SH) {
+    print "There is already a tcp-service running on $ip:$opt_p !\n";
+    print "Select another port for F*EX by running $0 -p OTHERPORT $ip\n";
+    print "or an alternative IP-address by running $0 OTHERADDRESS\n";
+    exit 5;
+  }
+}
+
+print "prerequisites checked, ok\n";
+
+unless (getpwnam('fex')) {
+  print "creating user fex\n";
+  system 'useradd -s /bin/bash -c "File EXchange" -m fex';
+}
+
+INSTALL:
+
+@FEX = getpwnam('fex') or die "no cannot create user fex\n";
+$FEXHOME  = $FEX[7];
+
+die "no HOME directory for user fex\n" unless -d $FEXHOME;
+
+print "Installing:\n";
+
+@save = (
+  "lib/fex.ph",
+  "lib/fup.pl",
+  "lib/reactivation.txt",
+  "etc/mime.types",
+  "htdocs/FAQ.html",
+  "htdocs/index.html",
+  "htdocs/robots.txt",
+);
+
+foreach $s (@save) {
+  $f = "$FEXHOME/$s";
+  if (-e $f) {
+    $fs = $f.'_save';
+    rename $f,$fs and print "$f --> $fs\n";
+  }
+}
+
+cpav(qw(bin cgi-bin lib etc htdocs doc),$FEXHOME);
+unlink "$FEXHOME/doc/License";
+unlink "$FEXHOME/htdocs/License";
+
+$hl = "$FEXHOME/htdocs/locale";
+unless (-d $hl) { mkdir $hl or die "$0: cannot mkdir $hl - $!\n" }
+
+if  (-d "$FEXHOME/spool") {
+  &convert_spool;
+} else {
+  chmod 0700,$FEXHOME;
+  mkdir "$FEXHOME/spool",0700 or die "cannot mkdir $FEXHOME/spool - $!\n";
+  mkdir "$FEXHOME/spool/.error",0700;
+}
+
+foreach $s (@save) {
+  $f = "$FEXHOME/$s";
+  $fs = $f.'_save';
+  $fn = $f.'_new';
+  if (-e $fs) {
+    system "rm -rf $fn";
+    rename $f,$fn and print "$f --> $fn\n";
+    rename $fs,$f and print "$fs --> $f\n";
+  }
+}
+
+system(qw(perl -p -i -e),
+  's:href="/?FAQ.html":href="/FAQ/FAQ.html":',
+  "$FEXHOME/lib/fup.pl"
+);
+  
+$fph = "$FEXHOME/lib/fex.ph";
+open $fph,$fph or die "cannot read $fph - $!\n";
+while (<$fph>) {
+  eval $_ if /^\s*\$admin_pw\s*=/;
+  s/'HOSTNAME'/'$hostname'/;
+  $conf .= $_;
+}
+close $fph;
+
+if (-x "$FEXHOME/cgi-bin/fac" and not $admin_pw) {
+  while (not $admin_pw) {
+    print "\nF*EX admin password (for web interface): ";
+    $admin_pw = <STDIN>;
+    $admin_pw =~ s/\s//g;
+  }
+  $conf =~ s/\$admin_pw\s*=\s*''/\$admin_pw = '$admin_pw'/ or
+  $conf =~ s/^/\$admin_pw = '$admin_pw';\n/;
+}
+
+open $fph,">$fph" or die "cannot write $fph - $!\n";
+print {$fph} $conf;
+close $fph;
+
+require $fph or die "$0: error in $fph\n";
+
+rename "locale/deutsch","locale/german"  if -d "locale/deutsch";
+rename "locale/espanol","locale/spanish" if -d "locale/espanol";
+
+if (@locales = glob "locale/*/lib/fup.pl") {
+  foreach (@locales) {
+    m{locale/(.+?)/} and $locale = $1;
+    if (-f "$FEXHOME/$_") { 
+      system 'locale/translate',$locale;
+      $hl = "$FEXHOME/htdocs/locale/$locale";
+      symlink "$FEXHOME/locale/$locale/htdocs",$hl unless -l $hl;
+    } else { 
+      push @nlocales,"./install $1\n";
+    }
+  }
+  if (@nlocales) {
+    if (glob "$FEXHOME/locale/*/lib/fup.pl") {
+      print "\nTo install another localized version, type:\n";
+    } else {
+      print "\nTo install a localized version, type:\n";
+    }
+    print @nlocales;
+  }
+}
+    
+unless (-f $xinetd) {
+  my $xc = '/etc/xinetd.conf';
+  if (open $xc,$xc) {
+    while (<$xc>) {
+      if (/^\s*only_from/) {
+        print "WARNING: found \"only_from\" in $xc : fexsrv is restricted!\n";
+      }
+    }
+    close $xc;
+  }
+  if (-d '/etc/xinetd.d') {
+    unless (-f $xinetd) {
+      open $xinetd,">$xinetd" or die "cannot write $xinetd - $!\n";
+      open F,'etc/xinetd_fex' or die "cannot read etc/xinetd_fex - $!\n";
+      while (<F>) {
+        s/FEXHOME/$FEXHOME/;
+        s/PORT/$opt_p/;
+        s/ADDRESS/$ip/;
+        print {$xinetd} $_;
+      }
+      close F;
+      close $xinetd;
+      system qw(/etc/init.d/xinetd restart);
+    }
+  } else {
+    print "WARNING: No /etc/xinetd.d found.\n";
+    print "WARNING: You have to install etc/xinetd_fex manually.\n";
+  }
+
+  $crontab = `crontab -u fex -l 2>/dev/null`;
+  if ($crontab !~ /fex_cleanup/) {
+    open $crontab,">fex.cron" or die "cannot create fex.cron - $!\n";
+    print {$crontab} $crontab,"\n";
+    print {$crontab} " 3 3 * * * exec $FEXHOME/bin/fex_cleanup\n";
+    close $crontab;
+    system qw(crontab -u fex fex.cron);
+  }
+
+  system "chown -R fex:root $FEXHOME $FEXHOME/spool/";
+  system "chmod -R go-r $FEXHOME/lib $FEXHOME/cgi-bin $FEXHOME/spool/";
+
+  print "\nUse $FEXHOME/bin/fac to configure your F*EX server.\n";
+} else {
+  system "chmod -R go-r $FEXHOME/lib $FEXHOME/cgi-bin";
+}
+
+$fph = "$FEXHOME/lib/fex.ph";
+require $fph;
+if (@local_rdomains and not @local_rhosts) {
+  print "WARNING:\n";
+  print "In $fph you have @local_rdomains but not @local_rhosts!\n";
+  print "Selfregistrating of external users will not work!\n";
+  print "See ${fph}_new/\n";
+}
+  
+exit;
+
+
+sub convert_spool {
+  my ($f,$d,$to,$from,$link);
+  
+  our ($spooldir,$skeydir,$gkeydir);
+  $ENV{FEXLIB} = "$FEXHOME/lib";
+  require "lib/fex.pp" or die "$0: cannot load lib/fex.pp - $!\n";
+
+  # User --> user@maildomain
+  if ($mdomain) {
+    foreach $f (glob "$spooldir/.dkeys/*") {
+      if ($link = readlink $f) {
+        (undef,$to,$from,$file) = split('/',$link);
+        if ($file) {
+          $to   .= '@'.$mdomain if $to   !~ /@/;
+          $from .= '@'.$mdomain if $from !~ /@/;
+          if ($link ne "../$to/$from/$file") {
+            symlink "../$to/$from/$file",$f;
+          }
+        }
+      }
+    }
+  }
+
+  # fix spool layout: FROM and TO must have domains and must be lower case
+  foreach $d ((glob "$spooldir/*/*"),(glob "$spooldir/*")) {
+    if (not -l $d and -d $d and $d =~ m:(.+)/(.+):) {
+      $p = $1;
+      $b = $2;
+      if ($b !~ /^@/ and $b !~ /^[A-Z_-]+$/) {
+        if ($mdomain and $b !~ /@/) {
+          rename $d,sprintf("%s/%s@%s",$p,lc($b),$mdomain);
+        } elsif ($b ne lc($b)) {
+          rename $d,sprintf("%s/%s",$p,lc($b));
+        }
+      }
+    }
+  }
+
+  # split auth-ID and subuser file: @ --> @ @SUBUSER
+  foreach my $u (glob "$spooldir/*@*") {
+    next if -f "$u/\@SUBUSER";
+    open my $idf,"$u/\@" or next;
+    $id = <$idf>;
+    if (defined ($su = <$idf>) and $su =~ /\w/
+        and open my $suf,">$u/\@SUBUSER") {
+      print {$suf} $su;
+      while (defined ($su = <$idf>)) { print {$suf} $su }
+      close $suf;
+      close $idf;
+      if (open my $idf,">$u/\@") {
+        print {$idf} $id;
+        close $idf;
+      }
+    }
+  }
+
+  # create new SKEYs
+  foreach my $sf (glob "$spooldir/*/\@SUBUSER") {
+    $user = (split '/',$sf)[-2];
+    if (open $sf,$sf) {
+      while (<$sf>) {
+        s/#.*//;
+        if (/(.+\@.+):(.+)/) {
+          ($subuser,$id) = ($1,$2);
+          next if $subuser =~ /\*/;
+          $skey = md5_hex("$user:$subuser:$id");
+          if (open $skey,'>',"$skeydir/$skey") {
+            print {$skey} "from=$subuser\n",
+                          "to=$user\n",
+                          "id=$id\n";
+            close $skey;
+          }
+          mkdirp("$spooldir/$subuser/\@MAINUSER");
+          symlink $skey,"$spooldir/$subuser/\@MAINUSER/$user";
+        }
+      }
+    }
+    close $sf;
+  }
+
+  # create new GKEYs
+  foreach my $gf (glob "$spooldir/*/\@GROUP/*") {
+    next unless -f $gf;
+    $group = (split '/',$gf)[-1];
+    $user  = (split '/',$gf)[-3];
+    if (open $gf,$gf) {
+      while (<$gf>) {
+        s/#.*//;
+        if (/(.+\@.+):(.+)/) {
+          ($gm,$id) = ($1,$2);
+          $gkey = md5_hex("$user:$group:$gm:$id");
+          if (open $gkey,'>',"$gkeydir/$gkey") {
+            print {$gkey} "from=$gm\n",
+                          "to=\@$group\n",
+                          "user=$user\n",
+                          "id=$id\n";
+            close $gkey;
+          }
+          mkdirp("$spooldir/$gm/\@GROUP");
+          symlink "../../$user/\@GROUP/$group","$spooldir/$gm/\@GROUP/$group";
+        }
+      }
+    }
+    close $gf;
+  }
+
+}
+
+sub cpav {
+  my $dd = pop @_;
+  local *P;
+  
+  die "cpav: $dd is not a directory" unless -d $dd;
+  open P,"tar cf - @_ | su -c 'cd $dd; tar xvf - 2>&1' fex |" 
+    or die "cpav: cannot tar - $!\n";
+  while (<P>) {
+    chomp;
+    print "$_ --> $dd/$_\n" unless /\/$/;
+  }
+  close P;
+}

@@ -1,0 +1,57 @@
+# http://www.stunnel.org/faq/certs.html
+
+# execute this as root!
+
+mkdir /home/fex/etc
+cd /home/fex/etc/
+
+openssl req -new -x509 -days 9999 -nodes -out stunnel.pem -keyout stunnel.pem
+# see http://www.infodrom.org/Debian/tips/stunnel.html
+dd if=/dev/urandom count=2 | openssl dhparam -rand - 1024 >> stunnel.pem
+openssl x509 -text -in stunnel.pem
+chmod 600 stunnel.pem
+
+cat <<EOD>stunnel.conf
+cert = /home/fex/etc/stunnel.pem
+sslVersion = all
+TIMEOUTclose = 1
+exec = perl
+execargs = perl -T /home/fex/bin/fexsrv stunnel
+EOD
+
+chown -R fex .
+
+stunnel=$(which stunnel4)
+if [ -z "$stunnel" ]; then
+  echo "no stunnel found" >&2
+else
+
+  cat <<EOD>/etc/xinetd.d/fexs
+# default: on
+# description: fex web server with SSL
+# note: only possible on port 443!
+service fexs
+{
+        socket_type     = stream
+        wait            = no
+        type            = unlisted
+        protocol        = tcp
+        port            = 443
+        cps             = 5 10
+        user            = fex
+        groups          = yes
+        server          = $stunnel
+        server_args     = /home/fex/etc/stunnel.conf
+        nice            = 0
+        disable         = no
+}
+EOD
+
+  /etc/init.d/xinetd restart
+  echo 'To enforce https, add to fex.ph:'
+  echo '$force_https = 1;'
+
+fi
+
+# Hint: on some systems stunnel works not well with xinetd
+#       you can also run stunnel without xinetd, in server daemon mode

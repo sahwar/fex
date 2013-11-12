@@ -1,0 +1,131 @@
+<HTML> 
+<HEAD>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<TITLE>F*EX - File EXchange</TITLE></HEAD>
+<BODY>
+<center>
+<h1>F*EX - Frams' Fast File EXchange</h1>
+<IMG SRC="logo.jpg">
+</center>
+<p>
+F*EX (Frams' Fast File EXchange) est un service pour envoyer des fichiers
+volumineux d'un utilisateur A à un utilisateur B.
+<p>
+L'expéditeur upload le fichier au server F*EX en utilisant
+<a href="/fup">un formulaire WWW</a> et le destinataire reçoit automatiquement
+une notification.
+<p>
+
+Vous vous dîtes:
+<blockquote><em>
+  Pourquoi aurais -je besoin d'un autre service de transfert de fichier ?!<br>
+  J'ai déja l'e-mail, le ftp, ssh et même sendfile !
+</em></blockquote>
+<p>
+Je réponds:
+<blockquote><em>
+  Vous avez toujours besoin de F*EX :-)
+</em></blockquote>
+<p>
+  
+Par exemple, vous voulez envoyer à vos amis la dernière vidéo de vos vacances (1 GB).
+Vous avez les possibilités suivantes (et les problèmes):<p>
+
+<ul>
+  <li><h3>envoyer un DVD par la voie postale</h3><p>
+      Hors de question - nous vivons en <<my @x=gmtime(time); $x[5]-69;>> après l'invention d'Internet. C'est pour les grand-pères.
+      <p>
+  <li><h3>utiliser l'e-mail</h3><p>
+      La plupart des serveurs e-mail ont une limite de 10 MB par message et très souvent un quota d'utilisation de quelques centaines de méga-octets.
+      <p>
+  <li><h3>uucp</h3><p>
+      Et pourquoi pas du marbre et un burin ?
+      <p>
+  <li><h3>ssh</h3><p>
+      Vous avez le mot de passe de vos amis ou bien vous êtes prêts à leur donne le votre, juste pour un transfert de fichier ?
+      <p>
+  <li><h3>ftp</h3><p>
+      <ul>
+        <li>Quel serveur ?
+        <li>Quel compte, quel mot de passe ?
+        <li>Vous ne vous souciez pas d'envoyer des mots de passes non chiffrés et des fichiers sur un Internet non sécurisé ?
+        <li>Est-ce que votre proxy support le ftp passif ?
+        <li>Dans le cas d'un ftp anonyme :
+          <ul>
+            <li>Est-ce qu'il permet des uploads de 1GB ?
+            <li>Est-ce qu'il permet de supprimer le fichier uploadé ?
+            <li>Qui peut télécharger votre fichier ?
+            <li>Qui peut supprimer votre fichier ?
+            <li>Vous devez envoyer à votre ami l'URL de téléchargement, il doit vous informer
+                que le download s'est bien passé et vous devez supprimer le fichier
+                .<br>
+                C'est plutôt pénible.
+          </ul>
+      </ul>
+      <p>
+  <li><h3>http</h3><p>
+      <ul>
+        <li>Pas d'upload par défaut et de gestion des utilisateurs. Cela doit être programmé
+	<li>Pas de notification automatique
+	<li>Pas d'effacement automatique
+	<li>Peu de serveur http peuvent gérer des fichiers de plus de 2GB
+      </ul>
+      <p>
+  <li><h3>sendfile</h3><p>
+      <ul>
+	<li>Vous utilisez UNIX et sendfile est installé ?
+	<li>Votre destinataire utilise UNIX et a sendfile d'installé ?
+	<li>Ni vous ou votre destinataire n'a le port 487 bloqué par un firewall ?
+      </ul>
+      <p>
+  <li><h3>Des services commerciaux comme DropLoad, ALLPeers, YouSendIt, etc</h3><p>
+      <ul>
+        <li>Quel limite ont-ils (le plupart: &lt; 2 GB)?
+	<li>Quid de la sécurité et de la confidentialité : est-ce vos fichiers seront entre de bonnes mains ?
+	<li>Est-ce qu'ils sont opensource ou propriétaire ?
+	<li>Est-ce qu'ils sont accessibles avec n'importe quel navigateur ou bien avez-vous besoin de java, active-X, flash ou d'autres plugins ésotériques ?
+	<li>Est-ce qu'ils vont encore exister d'ici quelques mois?<br>
+           (DropLoad, ALLPeers et drop.io ont déja mis la clé sous la porte)
+      </ul>
+      <p>
+</ul>
+<p>
+Si vous avez répondu "non" à une seule de ces questions, alors vous avez besoin de F*EX
+<p>
+<h2>Principales fonctionnalités de F*EX</h2>
+<p>
+<ul>
+  <li>transfert de fichier de taille virtuellement infini
+  <li>le destinataire et l'expéditeur ont uniquement besoin d'un e-mail et d'un navigateur web, ils n'ont pas besoin d'installer de logiciels.
+  <li>reprise d'upload et de téléchargement en cas de défaillance
+  <li>notification automatique du destinataire
+  <li>suppression automatique après un téléchargement
+  <li>suppression automatique après un délai ajustable (par défaut: 5 jours)
+  <li>les utilisateurs F*EX peuvent créer des URLs d'upload à usage unique pour des utilisateurs extérieurs
+  <li>les utilisateurs F*EX peuvent créer des sous-utilisateurs qui ne pourront envoyer des fichiers uniquement à cet utilisateur
+  <li>les utilisateurs F*EX peuvent créer des groups, similaire à des listes de diffusions, mais pour des fichiers
+  <li>maintenance réduite au minimum : pas d'interventation de l'administrateur nécessaires mise à part la création des nouveaux utilisateurs
+  <li>l'envoi à plusieurs destinataires ne nécessite pas le stockage d'autant de fichiers sur le serveur
+  <li>F*EX est un service web HTTP qui ne néccessite pas de contourner les parre-feux. 
+  <li>support des flux
+  <li>pour les vrais utilisateurs UNIX, il existe les programmes shell fexsend et fexget afin d'éviter l'utilisation ennuyeuse de l'interface web
+  <li>protocol et code source librement disponible (Perl Artistic)
+</ul>
+
+<h2>Parlons de SEX</h2>
+F*EX a un ami : Stream EXchange (SEX).<p>
+Vous pouvez imager SEX comme un tube UNIX réseau s'appuyant sur un relais.
+Cela peut s'avérer utile pour envoyer des données d'un utilisateur A à un utilisateur B lorsque A et B ne peuvent établir
+une connexion directe, mais que chacun peut accéder en HTTP au serveur SEX. Pour une intégration sans peine avec les outils UNIX,
+il y a les commandes shell sexsend et sexget.
+<p>
+L'authentifaction est la même qu'avec F*EX
+
+<h2>Encore des  questions?</h2>
+Voir la <a href="/FAQ/FAQ.html">FAQ</a>
+
+<p>
+<ADDRESS>contact: <A HREF="mailto:$SERVER_ADMIN$">fexmaster</A></ADDRESS>
+
+</BODY>
+</HTML> 

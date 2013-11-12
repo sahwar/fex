@@ -1,0 +1,64 @@
+<HTML> 
+<HEAD><TITLE>F*EX feature list</TITLE></HEAD>
+<BODY>
+<h1><a href="/">F*EX</a> feature list</h1>
+<ul>
+  <li>file transfer of virtually unlimited file size
+  <li>recipient and sender only need an e-mail program and a web browser -
+      of any kind, they do not have to install any software<br>
+      (the F*EX server itself is UNIX based)
+  <li>RESEND and REGET for resuming after link failures at last sent byte
+  <li>auto-notification of recipient
+  <li>auto-deletion after download
+  <li>auto-deletion after expiration date (default: 5 days)
+  <li>full-users can create one time upload URLs for foreign users
+  <li>full-users can create sub-users, who can send only to this full-user
+  <li>full-users can create groups, an analogy to mailing lists, but for files
+  <li>admin can allow (internal or external) user self-registration
+  <li>admin can allow upload to public recipients without authentification
+  <li>admin can allow upload for LAN users without registration 
+      (<a href="/usecases/anonymous.html">anonymous upload</a>)
+  <li>user can forward a file to a second recipient without re-uploading it
+  <li>adminstration by CLI or Web
+  <li>server based user address books
+  <li>user and admin can throttle bandwith usage
+  <li>admin can restrict access based on e-mail or ip addresses 
+  <li>sending to multiple recipients needs storage on the server only once
+  <li>quotas for sending and receiving
+  <li>support for named based virtual hosts 
+      (multiple server instances with different hostnames on same IP)
+  <li>support for streams, including streaming recursive file transfer
+  <li>support for file linking (upload just a link, not the file itself)
+  <li>integrated web server with special features:
+      <ul>
+        <li>HTML with inline perl code
+        <li>HTML with conditional if..then..elseif..end blocks
+        <li>HTML with include statement
+        <li>on-the-fly zip, tar and tgz streaming output 
+        <li>(restricted) directory file viewer
+      </ul>
+  <li>for real UNIX users, there are the shell programs 
+       <a href="/fstools/fexsend.html">fexsend</a> and
+       <a href="/fstools/fexget.html">fexget</a><br>
+       to avoid annoying web browser usage and with a lot of additional
+       features,<br>
+       also there is an <a href="/usecases/xx.html">Internet clipboard</a>
+       and <a href="/usecases/anonymous.html">anonymous usage</a>
+  <li><a href="/fex.html">protocol and source-code free available</a>
+  <li>localization for many languanges available
+  <li>optional authentification by LDAP, RADIUS, POP, IMAP, mailman
+  <li>server available for UNIX and Windows hosts
+  <li>about 10 times faster than apache
+  <li>(reverse) proxy support
+  <li>F*EX is a HTTP web-service and needs no firewall-tunnels
+  <li>works with NAT or DHCP clients, too
+  <li><a href="/usecases/BIGMAIL.html">postfix filter</a> available to send
+      e-mails with attachments of <b>any</b> size
+  <li>maintenance-free: no admin interaction necessary 
+  <li>minimal software & hardware requirements for the server
+  <li>easy server installation, no installation necessary on client side
+  <li>great <a href="/FAQ/">FAQ</a>, <a href="/usecases/">use cases</a> 
+      and detailed <a href="/doc/concept">internal documentation</a>
+</ul>
+</BODY>
+</HTML> 

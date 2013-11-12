@@ -1,0 +1,1070 @@
+#!/usr/bin/perl -wT
+
+# F*EX CGI for download
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use CGI 		qw':standard';
+use CGI::Carp		qw'fatalsToBrowser';
+use Fcntl 		qw':flock :seek';
+use Cwd			qw'abs_path';
+use File::Basename;
+use IO::Handle;
+use Encode;
+
+# add fex lib
+($FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+our $error = 'F*EX download ERROR';
+our $head = "$ENV{SERVER_NAME} F*EX download";
+# import from fex.pp
+our ($spooldir,$tmpdir,$logdir,$skeydir,$dkeydir,$durl);
+our ($bs,$fop_auth,$timeout,$keep_default);
+our ($limited_download,$admin,$akey,$adlm,$amdl);
+our (@file_link_dirs);
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+my $ra = $ENV{REMOTE_ADDR}||0;
+if (@download_hosts and not ipin($ra,@download_hosts)) {
+  http_die(
+    "Downloads from your host ($ra) are not allowed.",
+    "Contact $ENV{SERVER_ADMIN} for details."
+  );
+}
+
+&check_maint;
+
+# call localized fop if available
+if ($0 !~ m{/locale/.*/fop} and my $lang = $ENV{HTTP_ACCEPT_LANGUAGE}) {
+  if ($lang =~ /^de/ and $0 =~ m{(.*)/cgi-bin/fop}) {
+    my $fop = "$1/locale/deutsch/cgi-bin/fop";
+    exec $fop if -x $fop;
+  }
+}
+
+my $log = "$logdir/fop.log";
+
+chdir $spooldir or die "$spooldir - $!\n";
+
+my $http_client = $ENV{HTTP_USER_AGENT} || '';
+
+$file = $ENV{PATH_INFO} || '';
+http_die('no file name') unless $file;
+$file =~ s:%3F:/?/:g; # escape '?' for URL-decoding
+$file =~ s/%([\dA-F]{2})/unpack("a",pack("H2",$1))/ge;
+$file =~ s:/\?/:%3F:g; # deescape '?'
+$file =~ s:/\.\.:/__:g;
+$file =~ s:^/+::;
+$file = untaint($file);
+
+# secure mode with HTTP authorization?
+if ($fop_auth) {
+  @http_auth = ();
+  if ($ENV{HTTP_AUTHORIZATION} and $ENV{HTTP_AUTHORIZATION} =~ /Basic\s+(.+)/) {
+    @http_auth = split(':',decode_b64($1));
+  }
+  if (@http_auth != 2) {
+    &require_auth;
+  }
+  &check_auth($file,@http_auth);
+}
+
+# download-URL-scheme /$dkey/$file ?
+if ($file =~ m:^([^/]+)/[^/]+$:) {
+  $dkey = $1;
+  if ($link = readlink("$dkeydir/$dkey")) {
+    if ($link !~ s:^\.\./::) {
+      http_die("internal error on dkey for $link");
+    }
+    $file = untaint($link);
+  } 
+  else {
+    http_die("no such file $file");
+  }
+} 
+else {
+  $file =~ s/\?.*//;
+  # add mail-domain to addresses if necessary
+  if ($mdomain and $file =~ s:(.+)/(.+)/(.+):$3:) {
+    $to   = lc $1;
+    $from = lc $2;
+    $to   .= '@'.$mdomain if -d "$to\@$mdomain";
+    $from .= '@'.$mdomain if -d "$from\@$mdomain";
+    $file = "$to/$from/$file";
+  }
+}
+
+# afex!
+if ($file and $file =~ m:(.+)/(.+)/.+:) {
+  $to   = $1;
+  $from = $2;
+  if ($from =~ s/^(anonymous).*/$1/) {
+    if (@anonymous_upload and ipin($ra,@anonymous_upload) or $dkey) {
+      $anonymous = $from;
+    } 
+    else {
+      http_header('403 Forbidden');
+      print html_header($head),
+        "You have no permission to request the URI $ENV{REQUEST_URI}\n",
+        "</body></html>\n";
+      exit;
+    }
+  }
+} 
+else {
+  http_die("unknown query format");
+}
+
+$data = "$file/data";
+
+# request with ?query-parameter ?
+if ($qs = $ENV{QUERY_STRING}) {
+
+  http_die("\"$1\" is not allowed in URL") if $qs =~ /([<>%])/;
+
+  # workaround for broken F*IX
+  $qs =~ s/&ID=skey:\w+//;
+  
+  # subuser with skey?
+  if ($qs =~ s/&*SKEY=([\w:]+)//i) {
+    $skey = $1;
+    # encrypted skey?
+    if ($skey =~ s/^MD5H:(.+)/$1/) {
+      # lookup real skey
+      foreach my $s (glob "$skeydir/*") {
+        $s =~ s:.*/::;
+        if ($skey eq md5_hex($s.$ENV{SID})) {
+          $skey = $s;
+          last;
+        }
+      }
+    }
+    if (open $skey,'<',"$skeydir/$skey") {
+      $from = $to = '';
+      while (<$skey>) {
+        $from = lc($1) if /^from=(.+)/;
+        $to   = lc($1) if /^to=(.+)/;
+      }
+      close $skey;
+      if ($from and $to) {
+        $file =~ s:.*/:$to/$from/:;
+      } else {
+        http_die("INTERNAL ERROR: missing data in $skeydir/$skey");
+      }
+    } 
+    else {
+      debuglog("SKEY=$skey");
+      http_die("wrong SKEY authentification");
+    }
+  }
+  
+  # group member with gkey?
+  if ($qs =~ s/&*GKEY=([\w:]+)//i) {
+    $gkey = $1;
+    # encrypted gkey?
+    if ($gkey =~ s/^MD5H:(.+)/$1/) {
+      # lookup real gkey
+      foreach my $g (glob "$gkeydir/*") {
+        $g =~ s:.*/::;
+        if ($gkey eq md5_hex($g.$ENV{SID})) {
+          $gkey = $g;
+          last;
+        }
+      }
+    }
+    if (open $gkey,'<',"$gkeydir/$gkey") {
+      $from = $to = '';
+      while (<$gkey>) {
+        $from  = lc($1) if /^from=(.+)/;
+        $group = lc($1) if /^to=\@(.+)/;
+      }
+      close $gkey;
+      if ($from and $group and open $group,'<',"$from/\@GROUP/$group") {
+        while (<$group>) {
+          s/#.*//;
+          s/\s//g;
+          if (/(.+):/) {
+            my $to = $1;
+            $file =~ s:.*/:$to/$from/:;
+            last;
+          }
+        }
+        close $group;
+      } 
+      else {
+        http_die("INTERNAL ERROR: missing data in $gkeydir/$gkey");
+      }
+    } 
+    else {
+      debuglog("GKEY=$gkey");
+      http_die("wrong GKEY authentification");
+    }
+  }
+  
+  # regular user: check for ID in query
+  elsif ($qs =~ s/\&*\bID=([^&]+)//i) {
+    $id = $1;
+    $fop_auth = 0;
+
+    if ($file =~ m:^(.+)/(.+)/(.+):) {
+      $to   = $1;
+      $from = $2;
+      $to   =~ s/,+/,/g;
+      $to   =~ s/\s//g;
+      $from =~ s/\s//g;
+      if ($from ne 'anonymous') {
+        $to   .= '@'.$mdomain if $mdomain and $to   !~ /@/;
+        $from .= '@'.$mdomain if $mdomain and $from !~ /@/;
+      }
+      $to   = lc $to;
+      $from = lc $from;
+    } 
+    else {
+      http_die("unknown file query format");
+    }
+
+    if (-e "$to/\@CAPTIVE") {
+      http_die("$to is CAPTIVE");
+    }
+
+    # public or anonymous recipient? (needs no auth-ID for sender)
+    if ($anonymous or $id eq 'PUBLIC' and 
+        @public_recipients and grep /^\Q$to\E$/i,@public_recipients) {
+      $rid = $id;
+    } 
+    else {
+      open my $idf,'<',"$from/@" or http_die("unknown user $from");
+      $rid = getline($idf);
+      close $idf;
+      $rid = sidhash($rid,$id);
+    }
+      
+    unless ($id eq $rid) {
+      debuglog("real id=$rid, id sent by user=$id");
+      http_die("wrong auth-ID");
+    }
+    
+    # set akey link for HTTP sessions
+    # (need original id for consistant non-moving akey)
+    if (-d $akeydir and open $idf,'<',"$from/@" and my $id = getline($idf)) {
+      $akey = untaint(md5_hex("$from:$id"));
+      unlink "$akeydir/$akey";
+      symlink "../$from","$akeydir/$akey";
+    }
+    
+    my %to;
+    COLLECTTO: foreach my $to (split(',',$to)) {
+      if ($to !~ /.@./ and open my $AB,'<',"$from/\@ADDRESS_BOOK") {
+        while (<$AB>) {
+          s/\s*#.*//;
+          s/^\s+//;
+          next unless $_;
+          if (/^\s*([\S]+)\s+([\S]+)/) {
+            my ($alias,$address) = ($1,$2);
+            if ($to =~ /^\Q$alias\E$/i) {
+              foreach my $to (split(",",$address)) {
+                $to .= '@'.$mdomain if $mdomain and $to !~ /@/;
+                $to{$to} = lc $to; # ignore dupes
+              }
+              next COLLECTTO;
+            }
+          }
+        }
+      } 
+      elsif ($to =~ /^\@(.+)/) {
+        my $group = "$from/\@GROUP/$1";
+        if (not -l $group and open $group) {
+          while (<$group>) {
+            s/#.*//;
+            s/\s//g;
+            if (/(.+\@[w.-]+):.+/) {
+              $to{$1} = lc $1; # ignore dupes
+            }
+          }
+          close $group;
+        }
+      } 
+      else {
+        $to .= '@'.$mdomain if $mdomain and $to !~ /.@./;
+        $to{$to} = lc $to; # ignore dupes
+      }
+    }
+    foreach $to (keys %to) {
+      if (-e "$to/\@CAPTIVE") {
+        http_die("$to is CAPTIVE");
+      }
+      unless (-d $to or checkaddress($to)) {
+        http_die("$to is not a legal e-mail address");
+      }
+    }
+      
+  }
+
+  if ($qs =~ /\&?KEEP=(\d+)/i) {
+    $keep = $1;
+    $filename = filename($file);
+    check_captive($file);
+    if  (-f $data) {
+      unlink "$file/keep";
+      if (symlink $keep,"$file/keep") {
+        http_header('200 OK');
+        print html_header($head),
+              "<h3>set keep=$keep for $filename</h3>\n",
+              "</body></html>\n";
+      } 
+      else {
+        http_header('599 internal error');
+        print html_header($head),
+              "<h3>$filename - $!</h3>\n",
+              "</body></html>\n";
+      }
+    } 
+    else {
+      http_header('404 File not found');
+      print html_header($head),
+            "<h3>$filename not found</h3>\n",
+            "</body></html>\n";
+    }
+    exit;
+  } 
+  elsif ($qs =~ s/\&?KEEP//i) { 
+    check_captive($file);
+    $autodelete = 'NO';
+  }
+  
+  if ($qs =~ s/\&?FILEID=(\w+)//i) { $fileid = $1 }
+
+  if ($qs =~ s/\&?IGNOREWARNING//i) { $ignorewarning = 1 }
+  
+  if ($qs eq 'LIST') {
+    http_header('200 OK','Content-Type: text/plain');
+    print "$file :\n";
+    chdir $file and exec '/client/bin/l';
+    exit;
+  }
+
+  # copy file to yourself
+  if ($qs eq 'COPY') {
+    unless (-f "$file/data") {
+      http_die("File not found.");
+    }
+    ($to,$from,$file) = split('/',$file);
+    unless ("$to/@") {
+      # http_header('403 Forbidden');
+      # print html_header($head),
+      #  "You have no permission to copy a file.\n",
+      #  "</body></html>\n";
+      http_die("You have no permission to copy a file.");
+    }
+    if (-e "$to/$to/$file/data") {
+      # http_header('409 File Exists');
+      # print html_header($head),
+      #   "File $file already exists in your outgoing spool.\n",
+      #   "</body></html>\n";
+      http_die("File $file already exists in your outgoing spool.");
+    }
+    mkdirp("$to/$to/$file");
+    link "$to/$from/$file/data","$to/$to/$file/data" 
+      or http_die("cannot link to $to/$to/$file/data - $!\n");
+    my $fkey = copy("$to/$from/$file/filename","$to/$to/$file/filename");
+    open my $notify,'>',"$to/$to/$file/notify";
+    close $notify;
+    my $dkey = randstring(8);
+    unlink "$to/$to/$file/dkey","$dkeydir/$dkey";
+    symlink "../$to/$to/$file","$dkeydir/$dkey";
+    symlink $dkey,"$to/$to/$file/dkey";
+    http_header('200 OK',"Location: $durl/$dkey/$fkey");
+    print html_header($head),
+      "File $file copied to yourself.\n",
+      "</body></html>\n";
+    exit;
+  }
+  
+  # ex and hopp?
+  if ($qs =~ s/(^|&)DELETE//i) {
+    if (unlink $data) {
+      $filename = filename($file);
+      if (open my $log,'>',"$file/error") {
+        printf {$log} "%s has been deleted by %s at %s\n",
+                      $filename,$ENV{REMOTE_ADDR},isodate(time);
+        close $log;
+      }
+      if (open $log,'>>',$log) {
+        printf {$log}
+               "%s [%s_%s] %s %s deleted\n",
+               isodate(time),$$,$ENV{REQUESTCOUNT},$ra,encode_Q($file);
+        close $log;
+      }
+      http_header('200 OK',"X-File: $file");
+      print html_header($head),
+            "<h3>$filename deleted</h3>\n",
+            "</body></html>\n";
+      exit;
+    } 
+    else { http_die("no such file") }
+    exit;
+  } 
+  
+  # wipe out!? (for anonymous upload)
+  if ($qs =~ s/(^|&)PURGE//i) {
+    $filename = filename($file);
+    if (@anonymous_upload and ipin($ra,@anonymous_upload)) {
+      unlink "$dkeydir/$dkey" if $dkey;
+      if (rmrf($file)) {
+        if (open $log,'>>',$log) {
+          printf {$log}
+                 "%s [%s_%s] %s %s purged\n",
+                 isodate(time),$$,$ENV{REQUESTCOUNT},$ra,encode_Q($file);
+          close $log;
+        }
+        http_header('200 OK',"X-File: $file");
+        print html_header($head),
+          "<h3>$filename purged</h3>\n",
+          "</body></html>\n";
+      } 
+      else { http_die("no such file") }
+    } 
+    else { http_die("you are not allowed to purge $filename") }
+    exit;
+  } 
+  
+  # request for file size?
+  if ($qs eq '?') {
+    sendsize($file);
+    # control back to fexsrv for further HTTP handling
+    exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  }
+
+  # fallback
+  if ($qs) {
+    http_die("unknown query format $qs");
+  }
+
+}
+
+unless ($id and $rid and $id eq $rid or $dkey or $anonymous) {
+  http_die("wrong parameter $file");
+}
+
+unless ($to) {
+  http_die("internal error: unknown recipient");
+}
+
+unless ($from) {
+  http_die("internal error: unknown sender");
+}
+
+&check_status($from);
+
+# server based ip restrictions
+if (@download_hosts and not ipin($ra,@download_hosts)) {
+  http_die(
+    "Downloads from your host ($ra) are not allowed.",
+    "Contact $ENV{SERVER_ADMIN} for details."
+  );
+}
+
+# user based ip restrictions
+unless (check_rhosts("$to/\@DOWNLOAD_HOSTS")) {
+  http_die("You are not allowed to download from IP $ra");
+}
+
+# file based ip restrictions
+unless (check_rhosts("$file/restrictions")) {
+  http_die("Download of files from external user $from is restricted "
+          ."to internal hosts. Your IP $ra is not allowed.");
+}
+
+# set time mark for this access
+if ($file =~ m:(.+?)/:) {
+  my $user = $1;
+  my $time = untaint(time);
+  utime $time,$time,$user;
+}
+
+# reget or range?
+if ($range = $ENV{HTTP_RANGE}) {
+  $seek = $1 if $range =~ /^bytes=(\d+)-/i;
+  $stop = $1 if $range =~ /^bytes=\d*-(\d+)/i;
+} else {
+  $seek = 0;
+  $stop = 0;
+}
+
+if (not $autodelete or $autodelete ne 'NO') {
+  $autodelete = readlink "$file/autodelete" || 'YES';
+}
+  
+if ($from and $file eq "$from/$from/ADDRESS_BOOK") {
+  if (open my $AB,'<',"$from/\@ADDRESS_BOOK") {
+    my $ab = '';
+    while (<$AB>) {
+      s/^\s+//;
+      s/\s+$//;
+      s/[\r\n]//g;
+      $ab .= $_."\r\n";
+    }
+    close $AB;
+    nvt_print(
+      'HTTP/1.1 200 OK',
+      'Content-Length: ' . length($ab),
+      'Content-Type: text/plain',
+      ''
+    );
+    print $ab;
+  } 
+  else {
+    nvt_print(
+      'HTTP/1.1 404 No address book found',
+      'Content-Length: 0',
+      ''
+    );
+  }
+  # control back to fexsrv for further HTTP handling
+  exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+if (-f $data) {
+  # already downloaded?
+  if ($limited_download and $limited_download !~ /^n/i
+      and $from ne $to                     # fex to yourself is ok!
+      and $to !~ /$amdl/                   # allowed multi download recipients
+      and $from !~ /^fexmail/              # fexmail is ok!
+      and $to !~ /^anonymous/		   # anonymous fex is ok!
+      and $http_client !~ /$adlm/          # allowed download managers
+      and $file !~ m:/STDFEX$:
+      and not($dkey and ($ENV{HTTP_COOKIE}||'') =~ /dkey=$dkey/)
+      and open $file,'<',"$file/download") 
+  {
+    $_ = <$file> || '';
+    close $file;
+    chomp;
+    $_ = '' if $ra and /$ra/; # allow downloads from same ip
+    if ($_) {
+      s/(.+) ([\w.:]+)$/by $2 at $1/;
+      $file = filename($file);
+      http_die("$file has already been downloaded $_");
+    }
+  }
+  $sb = sendfile($file,$seek,$stop);
+  shutdown(STDOUT,2);
+} 
+elsif (-l $data) {
+  # $file =~ s:.*/::;
+  http_die("<tt>$file</tt> has been withdrawn");
+} 
+elsif (open $errf,'<',"$file/error" and $err = getline($errf)) {
+  fdlog($log,$file,0,0);
+  http_die($err);
+} 
+else {
+  fdlog($log,$file,0,0);
+  if ($file =~ /^anonymous.*afex_\d+\.tar$/) {
+    # should be extra handled...
+  }
+  http_die("no such file $file");
+}
+
+debuglog(sprintf("%s %s %d %d %d",
+         isodate(time),$file,$sb||0,$seek,-s $data||0));
+
+if ($sb+$seek == -s $data) {
+  
+  # note successfull download
+  $download = "$file/download";
+  if (open $download,'>>',$download) {
+    printf {$download} "%s %s\n",isodate(time),$ENV{REMOTE_ADDR};
+    close $download;
+  }
+  
+  # delete file after grace period
+  if ($autodelete eq 'YES') {
+    $grace_time = 60 unless defined $grace_time;
+    for (;;) {
+      my $utime = (stat $data)[8] || 0;
+      my $dtime = (stat $download)[8] || 0;
+      exit if $utime > $dtime;
+      last if time > $dtime+$grace_time;
+      sleep 10;
+    }
+    unlink $data;
+    my $error = "$file/error";
+    if (open $error,'>',$error) {
+      printf {$error} "%s has been autodeleted after download from %s at %s\n",
+                      filename($file),$ENV{REMOTE_ADDR},isodate(time);
+      close $error;
+    }
+  }
+  
+}
+
+exit;
+  
+
+sub sendfile {
+  my ($file,$seek,$stop) = @_;
+  my ($filename,$size,$total_size,$fileid,$filetype);
+  my ($data,$download,$header,$buf,$range,$s,$b,$t0);
+  my $type = '';
+  
+  $data     = $file.'/data';
+  $download = $file.'/download';
+  $header   = $file.'/header';
+  
+  # fallback defaults, should be set later with better values
+  $filename = filename($file);
+  $total_size = -s $data || 0;
+
+  # file link?
+  if (-l $data) {
+    unless (-f $data and -r $data) {
+      http_die("<tt>$file</tt> has been withdrawn");
+    }
+    $data = abs_path($data);
+    my $fok;
+    foreach my $dir (@file_link_dirs) {
+      $dir = abs_path($dir);
+      $fok = $data if $data =~ /^\Q$dir\//;
+    }
+    unless ($fok) {
+      http_die("no permission to download <tt>$file</tt>");
+    }
+  } else {
+    unless (-f $data and -r $data) {
+      http_die("<tt>$file</tt> has gone");
+    }
+  }
+
+  if ($ENV{REQUEST_METHOD} eq 'GET') {
+    debuglog("Exp: FROM=\"$from\"","Exp: TO=\"$to\"");
+    # lock for fup
+    open $data,$data and flock($data,LOCK_EX|LOCK_NB);
+    # security check
+    if (-l $data) {
+      http_die("no permission to download <tt>$file</tt>");
+    }
+    # HTTP Range download suckers are already rejected by fexsrv
+    unless ($range = $ENV{HTTP_RANGE}) {
+      # download lock
+      open $download,'>>',$download or die "$download - $!\n";
+      if ($file =~ m:(.+?)/(.+?)/: and $1 ne $2) {
+        # only one concurrent download is allowed if sender <> recipient
+        flock($download,LOCK_EX|LOCK_NB) or
+          http_die("$file locked: a download is already in progress");
+      }
+    }
+    $size = $total_size - $seek - ($stop ? $total_size-$stop-1 : 0);
+  } elsif ($ENV{REQUEST_METHOD} eq 'HEAD') { 
+    $size = -s $data || 0;
+  } else { 
+    http_die("unknown HTTP request method $ENV{REQUEST_METHOD}");
+  }
+  
+  # read MIME entity header (what the client said)
+  if (open $header,'<',$header) {
+    while (<$header>) {
+      if (/^Content-Type: (.+)/i) {
+        $type = $1;
+        last;
+      }
+    }
+    close $header;
+    $type =~ s/\s//g;
+  }
+  
+  $fileid = readlink "$file/id" || '';
+  
+  # determine own MIME entity header for download
+  my $mt = $ENV{FEXHOME}.'/etc/mime.types';
+  if ($http_client !~ /MSIE/ and $type =~ /x-mime/i and open $mt,'<',$mt) {
+    $type = 'application/octet-stream';
+    MIMETYPES: while (<$mt>) {
+      chomp;
+      s/#.*//;
+      s/^\s+//;
+      my ($mt,@ft) = split;
+      foreach my $ft (@ft) {
+        if ($filename =~ /\.\Q$ft\E$/i) {
+          $type = $mt;
+          last MIMETYPES;
+        }
+      }
+    }
+    close $mt;
+  }
+  # reset to default MIME type
+  else { $type = 'application/octet-stream' }
+  
+  # HTML is not allowed for security reasons! (embedded javascript, etc)
+  $type =~ s/html/plain/i;
+
+  debuglog("download with $http_client");
+
+  if ($seek or $stop) {
+    if ($size < 0) {
+      http_header('416 Requested Range Not Satisfiable');
+      exit;
+    }
+    if ($stop) {
+      $range = sprintf("bytes %s-%s/%s",$seek,$stop,$total_size);
+    } else {
+      $range = sprintf("bytes %s-%s/%s",$seek,$total_size-1,$total_size);
+    }
+    nvt_print(
+      'HTTP/1.1 206 Partial Content',
+      "Content-Length: $size",
+      "Content-Range: $range",
+      "Content-Type: $type",
+    );
+    if ($http_client !~ /MSIE/) {
+      nvt_print("Cache-Control: no-cache");
+      if ($type eq 'application/octet-stream') {
+        nvt_print("Content-Disposition: attachment; filename=\"$filename\"");
+      }
+    }
+    nvt_print('');
+  } else {
+    # another stupid IE bug-workaround 
+    # http://drupal.org/node/163445
+    # http://support.microsoft.com/kb/323308
+    if ($http_client =~ /MSIE/) {
+      # $type = 'application/x-msdownload';
+      if ($ignorewarning) {
+        $type .= "; filename=$filename";
+        nvt_print(
+          'HTTP/1.1 200 OK',
+          "Content-Length: $size",
+          "Content-Type: $type",
+#         "Pragma: no-cache",
+#         "Cache-Control: no-store",
+          "Content-Disposition: attachment; filename=\"$filename\"",
+          "Connection: close",
+        );
+#        nvt_print('','HTTP/1.1 200 OK',"Content-Length: $size","Content-Type: $type"); exit;
+      } else {
+        http_header('200 OK');
+        print html_header($head);
+        pq(qq(
+          '<h2>Internet Explorer warning</h2>'
+          'Using Microsoft Internet Explorer for download will probably'
+          'lead to problems, because it is not Internet compatible (RFC 2616).'
+          '<p>'
+          'We recommend <a href="http://firefox.com">Firefox</a>'
+          '<p>'
+          'If you really want to continue with Internet Explorer, then'
+          '<a href="$ENV{REQUEST_URL}?IGNOREWARNING">'
+          'click here with your right mouse button and select "save as"'
+          '</a>'
+          '<p>'
+          'See also <a href="/FAQ/user.html">F*EX user FAQ</a>.'
+          '</body></html>'
+        ));
+        exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+        exit;
+      }
+    } else {
+      nvt_print(
+        'HTTP/1.1 200 OK',
+        "Content-Length: $size",
+        "Content-Type: $type",
+        "Cache-Control: no-cache",
+        "Connection: close",
+      );
+      if ($type eq 'application/octet-stream') {
+        nvt_print(qq'Content-Disposition: attachment; filename="$filename"');
+      }
+    }
+
+    nvt_print("X-Size: $total_size");
+    nvt_print("X-File-ID: $fileid") if $fileid;
+    # if ((`file "$file/data" 2>/dev/null` || '') =~ m{.*/data:\s(.+)}) {
+    #  nvt_print("X-File-Type: $1");
+    # }
+    if ($dkey = $dkey||readlink "$file/dkey") {
+      my $ma = (readlink "$file/keep"||$keep_default)*60*60*24;
+      nvt_print("Set-Cookie: dkey=$dkey; Max-Age=$ma; Path=$ENV{REQUEST_URI}");
+    }
+    nvt_print('');
+  }
+
+  if ($ENV{REQUEST_METHOD} eq 'HEAD') {
+    # control back to fexsrv for further HTTP handling
+    exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+    exit;
+  }
+  
+  if ($ENV{REQUEST_METHOD} eq 'GET') {
+
+    if (@throttle) {
+      my $to = $file;
+      $to =~ s:/.*::;
+      foreach (@throttle) {
+        if (/(.+):(\d+)$/) {
+          my $throttle = $1;
+          my $limit = $2;
+          # throttle ip address?
+          if ($throttle =~ /^[\d.-]+$/) {
+            if (ipin($ra,$throttle)) {
+              $bwl = $limit;
+              last;
+            }
+          } 
+          # throttle e-mail address?
+          else {
+            # allow wildcard *, but not regexps
+            $throttle =~ quotemeta $throttle;
+            $throttle =~ s/\*/.*/g;
+            if ($to =~ /$throttle$/) {
+              $bwl = $limit;
+              last;
+            }
+          }
+        }
+      }
+    }
+    
+    foreach my $sig (keys %SIG) { local $SIG{$sig} = \&sigexit }
+    local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+
+    seek $data,$seek,0;
+
+    $t0 = time;
+    $s = $b = 0;
+
+    # sysread/syswrite because of speed
+    while ($s < $size and $b = sysread($data,$buf,$bs)) {
+      # last chunk for HTTP Range?
+      if ($stop and $s+$b > $size) {
+        $b = $size-$s;
+        $buf = substr($buf,0,$b)
+      }
+      $s += $b;      
+      alarm($timeout*10);
+      syswrite STDOUT,$buf or last; # client still alive?
+      if ($bwl) {
+        alarm(0);
+        sleep 1 while $s/(time-$t0||1)/1024 > $bwl;
+      }
+    }
+    
+    close $data;
+    alarm(0);
+    
+    fdlog($log,$file,$s,$size);
+  }
+  close $download;
+  
+  return $s;
+}
+
+
+sub sendsize {
+  my ($path) = @_;
+  my ($file,$upload,$to,$from,$dkey);
+  my $size = 0;
+  local $_;
+  
+  $path =~ s:^/::;
+  ($to,$from,$file) = split('/',$path);
+  $to =~ s/,.*//;
+  $to   = lc $to;
+  $from = lc $from;
+
+  $to   .= '@'.$mdomain if -d "$to\@$mdomain";
+  $from .= '@'.$mdomain if -d "$from\@$mdomain";
+
+  $file =~ s/%([A-F0-9]{2})/chr(hex($1))/ge;
+  $file = urlencode($file);
+
+  if ($to eq '*' and $fileid) {
+    foreach my $fd (glob "*/$from/$file") {
+      if (-f "$fd/data" 
+          and -l "$fd/id" and readlink "$fd/id" eq $fileid
+          and $dkey = readlink "$fd/dkey") {
+        $to = $fd;
+        $to =~ s:/.*::;
+        last;
+      }
+    }
+  } 
+  elsif ($to !~ /@/ and open my $AB,'<',"$from/\@ADDRESS_BOOK") {
+    while (<$AB>) {
+      s/\s*#.*//;
+      $_ = lc $_;
+      my ($alias,$address) = split;
+      if ($address) {
+        $address =~ s/,.*//;
+        $address .= '@'.$mdomain if $mdomain and $address !~ /@/;
+        if ($to eq $alias) {
+          $to = $address;
+          last;
+        }
+      }
+    }
+    close $AB;
+  }
+  
+  if (-f "$to/$from/$file/data") {
+    $dkey = readlink "$to/$from/$file/dkey";
+    $fkey = slurp("$to/$from/$file/filename")||$file;
+  }
+  
+  $upload = -s "$to/$from/$file/upload" || -s "$to/$from/$file/data" || 0;
+  $size = readlink "$to/$from/$file/size" || 0;
+  $fileid = readlink "$to/$from/$file/id" || '';
+
+  nvt_print('HTTP/1.1 200 OK');
+  nvt_print("Content-Length: $upload");
+  nvt_print("X-Original-Recipient: $to");
+  nvt_print("X-DKEY: $dkey") if $dkey;
+  nvt_print("X-Location: $durl/$dkey/$fkey") if $dkey and $fkey;
+  nvt_print("X-Size: $size");
+  nvt_print("X-File-ID: $fileid") if $fileid;
+  nvt_print("X-Features: $ENV{FEATURES}");
+  nvt_print('');
+}
+
+
+sub check_rhosts {
+  my $ipr = shift;
+  my @hosts;
+  local $_;
+
+  if (open $ipr,$ipr) {
+    while (<$ipr>) {
+      chomp;
+      s/#.*//;
+      s/\s//g;
+      if ($_ eq '@LOCAL_RHOSTS') {
+        push @hosts,@local_rhosts if @local_rhosts;
+      } elsif (/\w/) {
+        push @hosts,$_;
+      }
+    }
+    close $ipr;
+    if (@hosts and not ipin($ra,@hosts)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+sub require_auth {
+  http_header(
+    '401 Authorization Required',
+    'WWW-Authenticate: Basic realm="'.$ENV{SERVER_NAME}.' F*EX download"',
+    'Content-Length: 0',
+  );
+  # control back to fexsrv for further HTTP handling
+  exec($ENV{FEXHOME}.'/bin/fexsrv') if $ENV{KEEP_ALIVE};
+  exit;
+}
+
+
+sub check_auth {
+  my ($path,$user,$auth) = @_;
+  my ($to,$from,$file,$dkey);
+  my ($id,$idf);
+  my ($subuser,$subid);
+  my $auth_ok = 0;
+  local $_;
+
+  if ($path =~ m:(.+)/(.+)/(.+):) {
+    ($to,$from,$file) = ($1,$2,$3);
+  } 
+  elsif ($path =~ m:(.+)/(.+):) {  
+    ($dkey,$file) = ($1,$2);
+    $path = readlink "$dkeydir/$dkey" or http_die('no such file');
+    (undef,$to,$from,$file) = split('/',$path);
+  } 
+  else { http_die("wrong URL format for download") }
+
+  $to   .= '@'.$mdomain if $mdomain and $to   !~ /@/;
+  $from .= '@'.$mdomain if $mdomain and $from !~ /@/;
+
+  $to   = lc $to;
+  $from = lc $from;
+
+  # auth user match to in download URL?
+  if ($to ne $user and "$to\@$mdomain" ne $user and $to ne "$user@$mdomain") {
+    debuglog("mismatch: to=$to, auth user=$user");
+    &require_auth;
+  }
+
+  # check for real user
+  if (open $idf,'<',"$to/@") {
+    $id = getline($idf);
+    close $idf;
+    unless ($id and $id eq $auth) {
+      debuglog("$user mismatch: id=$id, auth=$auth");
+      &require_auth;
+    }
+  } 
+  # check for sub user
+  elsif (open $idf,'<',"$from/\@SUBUSER") {
+    while (<$idf>) {
+      chomp;
+      s/#.*//;
+      ($subuser,$subid) = split ':';
+      if ($subid and $subid eq $auth 
+          and ($user eq $subuser 
+               or $subuser eq '*@*'
+               or $subuser =~ /^\*\@(.+)/ and $user =~ /\@\Q$1\E$/i
+               or $subuser =~ /(.+)\@\*$/ and $user =~ /^\Q$1\E\@/i)) {
+        $auth_ok = 1;
+        last;
+      }
+    }
+    close $idf;
+    unless ($auth_ok) {
+      debuglog("no matching $user in $from/\@SUBUSER");
+      &require_auth;
+    }
+  }
+  else {
+    debuglog("no $to/@ and no $from/@");
+    &require_auth;
+  }
+  
+}
+
+
+sub check_captive {
+  my $to = shift;
+  $to =~ s:/.*::;
+  $to .= '@'.$mdomain if $mdomain and -d "$to\@$mdomain";
+  if (-e "$to/\@CAPTIVE") {
+    http_die("$to is CAPTIVE - no URL parameters allowed");
+  }
+}
+
+
+sub sigexit {
+  my ($sig) = @_;
+  my $msg;
+  
+  $msg = @_ ? "@_" : '???';
+  $msg =~ s/\n/ /g;
+  $msg =~ s/\s+$//;
+
+  errorlog("$file caught SIGNAL $msg");
+
+  # sigpipe means: client has terminated
+  # this event will be handled further by sendfile(), do not terminate here
+  if ($sig ne 'PIPE') {
+    $SIG{__DIE__} = '';
+    if ($sig eq 'DIE') {
+      shift;
+      die "$msg\n";
+    } else {
+      die "SIGNAL $msg\n";
+    }
+  }
+}

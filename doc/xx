@@ -1,0 +1,99 @@
+With xx you have a network wide shell based clip board for files and
+STDIN/STDOUT: easy data exchange between different accounts on different
+hosts. 
+
+  usage: send file(s):          xx file...
+     or: send STDIN:            xx -
+     or: send pipe:             ... | xx
+     or: get file(s) or STDIN:  xx
+     or: get file(s) quickly:   xx --
+
+
+Pipe example:
+
+  framstag@tandem:~: uname -a | xx
+  /home/framstag/.fex/tmp/STDFEX : 0 kB in 1 s (0 kB/s)
+  
+  
+  framstag@fex:~: xx
+  transfered: 0 MB (100%)
+  Linux tandem 2.6.24-28-server #1 SMP Wed Aug 18 22:01:20 UTC 2010 i686 GNU/Linux
+
+
+File transfer example:
+
+  framstag@tandem:~: xx /boot/
+  making tar transfer file /home/framstag/.fex/tmp/STDFEX :
+  /boot/
+  /boot/initrd.img-2.6.24-27-generic
+  /boot/vmlinuz-2.6.24-28-generic
+  (...)
+  /boot/System.map-2.6.24-27-generic
+  /home/framstag/.fex/tmp/STDFEX : 34 MB in 2 s (17605 kB/s)
+  
+  
+  framstag@fex:/tmp: xx
+  transfered: 34 MB (100%)
+  Files in transfer-container:
+  
+  drwxr-xr-x root/root         0 2010-10-20 07:37 boot/
+  -rw-r--r-- root/root   7905085 2010-05-25 15:38 boot/initrd.img-2.6.24-27-generic
+  -rw-r--r-- root/root   1927544 2010-10-16 20:38 boot/vmlinuz-2.6.24-28-generic
+  (...)
+  -rw-r--r-- root/root    906803 2010-03-24 14:33 boot/System.map-2.6.24-27-generic
+  
+  Extract these files? 
+
+
+One problem are shared system accounts like root where different persons
+use them: xx (like fexsend and fexget) uses $HOME/.fex/id which contains
+personal data.
+
+But you can put the ID authorization in the environment variable FEXID.
+
+fexsend on your local account gives you a string for "cut and paste", example: 
+
+  framstag@moep:~: fexsend -I
+  export FEXID='fex.rus.uni-stuttgart.de:8080 framstag jmBhf9ht'
+  history -d $(history 1);history -d $(history 1)
+
+You then copy these two lines with your mouse into the root account:
+
+  root@tandem:~# export FEXID'=fex.rus.uni-stuttgart.de:8080 framstag jmBhf9ht'
+  root@tandem:~# history -d $(history 1);history -d $(history 1)
+
+(The second line deletes these two lines from the bash history)
+
+Now you can use xx (or fexsend and fexget) as normal. Example:
+
+  root@tandem:~# grep sshd /var/log/daemon | xx
+  transfered: 265 kB in 1 s (265 kB/s)
+  
+  framstag@moep:~: xx | wc -l
+  434279
+
+
+After logging out from root@tandem the F*EX authorization data has gone.
+
+
+Internal details:
+
+The intermediate transfer file container is $HOME/.fex/tmp/STDFEX
+
+When transfering files tar/gzip format is used, whereas STDIN (pipe) will
+be transfered uncompressed. Tip: If you want to transfer files uncompress,
+then use: tar cvf - your files... | xx
+
+With default usage only one "storage slot" is available: STDFEX
+But you can use as many "storage slots" as you want by using "xx :TAG" 
+Examples:
+
+  uname -a | xx
+  
+  grep sshd /var/log/daemon | xx :log
+  
+  xx :log | grep obertux  
+  
+  xx :config /boot /etc /root
+  
+  xx :config --

@@ -1,0 +1,119 @@
+SEX is a F*EX companion: Stream EXchange
+
+You can imagine SEX as network wide UNIX pipes with a relay between. This
+can be usefull for piping data from A to B where A and B cannot establish
+a direct connection, but both can connect by HTTP to the SEX-server. SEX
+is a synchronous service in conjuction to F*EX which is asynchronous.
+
+For seamless integration into the UNIX tool chain, there are the
+shell-tools sexsend and sexget.
+
+Using web browsers for sexing will not work, because they cannot handle
+streams in a pipe. So far, there are only the UNIX clients. Feel free to
+implement other clients for other operating systems :-)
+
+Authentication is the same as with F*EX.
+
+Example:
+
+root@lanldap:/var/log: tail -f syslog | sexsend framstag@rus.uni-stuttgart.de
+
+framstag@blubb:/tmp: sexget | grep ldap
+
+
+If you need encryption, then use the standard UNIX toolbox and add a
+appropriate program to the pipe, for example: openssl bf
+
+
+Tips for using SEX for file exchange:
+
+I have a lot of (administrative) accounts on even more hosts, where I have
+to exchange a lot or big files. These hosts often cannot make direct
+tcp-connects to each other, because of IP-filters, firewalls or missing
+server software. Only outgoing connections are possible.
+
+Therefore NFS, ssh or even ftp are no option.
+
+Since today my solution was F*EX:
+
+1) on source host send the files within a container to the F*EX-server:
+
+	fexsend -a container.tar file1 file2 ... .
+
+2) read or copy the FEXURL with mouse
+
+3) on destination host get container.tar from F*EX-server and extract it:
+
+	fexget FEXURL 
+	tar xvf container.tar
+	rm container.tar
+
+
+Backdraws:
+
+- a lot of manually work
+- creation of container.tar needs (a lot of) time
+- container.tar needs (too much) disk space on source and destination host
+  and on the F*EX-Server
+  
+
+Small solution:
+
+Usage of xx (wrapper for fexsend) eliminates manually handling of
+container.tar. But it will be still created, only automatically.
+The ressource problems are still there.
+
+
+The new sexy solution:
+
+I use SEX (Stream EXchange) instead of FEX (File EXchange)!
+
+There is no more a temporary container.tar, but the files are transfered
+as a stream with the new client sexxx!
+
+An example (*):
+
+On the source host:
+
+	root@obertux:~/bin# sexxx .
+	streaming:
+	./
+	./autopatch
+	./subsys
+	./pwsync
+	./cspread
+	./fspread
+	./spread
+	./iptconf
+	./esxbackup
+	./esxlist
+	./getxx
+	./rscreen
+
+
+On the destination host:
+
+	framstag@flupp:/tmp: sexxx
+        extracting from stream:
+	drwxr-xr-x root/root         0 2010-08-06 12:48 ./
+	-rwxr-xr-x framstag/users  170 2010-01-20 13:26 ./autopatch
+	-rwxr-xr-x root/root       336 2006-02-02 15:15 ./subsys
+	-rwxr-xr-x root/root       278 2010-01-18 23:38 ./pwsync
+	lrwxrwxrwx root/root         0 2009-11-03 15:49 ./cspread -> spread
+	lrwxrwxrwx root/root         0 2009-11-03 15:49 ./fspread -> spread
+	-rwxr-xr-x root/root     10354 2010-02-12 14:49 ./spread
+	-rwxr-xr-x root/root      1380 2010-01-14 08:54 ./iptconf
+	-rwxr-xr-x root/root       116 2010-05-04 18:36 ./esxbackup
+	-rwxr-xr-x root/root       344 2010-05-06 13:33 ./esxlist
+	-rwxr-xr-x root/root        93 2010-08-06 12:32 ./getxx
+	-rwxr-xr-x 1000/users      173 2009-11-26 13:40 ./rscreen
+
+
+Now I can transfer any files from a new installed (VM) server to my
+admin workstation behin a firewall. Or the other direction.
+
+
+(*) The example above has only a few kB, but one can use sexxx for many GB
+    or even TB!
+    On my VMs I get a throughput of 90 MB/s.
+

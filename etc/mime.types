@@ -1,0 +1,36 @@
+application/ogg					ogg ogx
+application/pdf					pdf
+application/postscript				ps ai eps
+application/x-dvi				dvi
+audio/basic					au snd
+audio/mpeg					mpga mpega mp2 mp3 m4a
+audio/ogg					oga spx
+audio/x-ms-wma					wma
+audio/x-wav					wav
+image/gif					gif
+image/jpeg					jpeg jpg jpe
+image/pcx					pcx
+image/png					png
+image/svg+xml					svg svgz
+image/tiff					tiff tif
+image/x-ms-bmp					bmp
+image/x-portable-anymap				pnm
+image/x-portable-bitmap				pbm
+image/x-portable-graymap			pgm
+image/x-portable-pixmap				ppm
+image/x-rgb					rgb
+image/x-xbitmap					xbm
+image/x-xpixmap					xpm
+image/x-xwindowdump				xwd
+text/plain					asc txt text pot
+video/3gpp					3gp
+video/dl					dl
+video/dv					dif dv
+video/fli					fli
+video/gl					gl
+video/mpeg					mpeg mpg mpe
+video/mp4					mp4
+video/ogg					ogv
+video/quicktime					qt mov
+video/x-msvideo					avi
+video/x-sgi-movie				movie

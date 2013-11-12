@@ -1,0 +1,136 @@
+<HTML> 
+<HEAD><TITLE>F*EX - File EXchange</TITLE></HEAD>
+<BODY>
+<center>
+<h1>F*EX - Frams' Fast File EXchange</h1>
+<IMG SRC="logo.jpg">
+</center>
+<p>
+F*EX (Frams' Fast File EXchange) es un servicio para enviar ficheros (grandes, enormes,
+gigantes, ...) de un usuario A a otro B.
+<p>
+El remitente sube el fichero al servidor F*EX usando
+<a href="/fup">el formulario de subida WWW</a> y el destinatario
+autom&aacute;ticamente recibe una notifiaci&oacute;n por correo electr&oacute;nico con la URL de desacarga.
+<p>
+
+Usted dir&aacute;:
+<blockquote><em>
+  &iexcl;&iquest;Por qu&eacute; necesito de otro servicio de transferencia de ficheros?!<br>
+  &iexcl;Tengo el correo electr&oacute;nico, ftp, ssh e incluso sendfile!
+</em></blockquote>
+<p>
+Yo le respondo:
+<blockquote><em>
+  Aun as&iacute; necesita F*EX :-)
+</em></blockquote>
+<p>
+  
+Por ejemplo, quiere enviar a un amigo su &uacute;ltimo video de las vacaciones (1 GB).
+Tiene las siguientes posibilidades (y problemas):<p>
+
+<ul>
+  <li><h3>enviar un DVD por correo postal</h3><p>
+      Sin comentarios - &iexcl;vivimos en el a&ntilde;o
+      <<my @x=gmtime(time); $x[5]-69;>> 
+      tras la invenci&oacute;n de internet!
+      Enviar DVDs/CDs es para los abuelos.
+      <p>
+  <li><h3>usando el correo electr&oacute;nico</h3><p>
+      La mayor&iacute;a de los servidores de correo tienen una l&iacute;mite de 10 MB por mensaje de correo electr&oacute;nico
+      y una cuota de almacenamiento de uno 100 MB por usuario e incluso menos.
+      <p>
+  <li><h3>uucp</h3><p>
+      &iquest;Por qu&eacute; no escritura cuneiforme sobre planchas de piedra?
+      <p>
+  <li><h3>ssh</h3><p>
+      &iquest;Tiene la contrase&ntilde;a de su amigo o est&aacute; deseando darle la suya tan s&oacute;lo para la transferencia de un fichero?
+      <p>
+  <li><h3>ftp</h3><p>
+      <ul>
+        <li>Usando &iquest;qu&eacute; servidor FTP?
+        <li>Usando &iquest;qu&eacute; cuenta y con qu&eacute; contrase&ntilde;a?
+        <li>&iquest;No le importa enviar contrase&ntilde;as sin cifrar y ficheros a trav&eacute;s de internet que no es seguro?
+        <li>&iquest;Su proxy soporta ftp pasivo?
+        <li>En caso de usar ftp an&oacute;nimo:
+          <ul>
+            <li>&iquest;Permite subi 1 GB?
+            <li>&iquest;Permite borrar los ficheros subidos despu&eacute;s?
+            <li>&iquest;Qui&eacute;n m&aacute;s puede descargar su fichero?
+            <li>&iquest;Qui&eacute;n m&aacute;s puede borrar su fichero?
+            <li>Tiene que enviarle a su amigo la URL de descarga, &eacute;l tiene que 
+                informarle de que la descarga ha finalizado sin problemas y
+                tiene que borrar el fichero despu&eacute;s.<br>
+                En resumen: un grano en el culo.
+          </ul>
+      </ul>
+      <p>
+  <li><h3>http</h3><p>
+      <ul>
+        <li>No hay una administraci&oacute;n de ficheros subidos y usuarios - hay que programarla
+        <li>No hay autonotificaci&oacute;n
+        <li>No hay autoborrado
+        <li>Muy pocos servidores http pueden manejar ficheros de m&aacute;s de 2 GB
+      </ul>
+      <p>
+  <li><h3>sendfile</h3><p>
+      <ul>
+        <li>&iquest;Tiene UNIX y tiene sendfile instalado?
+        <li>&iquest;Su destinatario tiene UNIX y tiene sendfile instalado?
+        <li>&iquest;Ni usted ni su destinatario tiene un cortafuegos que bloquee el puerto 487?
+      </ul>
+      <p>
+  <li><h3>servicios comerciales como DropLoad, ALLPeers, YouSendIt, etc.</h3><p>
+      <ul>
+        <li>&iquest;Qu&eacute; limite tienen (la mayor&iacute;a: &lt; 2 GB)?
+        <li>&iquest;Qu&eacute; pasa con la seguridad y la privacidad: estar&aacute;n sus ficheros a salvo?
+        <li>&iquest;Est&aacute;n basados en software abierto o propietario?
+        <li>&iquest;Son accesible con cualquier navegador o necesita java, active-X, flash u otro plugins?
+        <li>&iquest;Sobrevir&aacute; m&aacute;s de unos cuantos meses?<br>
+           (DropLoad y ALLPeers ya han finalizado su actividad)
+      </ul>
+      <p>
+</ul>
+<p>
+Si ha contestado s&oacute;lo una vez "no" a las preguntas anteriores, entonces necesita
+F*EX.
+<p>
+<h2>Principales caracter&iacute;sticas de F*EX</h2>
+<p>
+<ul>
+  <li>transferencia de ficheros de tama&ntilde;o virtualmente ilimitado
+  <li>el destinatario y el remitente solo necesitan un programa de correo electr&oacute;nico y un navegador web -
+      de cualquier tipo, no necesitan instalar ning&uacute;n software
+  <li>RESEND y REGET para continuar las descargas interrumpidas por fallos en el enlace
+  <li>autonotificaci&oacute;n al destinatario
+  <li>autoborrado tras la descarga
+  <li>autoborrado tras la fecha de expiraci&oacute;n (por defecto: 5 d&iacute;as)
+  <li>los usuarios normales pueden crear subusuarios, que pueden enviar solo al usuario normal que lo defini&oacute;
+  <li>los usuarios normales puede crear grupos, una anolog&iacute;a de las listas de correo, pero para ficheros
+  <li>sin mantenimiento: no es necesaria la intervenci&oacute;n del administrador m&aacute;s all&aacute; de crear la cuentas en F*EX
+  <li>para enviar a m&uacute;ltiples destinatarios solo es necesario subir el fichero una vez
+  <li>F*EX es un servicio web HTTP y no necesita que se creen t&uacute;neles en los cortafuegos
+  <li>tambi&eacute;n soporta streams
+  <li>los usuarios UNIX reales, puede usar los programas para el shell fexsend y fexget para
+      evitar el uso del navegador web
+  <li>el protocolo y c&oacute;digo fuente est&aacute;n disponibles (Perl Artistic)
+</ul>
+
+<h2>Hablemos de SEX</h2>
+F*EX tiene un acompa&ntilde;ante: Stream EXchange (SEX).<p>
+Puede imaginar SEX como si fueran tuber&iacute;a de UNIX a trav&eacute;s de la red con un relay en medio.
+Esto puede ser &uacute;til para entubar datos del usuario A a otro B, donde A y B no pueden
+establecer una conexi&oacute;n directa, per ambos puede conectar por HTTP a servidor SEX.
+Las herramientas del shell sexsend y sexget permiten integrarlo f&aacute;cilmente entre
+el conjunto de herramientas de UNIX.
+<p>
+La autenticaci&oacute;n es igual que en F*EX.
+
+<h2>&iquest;Todav&iacute;a tiene m&aacute;s preguntas?</h2>
+Vea la <a href="/FAQ.html">FAQ</a>
+
+<p>
+<ADDRESS>contacto: <A HREF="mailto:$SERVER_ADMIN$">Administrador de F*EX</A></ADDRESS>
+
+</BODY>
+</HTML> 

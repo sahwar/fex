@@ -1,0 +1,536 @@
+#!/usr/bin/perl -w
+
+# client for stream exchange of the FEX service
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+# Copyright: Perl Artistic
+
+# sexsend / sexget / sexxx
+
+use Getopt::Std;
+use Socket;
+use IO::Handle;
+use IO::Socket::INET;
+use Digest::MD5 qw(md5_hex);  # encypted ID / SID 
+
+use constant k => 2**10;
+use constant M => 2**20;
+
+eval 'use Net::INET6Glue::INET_is_INET6';
+
+our $version = 20130805;
+
+$version = mtime($0) unless $version;
+
+$0 =~ s:.*/::;
+$| = 1;
+
+# sexsend is default
+$usage = 
+  "usage: ... | $0 [options] [SEX-URL/]recipient [stream]\n".
+  "options: -v           verbose mode\n".
+  "         -V           show version\n".
+  "         -t timeout   timeout in s (waiting for recipient)\n".
+  "special: recipient may be \"public\" or \"anonymous\"\n".
+  "see also: sexget, sexxx\n".
+  "example: tail -f /var/log/syslog | $0 fex.flupp.org/admin log\n";
+
+if ($0 eq 'sexget' or $0 eq 'fuckme') {
+  $usage = 
+    "usage: $0 [options] [[SEX-URL/]user:ID] [stream]\n".
+    "options: -g           show transfer rate\n".
+    "         -v           verbose mode\n".
+    "         -V           show version\n".
+    "arguments: user:ID    use this user & ID\n".
+    "                      (ID may be \"public\" or user:ID may be \"anonymous\")\n".
+    "           stream     name of the stream\n".
+    "see also: sexsend, sexxx\n".
+    "example: $0 log | grep kernel\n";
+}
+
+if ($0 eq 'sexxx') {
+  $usage = 
+    "usage: $0 [-v] [-g] [-c] [-u [SEX-URL/]user] [-s stream] [files...]\n".
+    "usage: $0 [-v] [-g]      [-u [SEX-URL/]user] [-s stream] | ...\n".
+    "options: -g               show transfer rate\n".
+    "         -v               verbose mode\n".
+    "         -q               quiet mode\n".
+    "         -c               compress files\n".
+    "         -u SEX-URL/user  SEX-URL and user (default: use FEXID/FEXXX)\n".
+    "         -s stream        stream name (default: xx)\n".
+    "see also: sexsend, sexget\n".
+    "examples: $0 -s config /etc /usr/local/etc\n".
+    "          $0 > backup.tar\n";
+}
+
+$fexhome = $ENV{FEXHOME} || $ENV{HOME}.'/.fex';
+$user = $id = '';
+$type = $timeout = $stream = $mode = '';
+$idf = "$fexhome/id";
+$bs = 2**16; # I/O blocksize
+
+# server URL, user and auth-ID
+if ($FEXID = $ENV{FEXID}) {
+  $FEXID = decode_b64($FEXID) if $FEXID !~ /\s/;
+  ($fexcgi,$user,$id) = split(/\s+/,$FEXID);
+} else {
+  if (open $idf,$idf) {
+    chomp($fexcgi = <$idf>) or die "$0: no FEX-URL in $idf\n";
+    chomp($user = <$idf>)   or die "$0: no FROM in $idf\n";
+    chomp($id = <$idf>)     or die "$0: no ID in $idf\n";
+    close $idf;
+    despace($fexcgi,$user,$id);
+    unless ($fexcgi =~ /^[_:=\w\-\.\/\@\%]+$/) {
+      die "$0: illegal FEX-URL \"$fexcgi\" in $idf\n";
+    }
+    unless ($user =~ /^[_:=\w\-\.\/\@\%\+]+$/) {
+      die "$0: illegal FROM \"$user\" in $idf\n";
+    }
+  }
+}
+
+$opt_h = $opt_v = $opt_V = $opt_q = 0;
+$opt_u = $opt_s = $opt_c = $opt_t = '';
+
+if ($0 eq 'sexxx') {
+  
+  # xx server URL, user and auth-ID
+  if ($FEXXX = $ENV{FEXXX}) {
+    $FEXXX = decode_b64($FEXXX) if $FEXXX !~ /\s/;
+    ($fexcgi,$user,$id) = split(/\s+/,$FEXXX);
+  } elsif (open $idf,$idf) {
+    while (<$idf>) {
+      if (/^\[xx\]/) {
+        chomp($fexcgi = <$idf>) or die "$0: no xx FEX-URL in $idf\n";
+        chomp($user = <$idf>)   or die "$0: no xx FROM in $idf\n";
+        chomp($id = <$idf>)     or die "$0: no xx ID in $idf\n";
+        last;
+      }
+    }
+    close $idf;
+  }
+  
+  getopts('hvcu:s:') or die $usage;
+  die $usage if $opt_h;
+  die $usage unless -t;
+
+  if ($opt_c) {
+    $opt_c = 'z';
+    $type = '&type=GZIP';
+  }
+
+  if ($opt_u) {
+    $fexcgi = $1 if $opt_u =~ s:(.+)/::;
+    $user = $opt_u;
+  }
+
+  unless ($fexcgi) {
+    die "$0: no xx user found, use \"$0 -u SEX-URL/user\"\n";
+  }
+
+  unless ($user) {
+    die "$0: no xx user found, use \"$0 -u user\"\n";
+  }
+  
+} elsif ($0 eq 'sexget' or $0 eq 'fuckme') {
+  getopts('hgvVdu:') or die $usage;
+  die $usage if $opt_h;
+
+
+  if ($opt_V) {
+    print "Version: $version\n";
+    exit unless @ARGV;
+  }
+  
+  if (not $opt_u and @ARGV and $ARGV[0] =~ m{^anonymous|/|:}) {
+    $opt_u = shift @ARGV;
+  }
+  
+  if ($opt_u) {
+    $fexcgi = $1 if $opt_u =~ s:(.+)/::;
+    ($user,$id) = split(':',$opt_u);
+    if ($user =~ /^anonymous/) {
+      $anonymous = $user;
+    } elsif (not $id) {
+      die $usage;
+    }
+  }
+
+  unless ($fexcgi) {
+    die "$0: no SEX URL found, use \"$0 -u SEX-URL/recipient\" or \"fexsend -I\"\n";
+  }
+  
+  unless ($user) {
+    die "$0: no recipient found, use \"$0 -u SEX-URL/recipient\" or \"fexsend -I\"\n";
+  }
+  
+} else { # sexsend
+  
+  $opt_g = 1;
+  getopts('hguvqVt:') or die $usage;
+  die $usage if $opt_h;
+
+  if ($opt_V) {
+    print "Version: $version\n";
+    exit unless @ARGV;
+  }
+  
+  if ($opt_t and $opt_t =~ /^\d+$/) {
+    $timeout = "&timeout=$opt_t";
+  }
+
+  my $save_user = $user;
+  $user = shift or die $usage;
+  $fexcgi = $1 if $user =~ s:(.+)/::;
+  
+  if ($user =~ /^anonymous/) {
+    die "$0: need SEX-URL with anonymous SEX\n" unless $fexcgi;
+    $mode = 'anonymous';
+  } elsif ($user eq 'public') {
+    unless ($id) {
+      die "$0: public SEX not possible without FEXID, set it with \"fexsend -I\"\n";
+    }
+    $mode = $user;
+    $user = $save_user;
+  } else {
+    unless ($fexcgi) {
+      die "$0: no SEX URL found, use \"$0 SEX-URL/recipient\" or \"fexsend -I\"\n";
+    }
+  }
+  
+}
+
+$fexcgi =~ s(^http://)()i;
+$fexcgi =~ s(/fup.*)();
+$server = $fexcgi;
+
+if    ($server =~ s(^https://)()i) { $port = 443 } 
+elsif ($server =~ /:(\d+)/)        { $port = $1 } 
+else                               { $port = 80 }    
+
+$server =~ s([:/].*)();
+
+## set up tcp/ip connection
+# $iaddr = gethostbyname($server) 
+#          or die "$0: cannot find ip-address for $server $!\n";
+# socket(SH,PF_INET,SOCK_STREAM,getprotobyname('tcp')) or die "$0: socket $!\n";
+# connect(SH,sockaddr_in($port,$iaddr)) or die "$0: connect $!\n";
+# warn "connecting $server:$port user=$user\n";
+if ($port == 443) {
+  eval "use IO::Socket::SSL";
+  die "$0: cannot load IO::Socket::SSL\n" if $@;
+  $SH = IO::Socket::SSL->new(                                                  
+    PeerAddr => $server,                                                       
+    PeerPort => $port,                                                         
+    Proto    => 'tcp',                                                         
+  );                                                                           
+} else {                                                                       
+  $SH = IO::Socket::INET->new(
+    PeerAddr => $server,
+    PeerPort => $port,
+    Proto    => 'tcp',                                                         
+  );                                                                           
+}
+
+die "cannot connect $server:$port - $!\n" unless $SH;                          
+warn "TCPCONNECT to $server:$port\n" if $opt_v;
+
+# autoflush $SH 1;
+autoflush STDERR;
+
+$SIG{PIPE} = \&sigpipehandler;
+
+if ($0 eq 'sexget' or $0 eq 'fuckme') {
+  $stream = "&stream=" . shift if @ARGV;
+  if ($anonymous) {
+    $cid = 'anonymous';
+  } elsif ($id eq 'public') {
+    $cid = 'public';
+  } else {
+    $cid = query_sid($server,$port,$id);
+  }
+  request("GET /sex?user=$user&ID=$cid$stream HTTP/1.0");
+  transfer($SH,STDOUT);
+  # print while sysread $SH,$_,$bs;
+  exit;
+}
+
+if ($0 eq 'sexxx') {
+  $stream = "&stream=" . ($opt_s || 'xx');
+  if (@ARGV) {
+    warn "streaming:\n";
+    open my $tar,'-|','tar',"cv${opt_c}f",'-',@ARGV or die "$0: cannot run tar - $!\n";
+    request("POST /sex?user=$user$type$stream HTTP/1.0");
+    transfer($tar,$SH);
+    # while (read $tar,$_,$bs) { syswrite $SH,$_ }
+  } else {
+    $cid = query_sid($server,$port,$id);
+    request("GET /sex?user=$user&ID=$cid$stream HTTP/1.0");
+    $opt_c = 'z' if $H{'CONTENT-TYPE'} =~ /gzip/i;
+    if (-t STDOUT) {
+      print "extracting from stream:\n";
+      open $out,"|tar xv${opt_c}f -" or die "$0: cannot run tar - $!\n";
+    } else {
+      if ($opt_c) {
+        open $out,"|gzip -d" or die "$0: cannot run gunzip - $!\n";
+      } else {
+        $out = *STDOUT;
+      }
+    }
+    print {$out} $_ while sysread $SH,$_,$bs;
+  }
+  exit;
+}
+
+# sexsend
+$stream = "&stream=" . shift if @ARGV;
+
+if ($mode eq 'anonymous') {
+  unless ($opt_q) {
+    print "http://$server:$port/sex?user=$user&ID=anonymous$stream\n";
+    printf "http://$server:$port/sex?%s\n",
+           encode_b64("user=$user&ID=anonymous$stream");
+  }
+  $mode = "&mode=anonymous";
+} elsif ($mode eq 'public') {
+  die "$0: need user/ID when sending to public, set it with fexsend -I\n" unless $user and $id;
+  unless ($opt_q) {
+    print "http://$server:$port/sex?user=$user&ID=public$stream\n";
+    printf "http://$server:$port/sex?%s\n",
+           encode_b64("user=$user&ID=public$stream");
+  }
+  $cid = query_sid($server,$port,$id);
+  $mode = "&ID=$cid&mode=public";
+} else {
+  # $user = checkalias($user) unless $opt_d;
+}
+
+request("POST /sex?user=$user$mode$type$timeout$stream HTTP/1.0");
+print STDERR "==> (streaming ...)\n" if $opt_v;
+
+transfer(STDIN,$SH);
+  
+exit;
+
+
+sub transfer {
+  my $source = shift;
+  my $destination = shift;
+  my ($t0,$t1,$tt);
+  my ($B,$b,$bt);
+  
+  $t0 = $t2 = time;
+  $tt = $t0-1;
+  $t1 = 0;
+
+  while ($b = sysread $source,$_,$bs) {
+    syswrite $destination,$_ or die $!;
+    $B += $b;
+    if ($opt_g) {
+      $bt += $b;
+      $t2 = time;
+      if ($t2>$t1) {
+        if ($B>2*M) {
+          printf STDERR "%d MB %d kB/s        \r",
+                        int($B/M),int($bt/k/($t2-$tt));
+        } else {
+          printf STDERR "%d kB %d kB/s        \r",
+                        int($B/k),int($bt/k/($t2-$tt));
+        }
+        $t1 = $t2;
+        if ($t2-$tt>10) {
+          $bt = 0;
+          $tt = $t2;
+        }
+      }
+    }
+  }
+
+  die "$0: no stream data\n" unless $B;
+  
+  $tt = (time-$t0)||1;
+  
+  if ($opt_v or $opt_g) {
+    if ($B>2097152) {
+      printf STDERR "transfered: %d MB in %d s with %d kB/s\n",
+        int($B/1048576),$tt,int($B/1024/$tt);
+    } elsif($B>2048) {
+      printf STDERR "transfered: %d kB in %d s with %d kB/s\n",
+        int($B/1024),$tt,int($B/1024/$tt);
+    } else {
+      printf STDERR "transfered: %d B in %d s with %d kB/s\n",
+        $B,$tt,int($B/1024/$tt);
+    }
+  }
+  
+}
+
+
+sub request {
+  my $req = shift;
+  
+  print STDERR "==> $req\n" if $opt_v;
+  syswrite $SH,"$req\r\n\r\n";
+  for (;;) {
+    unless (defined($_ = &getline)) {
+      die "$0: server has closed the connection\n";
+    }
+    if (/^HTTP\/[\d\.]+ 200/) {
+      print STDERR "<== $_" if $opt_v;
+      last;
+    } elsif (/^HTTP\/[\d\.]+ 199/) {
+      print STDERR "<== $_" if $opt_v;
+    } else {
+      if ($opt_v) {
+        print STDERR "<== $_";
+        exit 3;
+      } else {
+        s:^HTTP/[ \d\.]+::;
+        s/\r//;
+        die "$0: server response: $_";
+      }
+    }
+  }
+  while (defined($_ = &getline)) {
+    last if /^\s*$/;
+    $H{uc($1)} = $2 if /(.+):\s*(.+)/;
+    print STDERR "<== $_" if $opt_v;
+  }
+}
+
+# check for (mutt) alias
+sub checkalias {
+  my $to = shift;
+  if ($to !~ /@/ and open F,$ENV{HOME}.'/.mutt/aliases') {
+    while (<F>) {
+      next if /,/;
+      if (/^alias $to\s/i) {
+        chomp;
+        s/\s*#.*//;
+        s/\s+$//;
+        s/.*\s+//;
+        s/<//;
+        s/>//;
+        $to = $_;
+        warn "$0: found alias, using address $to\n";
+        die unless $to;
+        last;
+      }
+    }
+    close F;
+  }
+  return $to;
+}
+
+sub despace {
+  foreach (@_) {
+    s/^\s+//;
+    s/\s+$//;
+  }
+}
+
+sub query_sid {
+  my ($server,$port,$id) = @_;
+  my $req;
+  local $_;
+  
+  $req = "GET SID HTTP/1.1";
+  print STDERR "==> $req\n" if $opt_v;
+  syswrite $SH,"$req\r\n\r\n";
+  $_ = &getline;
+  unless (defined $_ and /\w/) { 
+    print STDERR "\n" if $opt_v;
+    die "$0: no response from server\n";
+  }
+  s/\r//;
+  if (/^HTTP.* 201 (.+)/) {
+    print STDERR "<== $_" if $opt_v;
+    $id = 'MD5H:'.md5_hex($id.$1);
+    while (defined($_ = &getline)) { 
+      s/\r//;
+      last if /^\n/;
+      print STDERR "<== $_" if $opt_v;
+    }
+  } else {
+    die "$0: $server does not support session ID\n";
+  }
+  return $id;
+}
+
+sub sigpipehandler { 
+  local $_ = '';
+  $SIG{ALRM} = sub { };
+  alarm(1);
+  $_ = &getline||'';
+  if (/^HTTP.* \d+ (.*)/) {
+    if ($opt_v) {
+      die "\n$0: server error: @_\n";
+    } else {
+      die "\n$0: server error: $1\n";
+    }
+  } else {
+    die "\n$0: got SIGPIPE (server closed connection)\n";
+  }
+}
+
+# read one text line from $SH;
+sub getline {
+  my $line = '';
+  my $c;
+
+  local $SIG{ALRM} = sub { die "$0: timeout while waiting for server reply\n" };
+  alarm($opt_t||300);
+  
+  # must use sysread to avoid perl line buffering
+  while (sysread $SH,$c,1) {
+    $line .= $c;
+    last if $c eq "\n";
+  }
+  
+  alarm(0);
+  
+  return $line;
+}
+
+sub mtime {
+  my @d = localtime((stat shift)[9]);
+  return sprintf('%d%02d%02d',$d[5]+1900,$d[4]+1,$d[3]);
+}
+
+# from MIME::Base64::Perl
+sub decode_b64 {
+  local $_ = shift;
+  my $uu = '';
+  my ($i,$l);
+  
+  tr|A-Za-z0-9+=/||cd;
+  s/=+$//;
+  tr|A-Za-z0-9+/| -_|;
+  return "" unless length;
+
+  $l = (length) - 60;
+  for ($i = 0; $i <= $l; $i += 60) {
+    $uu .= "M" . substr($_,$i,60);
+  }
+  $_ = substr($_,$i);
+  if (length) {
+    $uu .= chr(32 + (length)*3/4) . $_;
+  }
+  return unpack ("u",$uu);
+}
+
+
+sub encode_b64 {
+  my $res = "";
+  my $eol = $_[1];
+  my $padding;
+  
+  $eol = "\n" unless defined $eol;
+  pos($_[0]) = 0;
+  $res = join '',map(pack('u',$_)=~ /^.(\S*)/, ($_[0]=~/(.{1,45})/gs));
+  $res =~ tr|` -_|AA-Za-z0-9+/|;
+  $padding = (3-length($_[0])%3)%3;
+  $res =~ s/.{$padding}$/'=' x $padding/e if $padding;
+  return $res;
+}

@@ -1,0 +1,46 @@
+#!/bin/sh
+
+ZZ=${ZZ:-$HOME/.zz}
+
+if [ "X$*" = X-h -o "X$*" = X--help ]; then
+  exec cat<<EOD
+zz is the generic clip board program. See also the edit helper program ezz.
+The clip board is \$ZZ (default: \$HOME/.zz). Options and modes are:
+
+"zz"            write \$ZZ to STDOUT
+"zz file(s)"    copy file(s) into \$ZZ
+"zz -"          write STDIN (keyboard, mouse buffer) to \$ZZ
+"... | zz"      write STDIN from pipe to \$ZZ
+"... | zz +"    add STDIN from pipe to \$ZZ
+"zz | ..."      write \$ZZ to pipe
+
+Examples:
+
+  zz *.txt
+  ls -l | zz
+  zz | wc -l
+  (within mutt:) |zz
+  (within tin:)  |azz
+  (within vi:)   :w !zz
+  (within vi:)   :r !zz
+  
+Limitation: zz does not work across different accounts or hosts! Use xx instead.
+EOD
+fi
+
+if [ x"$1"x = x+x ]; then 
+  shift
+  exec cat -- "$@" >>$ZZ
+fi
+
+if [ -t 0 ]; then
+    if [ x"$1"x = xx ]; then 
+        exec cat -- $ZZ
+    else 
+        test -f $ZZ && mv $ZZ $ZZ~
+        exec cat -- "$@" >$ZZ
+    fi
+else
+    test -f $ZZ && mv $ZZ $ZZ~
+    exec cat >$ZZ
+fi	

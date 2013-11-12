@@ -1,0 +1,19 @@
+<h2>Misc questions</h2>
+
+Q: F*EX is great! Can I join the developing team? What needs to be done?
+A: Contact the author <framstag@rus.uni-stuttgart.de>
+
+   Requested features are:
+   <ul>
+     <li>testers for MacOS, AIX and other UNIXes
+     <li>a new maintainer for the Java client F*IX
+     <li>an Android or iOS client
+     <li>a F*EX plugin for thunderbird or outlook
+         see thunderbird's filelink
+         https://support.mozillamessaging.com/en-US/kb/filelink-large-attachments
+         https://developer.mozilla.org/en/Thunderbird/Filelink_Providers
+     <li>more (other) languange support (japanese, bavarian, klingon ...) 
+   </ul>
+
+Q: Can I donate something for F*EX?
+A: If you have a pet animal, fex a cute video of it to the author <framstag@rus.uni-stuttgart.de>

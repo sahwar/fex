@@ -1,0 +1,89 @@
+Prerequisites:
+==============
+
+To install the F*EX server, you need a UNIX system with perl, xinetd and
+/usr/lib/sendmail (either original or a clone like postfix or exim). 
+Your perl must have the following standard core modules:
+
+CGI
+CGI::Carp
+Digest::MD5
+Encode
+Fcntl
+File::Basename
+Getopt::Std
+IO::Handle
+POSIX
+
+Optional are the non-standard perl modules:
+
+Net::DNS  		(for better domain error handling)
+Socket6   		(for ipv6 support)
+Net::INET6Glue		(for ipv6 support)
+IO::Socket::INET6	(for ipv6 support)
+
+On Debian or Ubuntu Linux simply execute as root:
+
+  apt-get install xinetd perl-modules libnet-dns-perl libnet-inet6glue-perl
+  test -x /usr/lib/sendmail || apt-get install postfix
+
+Do not forget to open port 80 on your firewalls and routers for incoming
+connections!
+
+To install F*EX, simply run "./install", then edit lib/fex.ph and set your
+local config.  If you want to upgrade from a previous F*EX version, you
+also can run "./install", no old config files will be overwritten. Also
+index.html is kept.
+   
+Alternativly use "./install -p 8888" to install F*EX on port 8888 instead
+on default port 80. 
+
+Run "./install" again for installing optional localizations (languages).
+
+If the install-script does not work for you (no xinetd, no GNU tools, etc)
+here is what is to be done manually for installing:
+
+echo "fex 80/tcp" >> /etc/services
+echo "fex stream tcp nowait fex /home/fex/bin/fexsrv fexsrv" >> /etc/inetd.conf
+# now restart inetd
+useradd -s /bin/bash -c "File EXchange" -m fex
+pwd # --> FEXSOURCEDIR
+su - fex
+cd FEXSOURCEDIR
+cp -av bin cgi-bin lib etc htdocs doc $HOME
+cd $HOME
+mkdir spool
+chmod 700 spool
+vi lib/fex.ph
+# set your config
+crontab -e
+	3 3 * * * exec /home/fex/bin/fex_cleanup
+
+Hints:
+======
+
+F*EX runs with its own uid (default: fex), which will be created by the
+install script.
+
+F*EX uses a directory (FEXHOME) containing anything needed to run fex.
+Default is FEXHOME=/home/fex, the home directory of the "fex" user.
+
+If you want fex to be installed elsewhere create a new "fex" user account
+BEFORE running ./install, e.g.:
+
+adduser --system --group \
+  --gecos "File EXchange" \
+  --home /srv/fex \
+  --shell /bin/bash \
+  fex
+./install
+
+If you run F*EX behind a HTTP reverse proxy, then write to lib/fex.ph :
+	$reverse_proxy_ip = 'internal-IP.address.of.proxy';
+	$durl = 'http://your.proxy.with.domain/fop';
+Be aware that most proxies have a 2 GB file size limit (signed int 32 bit bug)!
+Of course you have to configure your reverse proxy correctly, especially
+the URL rewrite rules. See the manual of your reverse proxy.
+
+
+On problems contact the author: framstag@rus.uni-stuttgart.de

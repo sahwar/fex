@@ -1,0 +1,668 @@
+#!/usr/bin/perl -w
+
+# CLI admin client for the FEX service
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use 5.006;
+use Getopt::Std;
+use File::Basename;
+use Digest::MD5		qw(md5_hex);
+
+use constant M => 1024*1024;
+
+# do not run as CGI!
+exit if $ENV{SCRIPT_NAME};
+
+# search for fex lib
+foreach my $lib (
+  $ENV{FEXLIB}||'',
+  dirname(dirname($0)),
+  '/usr/local/fex',
+  '/usr/local/share/fex',
+  '/usr/share/fex',
+) {
+  $ENV{FEXLIB} = $FEXLIB = $lib       and last if -f "$lib/fex.pp";
+  $ENV{FEXLIB} = $FEXLIB = "$lib/lib" and last if -f "$lib/lib/fex.pp";
+}
+die "$0: no FEXLIB\n" unless $FEXLIB;
+
+$0 =~ s:.*/::;
+
+# become effective user fex
+unless ($<) {
+  if (my @pw = getpwnam('fex')) {
+    $) = $pw[3];
+    $> = $pw[2];
+    $ENV{HOME} = $pw[7];
+  } else {
+    die "$0: no such user 'fex'\n";
+  }
+}
+
+# import from fex.pp
+our ($FEXHOME,$hostname,$spooldir,$logdir,$akeydir,$docdir);
+our ($durl,$mdomain,$admin);
+our ($autodelete,$keep_default,$recipient_quota,$sender_quota);
+our (@local_rdomains);
+local $notification = 'full';
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+die "$0: \$admin not configured in $FEXLIB/fex.ph\n" if $admin =~ /example.org/;
+
+$EDITOR = $ENV{VISUAL} || $ENV{EDITOR} || 
+          (-x '/usr/bin/editor' ? '/usr/bin/editor' : 'vi');
+
+$opt_c = $opt_v = $opt_l = $opt_h = $opt_w = $opt_u = $opt_R = 0;
+$opt_r = $opt_d = $opt_q = $opt_a = $opt_n = $opt_k = $opt_m = '';
+$opt_y = $opt_S = $opt_C = $opt_D = $opt_A = $opt_V = '';
+
+@__ = @ARGV;
+while (my $a = shift @__) {
+  if ($a eq '-V') {
+    shift @__;
+  } else {
+    push @_ARGV,$a;
+  }
+}
+
+getopts('hcvlwuRq:r:d:a:n:k:m:y:S:C:A:V:D:') or usage(2);
+usage(0) if $opt_h;
+
+if ($opt_V) {
+  while (my ($hh,$vh) = each (%vhost)) {
+    if ($opt_V eq basename($vh) or $opt_V eq $hh) {
+      $ENV{HTTP_HOST} = $hh;
+      $ENV{VHOST} = "$hh:$vh";
+      $ENV{FEXLIB} = "$vh/lib";
+      die "$0: no $ENV{FEXLIB}/fex.ph\n" unless -f "$ENV{FEXLIB}/fex.ph";
+      exec $0,@_ARGV;
+      die "$0: cannot re-exec\n";
+    }
+  }
+  die "$0: no virtual host $opt_V defined\n";
+}
+chdir $spooldir or die "$0: no $spooldir\n";
+
+@stat = stat $spooldir or die "$0: cannot access $spooldir - $!\n";
+warn "$0: $spooldir with owner=root !?\n" unless $stat[4];
+$) = $stat[5];
+$> = $stat[4];
+
+$fup = $durl;
+$fup =~ s:/[^/]+$:/fup:;
+
+# maintenance mode
+if ($opt_m) {
+  if ($opt_m eq 'exit') {
+    if (unlink '@MAINTENANCE') {
+      warn "$0: leaving maintenance mode\n";
+    } else {
+      warn "$0: no maintenance mode\n";
+    }
+  } else {
+    unlink '@MAINTENANCE';
+    symlink $opt_m,'@MAINTENANCE'
+      or die "$0: cannot write $spooldir/\@MAINTENANCE - $!";
+    warn "$0: entering maintenance mode\n";
+  }
+  exit;
+}
+
+# list files and download URLs
+if ($opt_w) {
+  $log = "$logdir/fexsrv.log";
+  warn "$0: polling $log\n\n";
+  exec "$FEXHOME/bin/logwatch",$log;
+  die "$0: logwatch not found\n";
+}
+
+# list files and download URLs
+if ($opt_l) {
+  my ($file,$dkey);
+  chdir $spooldir or die "$0: $spooldir - $!\n";
+  foreach $file (glob "*/*/*") {
+    if (-s "$file/data" and 
+        $dkey = readlink("$file/dkey") and 
+        -l ".dkeys/$dkey") {
+      printf "%s --> %s :\n$durl/$dkey/%s\n",split "/",$file;
+    }
+  }
+  exit;
+}
+
+# delete user 
+if ($opt_d) {
+  $idf = "$spooldir/$opt_d/\@";
+  die "$0: no such user $opt_d\n" unless -f $idf;
+  unlink $idf or die "$0: cannot remove $idf - $!\n";
+  unlink "$spooldir/$opt_d/\@ALLOWED_RECIPIENTS";
+  print "$opt_d deleted\n";
+  exit;
+}
+
+# set user restriction file
+if ($opt_R) {
+  $user = shift or usage(2);
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  die "$0: no user $user\n" unless -d "$spooldir/$user";
+  unless (@local_rdomains) {
+    die "$0: no \@local_rdomains in server config\n";
+  }
+  my $rf = "$spooldir/$user/\@ALLOWED_RECIPIENTS";
+  open $rf,'>',$rf or die "$0: cannot open $rf - $!";
+  print {$rf} "\@LOCAL_RDOMAINS\n";
+  close $rf;
+  print "$user restricted\n";
+  exit;
+}
+
+# edit user restriction file
+if ($opt_r) {
+  if    ($opt_r =~ /^r/i) { $opt_r = 'ALLOWED_RECIPIENTS' }
+  elsif ($opt_r =~ /^u/i) { $opt_r = 'UPLOAD_HOSTS' }
+  elsif ($opt_r =~ /^d/i) { $opt_r = 'DOWNLOAD_HOSTS' }
+  else                    { usage(2) }
+  $user = shift or usage(2);
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  die "$0: no user $user\n" unless -d "$spooldir/$user";
+  my $rf = "$spooldir/$user/\@$opt_r";
+  unless (-s $rf) {
+    open $rf,'>',$rf or die "$0: cannot open $rf - $!";
+    if ($opt_r eq 'ALLOWED_RECIPIENTS') {
+      print {$rf}<<EOD;
+# Restrict allowed recipients. Only listed addresses are allowed as recipients.
+# Make this file COMPLETLY empty if you want to disable the restriction.
+# An allowed recipient is an e-mail address. You can use * as wildcard.
+# Examples:
+#    framstag\@rus.uni-stuttgart.de
+#    *\@flupp.org
+EOD
+    } elsif ($opt_r eq 'UPLOAD_HOSTS') {
+      print {$rf}<<EOD;
+# Restrict allowed upload hosts. 
+# Only listed addresses are allowed as upload hosts.
+# Make this file COMPLETLY empty if you want to disable the restriction.
+# You can add single ip adresses or ip ranges.
+# Examples:
+#    129.69.1.11
+#    10.0.10.0-10.0.10.255
+EOD
+    } elsif ($opt_r eq 'DOWNLOAD_HOSTS') {
+      print {$rf}<<EOD;
+# Restrict allowed download hosts. 
+# Only listed addresses are allowed as download hosts.
+# Make this file COMPLETLY empty if you want to disable the restriction.
+# You can add single ip adresses or ip ranges.
+# Examples:
+#    129.69.1.11
+#    10.0.10.0-10.0.10.255
+EOD
+    } else {
+      die "$0: unknown option -r $opt_r\n";
+    }
+    close $rf;
+  }
+  system $EDITOR,$rf;
+  unlink $rf if -s $rf<5;
+  exit;
+}
+
+# edit configuration
+if ($opt_c) {
+  exec $EDITOR,"$FEXLIB/fex.ph";
+}
+
+# add virtual server
+if ($opt_A) {
+  if ($opt_A =~ /(.+):(.+)/) { 
+    $vhost = $1;
+    $hhost = $2;
+  } else { 
+    die usage(2);
+  }
+  $vhd = "$FEXHOME/$vhost";
+  die "$0: $vhd does already exist\n" if -e $vhd;
+  mkdir $vhd or die "$0: cannot mkdir $vhd - $!\n";
+  # symlink "../cgi-bin","$vhd/cgi-bin";
+  mkdir "$vhd/lib";
+  mkdir "$vhd/spool";
+  mkdir "$vhd/htdocs";
+  mkdir "$vhd/htdocs/locale";
+  $_ = slurp("$FEXLIB/fex.ph");
+  s/^/\$hostname = '$hhost';\n/;
+  $fph = "$vhd/lib/fex.ph";
+  open $fph,">$fph" or die "$0: cannot write to $fph - $!\n";
+  print {$fph} $_;
+  close $fph;
+  system "cp $FEXLIB/fup.pl $vhd/lib/fup.pl";
+  foreach $i (qw'dop fex.pp fup.pl lf.pl reactivation.txt') {
+    # symlink "$FEXLIB/$i","$vhd/lib/$i";
+    symlink "../../lib/$i","$vhd/lib/$i";
+  }
+  foreach $i (qw(
+    index.html tools.html SEX.html robots.txt 
+    logo.jpg small_logo.jpg action-fex-camel.gif favicon.ico
+    FAQ
+  )) {
+    cpa("$FEXHOME/htdocs/$i","$vhd/htdocs");
+  }
+  symlink "$FEXHOME/htdocs/version","../../htdocs/version";
+  symlink "$FEXHOME/htdocs/download","../../htdocs/download";
+  cpa("$FEXHOME/locale",$vhd);
+  foreach $ld (glob "$vhd/locale/*") {
+    if (not -l $ld and -d "$ld/cgi-bin") {
+      $locale = basename($ld);
+      rmrf("$ld/cgi-bin");
+      # symlink "../../../locale/$locale/cgi-bin","$ld/cgi-bin";
+      symlink "../../../locale/$locale/htdocs","$vhd/htdocs/locale/$locale";
+      unlink "$ld/lib/fex.ph";
+      symlink "../../../lib/fex.ph","$ld/lib/fex.ph";
+      symlink "../../../../locale/$locale/lib","$ld/lib/master";
+      foreach $f (qw'dop fex.pp lf.pl reactivation.txt') {
+        unlink "$ld/lib/$f";
+        symlink "master/$f","$ld/lib/$f";
+      }
+    }
+  }
+  $fph = "$FEXLIB/fex.ph";
+  open $fph,">>$fph" or die "$0: cannot write to $fph = $!\n";
+  print {$fph} "\n\$vhost{'$hhost'} = '$vhd';\n";
+  close $fph;
+  print "You must now edit and configure $vhd\n";
+  print "or execute: $0 -V $vhost -c\n";
+  exit;
+}
+
+# show config
+if ($opt_v) {
+  print "config from $FEXLIB/fex.ph :\n";
+  print "\tspooldir        = $spooldir\n";
+  print "\tlogdir          = $logdir\n";
+  print "\tdocdir          = $docdir\n";
+  print "\tdurl            = $durl\n";
+  print "\tmdomain         = $mdomain\n";
+  print "\tautodelete      = $autodelete\n";
+  print "\tkeep            = $keep_default\n";
+  print "\trecipient_quota = $recipient_quota\n";
+  print "\tsender_quota    = $sender_quota\n";
+  print "\tadmin           = $admin\n";
+  while (($hh,$vh) = each %vhost) {
+    printf "\tvirtual server %s : %s\n",basename($vh),$hh;
+  }
+#  unless (@ARGV) {
+#    foreach $ph (glob "$ENV{HOME}/*/lib/fex.ph") {
+#      $ENV{FEXLIB} = dirname($ph);
+#      print "\n";
+#      system $0,'-v',$ph;
+#    }
+#  }
+  if ($m = readlink '@MAINTENANCE') {
+    print "server is in maintenance mode ($m)!\n" ;
+  }
+  exit;
+}
+
+# add user or show user config
+if ($opt_u) {
+  if ($opt_u = shift @ARGV) {
+    $user = lc $opt_u;
+    $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+    $id = shift @ARGV;
+    $idf = "$spooldir/$user/@";
+    if (open $idf,$idf) {
+      chomp($ido = <$idf>||'');
+      close $idf;
+    }
+    unless ($id) {
+      die "$0: $user is not a FEX user\n" unless -f "$spooldir/$user/@";
+      showuser($user,$ido);
+      exit;
+    }
+    unless ($user =~ /\w@[\w\.\-]+\.[a-z]+$/) {
+      die "$0: $user is not a valid e-mail-address!\n";
+    }
+    unless (-d "$spooldir/$user") {
+      mkdir "$spooldir/$user",0755 
+        or die "$0: cannot mkdir $spooldir/$user - $!\n";
+    }
+    open F,">$idf" or die "$0: cannot write $idf - $!\n";
+    print F $id,"\n";
+    close F or die "$0: cannot write $idf - $!\n";
+    showuser($user,$id);
+  } else {
+    print "Users in $spooldir:\n";
+    foreach $user (glob "$spooldir/*/@") {
+      $user =~ s:.*/(.+)/@:$1:;
+      print "$user\n";
+    }
+  }
+  exit;
+}
+
+# set user autodelete default
+if ($opt_a) {
+  $user = lc $opt_a;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $_ = shift @ARGV || '';
+  if    (/^n/i) { $autodelete = 'no' } 
+  elsif (/^y/i) { $autodelete = 'yes' } 
+  elsif (/^d/i) { $autodelete = 'delay' } 
+  else          { usage(2) }
+  mkdir "$spooldir/$user",0755;
+  my $adf = "$spooldir/$user/\@AUTODELETE";
+  unlink $adf;
+  symlink $autodelete,$adf or die "$0: cannot create symlink $adf - $!\n";
+  exit;
+}
+
+# set user notification default
+if ($opt_n) {
+  $user = lc $opt_n;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $_ = shift @ARGV || '';
+  if    (/^n/i) { $notification = 'no' } 
+  elsif (/^s/i) { $notification = 'short' } 
+  elsif (/^f/i) { $notification = '' } 
+  else          { usage(2) }
+  mkdir "$spooldir/$user",0755;
+  my $ndf = "$spooldir/$user/\@NOTIFICATION";
+  unlink $ndf;
+  if ($notification) {
+    symlink $notification,$ndf or die "$0: cannot create symlink $ndf - $!\n";
+  }
+  exit;
+}
+
+# set user keep default
+if ($opt_k) {
+  $user = lc $opt_k;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  my $keep = shift @ARGV || '';
+  die usage(2) if $keep !~ /^\d+$/;
+  mkdir "$spooldir/$user",0755;
+  my $kf = "$spooldir/$user/\@KEEP";
+  unlink $kf;
+  symlink $keep,$kf or die "$0: cannot create symlink $kf - $!\n";
+  exit;
+}
+
+# quota
+if ($opt_q) {
+  $user = lc $opt_q;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  unless (-d "$spooldir/$user") {
+    die "$0: $user is not a regular FEX user\n";
+  }
+  quota($user,@ARGV);
+  exit;
+}
+
+if ($opt_C) { 
+  $user = lc $opt_C;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  unless (-f "$spooldir/$user/@") {
+    die "$0: $user is not a regular FEX user\n";
+  }
+  $_ = shift @ARGV || '';
+  if (/^y/i) {
+    open $user,">>$spooldir/$user/\@CAPTIVE";
+    close $user;
+    print "$user is now captive\n";
+  } elsif (/^n/i) {
+    unlink "$spooldir/$user/\@CAPTIVE";
+    print "$user is no more captive\n";
+  } else {
+    usage(2);
+  }
+  exit;
+}
+
+if ($opt_y) { 
+  $user = lc $opt_y;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  unless (-f "$spooldir/$user/@") {
+    die "$0: $user is not a regular FEX user\n";
+  }
+  $_ = shift @ARGV || '';
+  if (/^y/i) {
+    open $user,">>$spooldir/$user/\@FEXYOURSELF";
+    close $user;
+    print "$user has now \"fex yourself\" default\n";
+  } elsif (/^n/i) {
+    unlink "$spooldir/$user/\@FEXYOURSELF";
+    print "$user has no \"fex yourself\" default\n";
+  } else {
+    usage(2);
+  }
+  exit;
+}
+
+if ($opt_D) { 
+  $user = lc $opt_D;
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  $_ = shift @ARGV || '';
+  if (/^y/i) {
+    open $user,">>$spooldir/$user/\@DISABLED";
+    close $user;
+    print "$user is now disabled\n";
+  } elsif (/^n/i) {
+    unlink "$spooldir/$user/\@DISABLED";
+    print "$user is now enabled\n";
+  } else {
+    usage(2);
+  }
+  exit;
+}
+
+if ($opt_S eq 'fup') { 
+  &fupstat;
+  exit;
+}
+
+if ($opt_S eq 'fop') {
+  &fopstat;
+  exit;
+}
+
+usage(3);
+
+sub showuser {
+  my $user = shift;
+  my $id = shift;
+  my ($keep,$autodelete,$notification);
+  
+  $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  
+  print "[using config $FEXLIB/fex.ph]\n";
+  print "$fup?from=$user&id=$id\n";
+  printf "%s/%s\n",$fup,b64("from=$user&id=$id");
+  printf "%s/%s\n",$fup,b64("from=$user&to=$user&id=$id&submit=.");
+  print "spool: $spooldir/$user/\n";
+  printf "fex yourself default: %s\n", 
+         -e "$spooldir/$user/\@FEXYOURSELF" ? 'yes' : 'no';
+  printf "captive: %s\n", 
+         -e "$spooldir/$user/\@CAPTIVE" ? 'yes' : 'no';
+  printf "disabled: %s\n", 
+         -e "$spooldir/$user/\@DISABLED" ? 'yes' : 'no';
+  printf "recipients restrictions: %s\n", 
+         -e "$spooldir/$user/\@ALLOWED_RECIPIENTS" ? 'yes' : 'no';
+  printf "upload restrictions: %s\n", 
+         -e "$spooldir/$user/\@UPLOAD_HOSTS" ? 'yes' : 'no';
+  printf "download restrictions: %s\n", 
+         -e "$spooldir/$user/\@DOWNLOAD_HOSTS" ? 'yes' : 'no';
+  $autodelete = lc(readlink "$spooldir/$user/\@AUTODELETE" || $::autodelete);
+  print "autodelete default: $autodelete\n";
+  $notification = lc(readlink "$spooldir/$user/\@NOTIFICATION" || $::notification);
+  print "notification default: $notification\n";
+  $keep = readlink "$spooldir/$user/\@KEEP" || $keep_default;
+  print "keep default: $keep\n";
+  quota($user);
+}
+
+# set or show disk quota
+sub quota {
+  my $user = shift;
+  my $rquota = '';
+  my $squota = '';
+  my $qf = "$spooldir/$user/\@QUOTA";
+  local $_;
+  
+  if (open $qf,$qf) {
+    while (<$qf>) {
+      s/#.*//;
+      $rquota = $1 if /recipient.*?(\d+)/i;
+      $squota = $1 if /sender.*?(\d+)/i;
+    }
+    close $qf;
+  }
+  
+  if (@_) {
+    while (@_) {
+      $_ = shift;
+      $rquota = $1 if /^r.*:(\d*)/i;
+      $squota = $1 if /^s.*:(\d*)/i;
+    }
+    open $qf,'>',$qf or die "$0: cannot write $qf - $!\n";
+    print {$qf} "recipient:$rquota\n" if $rquota =~ /\d/;
+    print {$qf} "sender:$squota\n"    if $squota =~ /\d/;
+    close $qf;
+  } 
+  
+  $rquota = $recipient_quota if $rquota !~ /\d/;
+  $squota = $sender_quota    if $squota !~ /\d/;
+  printf "recpient quota (used): %d (%d) MB\n",
+         check_recipient_quota($user);
+  printf "sender quota (used): %d (%d) MB\n",
+         check_sender_quota($user);
+}
+
+
+sub usage {
+  my $port = '';
+  my $proto = 'http';
+  
+  if ($durl =~ /:(\d+)/)    { $port = ":$1" }
+  if ($durl =~ /^(https?)/) { $proto = $1 }
+
+  print <<EOD;
+Usages:
+$0 -u                 # list full users
+$0 -u user            # show user config
+$0 -u user auth-ID    # create new user or set new auth-ID
+$0 -q user s:quota    # set new disk quota (MB) for sender user
+$0 -q user r:quota    # set new disk quota (MB) for recipient user
+$0 -R user            # restrict user: only internal recipients allowed
+$0 -rr user           # edit user recipients restriction
+$0 -ru user           # edit user upload restriction
+$0 -rd user           # edit user download restriction
+$0 -d user            # delete user
+$0 -D user [yn]       # disable user (yes,no)
+$0 -a user [ynd]      # set user autodelete default (yes,no,delay)
+$0 -n user [fsn]      # set user notification default (full,short,no)
+$0 -k user days       # set user keep default in days
+$0 -C user [yn]       # set user captive (yes,no)
+$0 -y user [yn]       # set user "fex yourself" default (yes,no)
+$0 -S fup             # file upload statistics
+$0 -S fop             # file download statistics
+$0 -A alias:hostname  # add new virtual server
+$0 -v                 # show server config
+$0 -c                 # edit server config
+$0 -l                 # list current files
+$0 -w                 # watch fexsrv.log (continously)
+$0 -m reason          # enter maintenance mode (reason "exit" to leave)
+$0 -V virtualhost ... # operations on virtualhost (alias or hostname)
+Examples: 
+$0 -u framstag\@rus.uni-stuttgart.de schwubbeldidu
+$0 -q framstag\@rus.uni-stuttgart.de s:10000
+EOD
+  if (-x "$FEXHOME/cgi-bin/fac") {
+    print "See also web admin interface $proto://$hostname$port/fac\n";
+  }
+  exit shift;
+}
+
+
+sub fupstat {
+  my (%user,%domain,%du);
+  my ($log,$u,$d,$z);
+  my $Z = 0;
+    
+  if (-t) { $log = "$logdir/fup.log" } 
+  else    { $log = '>&=STDIN' }
+  open $log,$log or die "$0: cannot open $log - $!\n";
+  
+  while (<$log>) {
+    if (/^([\d: -]+) (\[[\d_]+\] )?(\w\S*) .* (\d+)$/) {
+      $z = $4;
+      $u = $3;
+      $u .= '@'.$mdomain if $mdomain and $u !~ /@/;
+      $user{$u} += $z;
+      $d = $u;
+      $d =~ s/.*@//;
+      $d =~ s/.*\.(.+\.\w+)/$1/;
+      $domain{$d} += $z;
+      $du{$d}{$u}++;
+      $Z += $z;
+    }
+  }
+
+  foreach $u (sort {$user{$a} <=> $user{$b}} keys %user) {
+    printf "%s : %d\n",$u,$user{$u}/M;
+  }
+  print "========================================================\n";
+  foreach $d (sort {$domain{$a} <=> $domain{$b}} keys %domain) {
+    printf "%s : %d MB, %d user\n",$d,$domain{$d}/M,scalar(keys %{$du{$d}});
+  }
+  printf "Total: %d GB\n",$Z/M/1024;
+  
+  exit;
+}
+
+
+sub fopstat {
+  my $Z = 0;
+  my ($log,$u,$d,$z);
+  my (%user,%domain,%du);
+    
+  if (-t) { $log = "$logdir/fop.log" } 
+  else    { $log = '>&=STDIN' }
+  open $log,$log or die "$0: cannot open $log - $!\n";
+  
+  while (<$log>) {
+    if (/^([\d: -]+) (\[[\d_]+\] )?[\d.]+ (.+?)\/.* (\d+)\/\d+/) {
+      $z = $4;
+      $u = $3;
+      $u .= '@'.$mdomain if $mdomain and $u !~ /@/;
+      $user{$u} += $z;
+      $d = $u;
+      $d =~ s/.*@//;
+      $d =~ s/.*\.(.+\.\w+)/$1/;
+      $domain{$d} += $z;
+      $du{$d}{$u}++;
+      $Z += $z;
+    }
+  }
+
+  foreach $u (sort {$user{$a} <=> $user{$b}} keys %user) {
+    printf "%s : %d\n",$u,$user{$u}/M;
+  }
+  print "========================================================\n";
+  foreach $d (sort {$domain{$a} <=> $domain{$b}} keys %domain) {
+    printf "%s : %d MB, %d user\n",$d,$domain{$d}/M,scalar(keys %{$du{$d}});
+  }
+  printf "Total: %d GB\n",$Z/M/1024;
+  
+  exit;
+}
+
+
+sub cpa {
+  my $dd = pop @_;
+  
+  die "(cpa): $dd is not a directory" unless -d $dd;
+  system "rsync -a @_ $dd/" ;
+}

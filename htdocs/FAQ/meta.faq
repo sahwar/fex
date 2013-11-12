@@ -1,0 +1,79 @@
+<h2>Meta questions</h2>
+
+Q: What is so special with F*EX?
+A: See feature list http://fex.rus.uni-stuttgart.de/features.html
+   and use cases http://fex.rus.uni-stuttgart.de/usecases/
+
+Q: Why not use one of the commercial services like DropLoad, ALLPeers, YouSendIt, etc?
+A: * They have a limit of 2 GB or even less.
+   * Their security and privacy status is unknown.
+   * They are not open source based.
+   * There are no UNIX (CLI) clients for them.
+   * They need java, active-X, flash or other evil plugins.
+   * It is unknown how long they will exist - DropLoad and ALLPeers already have terminated their business.
+   
+Q: Why name "F*EX" and not shortly "FEX"?
+A: At publication time there was already an (older) program named "FEX" on freshmeat.net.
+
+Q: Why a camel as the logo?
+A: The logo was inspired by the Perl camel, but it is based on a Steiff plush
+   camel, which rides with us on our racing tandem.
+   The logo was drawn by my stoker Beate.
+   http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html
+
+Q: Who is the author?
+A: The main author is Ulli Horlacher <framstag@rus.uni-stuttgart.de><br>
+   But there are also a lot of contributors.
+
+Q: What do I need to install F*EX?
+A: A UNIX or Windows host with a DNS entry, smtp for outgoing e-mail and one open and free incoming tcp port.
+   And you must have administrative rights (UNIX: root) on this host.
+
+Q: What means DNS and smtp? What is a tcp port?
+A: Do not install F*EX. It is beyond your horizon.
+
+Q: Can I run F*EX on Windows?
+A: On client side all operating systems are supported, even Windows.
+   If you want to run a F*EX server on Windows, then see http://fex.rus.uni-stuttgart.de/fexwix.html
+
+Q: Where can I get the F*EX sources?
+A: F*EX server for UNIX: http://fex.rus.uni-stuttgart.de/fex.html
+
+Q: I do not want to install an own F*EX server, but where can I use it?
+A: Contact <fex@nepustil.net> http://www.nepustil.net/
+
+Q: Isn't Perl too slow for this job?
+A: fex.rus.uni-stuttgart.de runs on an office PC and F*EX is able to handle uploads with more than 300 MB/s.
+   Try this with an ordinary webserver like Apache!
+
+Q: Which licence does F*EX have? And why?
+A: Perl Artistic free software with a special anti-military clause: 
+   http://fex.rus.uni-stuttgart.de/doc/Licence
+   "I want peace on earth and goodwill towards men"
+   http://www.youtube.com/watch?v=JHU0HinVhYc
+
+Q: Is there a F*EX mailing list?
+A: https://listserv.uni-stuttgart.de/mailman/listinfo/fex
+
+Q: Where can I get commercial support for F*EX?
+A: Contact <fex@nepustil.net> http://www.nepustil.net/
+
+Q: Who else is using F*EX?
+A: For example:
+   * German Aerospace Center http://fex.dlr.de/
+   * European Commission Institute for Energy and Transport http://fex.jrc.nl/
+   * High Performance Computing Center Stuttgart http://fex.hlrs.de/
+   * Swiss National Supercomputing Centre http://fex.cscs.ch/
+   * Institut Pasteur http://dl.pasteur.fr/
+   * Deutsche Kinemathek Museum f&uuml;r Film und Fernsehen http://upload.deutsche-kinemathek.de/
+
+Q: Is F*EX secure?
+A: F*EX is written in Perl which does not have common security problems with buffer overruns, segmentation faults, heap and stack corruption.
+   F*EX does not use an extra web server or a (SQL) database, so no typical web attacks are possible.
+   F*EX was analysed by security company revshell.com and labeled as "secure".
+   
+Q: Feature/design XY is missing.
+A: Contact the author <framstag@rus.uni-stuttgart.de>
+
+Q: I have more/other questions than in this document!
+A: Ask the author <framstag@rus.uni-stuttgart.de>

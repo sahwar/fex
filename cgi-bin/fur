@@ -1,0 +1,387 @@
+#!/usr/bin/perl -wT
+
+# FEX CGI for user registration
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use CGI         qw(:standard);
+use CGI::Carp	qw(fatalsToBrowser);
+use Fcntl 	qw(:flock :seek :mode);
+
+# import from fex.ph
+our (@local_hosts,@local_domains,@local_rhosts,@local_rdomains);
+our (@registration_hosts,@registration_domains);
+our ($usage_conditions);
+
+# import from fex.pp
+our ($mdomain,$logdir,$spooldir,$fra,$hostname,$sendmail,$admin,$bcc);
+
+our $error = "F*EX user registration ERROR";
+
+my $ra = $ENV{REMOTE_ADDR}||0;
+
+my ($CASE,$ESAC);
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+# load common code, local config: $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+my $log = "$logdir/fur.log";
+my $head = "$ENV{SERVER_NAME} F*EX user registration";
+
+chdir $spooldir or die "$spooldir - $!\n";
+
+my $user = my $id = my $verify = '';
+
+&check_maint;
+
+# look for CGI parameters
+foreach my $v (param) {
+  my $vv = strip(param($v));
+  debuglog("Param: $v=\"$vv\"");
+  $CASE =
+    $v =~ /^user$/i	? $user		= normalize_address($vv):
+    $v =~ /^exuser$/i	? $exuser	= normalize_address($vv):
+    $v =~ /^demouser$/i	? $demouser	= normalize_address($vv):
+    $v =~ /^verify$/i	? $verify	= lc($vv):
+    $v =~ /^confirm$/i	? $confirm	= $vv:
+    $v =~ /^domain$/i	? $domain	= lc($vv):
+  $ESAC;
+}
+
+if ($confirm) {
+  if ($confirm =~ /^(\w+)$/i) {
+    $confirm = $1;
+  } else {
+    http_die("illegal registration key");
+  }
+  open $confirm,"<.reg/$confirm" or http_die("no registration key $confirm");
+  $user = untaint(getline($confirm));
+  $id   = getline($confirm);
+  close $confirm;
+  # unlink ".reg/$confirm";
+  unless ($user and $id) {
+    http_die("no registration data for key $confirm");
+  }
+  unless (-d $user) {
+    mkdir $user,0770 or http_die("mkdir $user - $!\n");
+  }
+  # if (-f "$user/@") { http_die("$user is already activated") }
+  open $user,'>',"$user/@" or http_die("open $user/@ - $!\n");
+  print {$user} $id,"\n";  
+  close $user or http_die("close $user/@ - $!\n");
+  
+  http_header("200 OK");
+  print html_header($head);
+  my $url = "$ENV{PROTO}://$ENV{HTTP_HOST}/fup/" . b64("from=$user&id=$id");
+  pq(qq(
+    '<h3>Your registration was successful. Your new F*EX account is:</h3>'
+    '<p>'
+    '<tt><a href="$url">$url</a></tt>'
+    '<p>'
+    '(bookmark this URL!)'
+    '<p>'
+    'or you can use:'
+    '<p>'
+    '<table>
+    '  <tr><td>URL:<td><tt><b>$ENV{PROTO}://$ENV{HTTP_HOST}/fup/</tt></b></tr>'
+    '  <tr><td>Sender:<td><tt><b>$user</tt></b></tr>'
+    '  <tr><td>auth-ID:<td><tt><b>$id</tt></b></tr>'
+    '</table>
+    '</body></html>'
+  ));
+  furlog("confirm: account $user created");
+  exit;
+}
+
+unless ($user or $exuser or $demouser) {
+  http_header("200 OK");
+  print html_header($head);
+  pq(qq(
+    '<form action="$ENV{SCRIPT_NAME}"'
+    '      method="post"'
+    '      accept-charset="UTF-8"'
+    '      enctype="multipart/form-data">'
+  ));
+  if (@local_domains and @local_hosts and ipin($ra,@local_hosts)) {
+    $reg = $ra;
+    if ("@local_domains" eq "*") {
+      pq(qq(
+        '  new user (may send to internal or external users):<br>'
+        '  <input type="text" name="user" size="80" value="$user">'
+      ));
+    } else {
+      if ($mdomain and not grep /^\Q$mdomain\E$/i,@local_domains) {
+        unshift @local_domains,$mdomain;
+      }
+      my @mydomains = map { "\t<option>$_</option>\n" } @local_domains;
+      pq(qq(
+        '  new user (may send to internal or external users):<br>'
+        '  <input type="text" name="user" size="40" value="$user">\@<select name="domain" size="1">@mydomains</select>'
+      ));
+    }
+  }
+  if (@local_rdomains and @local_rhosts and
+      (not @registration_hosts or ipin($ra,@registration_hosts))) {
+    print "   <p>or<p>\n" if $reg;
+    $reg = $ra;
+    pq(qq(
+      '  new external user (may send only to internal users):<br>'
+      '  <input type="text" name="exuser" size="80">'
+      '  <p>'
+    ));
+  }
+  if (@demo) {
+    print "   <p>or<p>\n" if $reg;
+    $reg = $ra;
+    local $_ = sprintf "with %d MB quota and %d day%s account life time",
+               @demo,$demo[1]>1 ? 's' : '';
+    pq(qq(
+      '  new demo user ($_):<br>'
+      '  <input type="text" name="demouser" size="80">'
+      '  <p>'
+    ));
+  }
+  if ($reg) {
+    pq(qq(
+      '  <p>'
+      '  you must enter your e-mail address and <input type="submit" value="submit">'
+      '</form>'
+      '<p>'
+    ));
+    if (@local_rdomains) {
+      pq(qq(
+        '<p><hr><p>'
+        'internal domains are:'
+        '<pre>'
+      ));
+      foreach my $lrd (@local_rdomains) {
+        print "  $lrd\n";
+      }
+    }
+    print "</pre></body></html>\n";
+  } else {
+    html_error($error,
+      "Registrations from your host ($ra) are not allowed.",
+      "Contact $ENV{SERVER_ADMIN} for details."
+    );
+  }
+  exit;
+}
+
+if ($exuser) {
+  unless (@local_rdomains) {
+    http_die("no \@local_rdomains");
+  }
+  if (@registration_hosts and not ipin($ra,@registration_hosts)) {
+    html_error($error,
+      "Registrations from your host ($ra) are not allowed.",
+      "Contact $ENV{SERVER_ADMIN} for details."
+    );
+  }
+  if ($exuser =~ /\@(.+)/) {
+    my $exd = $1;
+    if (@registration_domains and
+        not grep /^\Q$exd\E$/i,@registration_domains) {
+      html_error($error,
+        "Your domain <tt>$exd</tt> is not allowed for registration.",
+        "Contact $ENV{SERVER_ADMIN} for details."
+      );
+    }
+  } else {
+    html_error($error,"no domain for <tt>$exuser</tt>");
+  }
+  if (-f "$exuser/@") {
+    html_error($error,"<tt>$exuser</tt> does already exist");
+  }
+  $user = $exuser;
+} elsif ($demouser) {
+  $user = $demouser;
+} else {
+  my $mydomains = join('|',@local_domains);
+  $mydomains .= "|$mdomain" if $mdomain;
+  $mydomains =~ s/\./\\./g;
+  $user .= '@'.$domain  if $domain and $user !~ /@/;
+  # $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  
+  unless (@local_hosts and ipin($ra,@local_hosts)) {
+    html_error($error,
+      "Registrations from your host ($ra) are not allowed.",
+      "Contact $ENV{SERVER_ADMIN} for details."
+    );
+  }
+  if ("@local_domains" ne "*" and $user !~ /[@.]($mydomains)$/i) {
+    html_error($error,
+      "Illegal domain for username.",
+      "Contact $ENV{SERVER_ADMIN} for details."
+    );
+  }
+}
+
+unless (checkforbidden($user)) {
+  html_error($error,"<tt>$user</tt> is not allowed");
+}
+unless (checkaddress($user)) {
+  html_error($error,"<tt>$user</tt> is not a valid e-mail address");
+}
+$user = untaint($user);
+
+if (-f "$user/@") {
+  html_error(
+    $error,
+    "you are already registered".
+    " (<a href=\"/fup?from=$user&ID_forgotten=1\">I have lost my auth-ID</a>)"
+  ); 
+}
+
+unless (-d $user) {
+  mkdir $user,0770 or http_die("mkdir $user - $!\n");
+}
+
+if ($exuser) {
+  my $rf;
+  # recipients e-mail address restrictions
+  $rf = "$exuser/\@ALLOWED_RECIPIENTS";
+  open $rf,'>',$rf or http_die("cannot write $rf - $!\n");
+  print {$rf} "\@LOCAL_RDOMAINS\n";
+  close $rf;
+  # recipients ip restrictions
+  $rf = "$exuser/\@ALLOWED_RHOSTS";
+  open $rf,'>',$rf or http_die("cannot write $rf - $!\n");
+  print {$rf} "\@LOCAL_RHOSTS\n";
+  close $rf;
+  if (open $user,'>',"$user/.auto") {
+    print {$user} "fur:external\n";  
+    close $user;
+  }
+} elsif ($demouser) {
+  my $quota = "$demouser/\@QUOTA";
+  open $quota,'>',$quota or http_die("cannot write $quota - $!\n");
+  print {$quota} "recipient:10\n","sender:10\n";
+  close $quota;
+  if (open $user,'>',"$user/.auto") {
+    print {$user} "fur:demo\n";  
+    close $user;
+  }
+  open $demouser,'>',"$demouser/.demo" and close $demouser;
+} else {
+  if (open $user,'>',"$user/.auto") {
+    print {$user} "fur:internal\n";  
+    close $user;
+  }
+}
+
+$id = randstring(6);
+
+if ("@local_domains" eq "*") {
+  open $id,'>',"$user/@" or http_die("open $user/@ - $!\n");
+  print {$id} $id,"\n";  
+  close $id or http_die("close $user/@ - $!\n");
+  http_header("200 OK");
+  print html_header($head);
+  $uid = "from=$user&id=$id";
+  $b64 = b64($uid);
+  pq(qq(
+    'Account created:'
+    '<pre>'
+    '$ENV{PROTO}://$ENV{HTTP_HOST}/fup?$uid'
+    '$ENV{PROTO}://$ENV{HTTP_HOST}/fup/$b64'
+    '</pre>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+if ($verify eq 'no') {
+  open $id,'>',"$user/@" or http_die("open $user/@ - $!\n");
+  print {$id} $id,"\n";  
+  close $id or http_die("close $user/@ - $!\n");
+  http_header("200 OK",'Content-Type: text/plain');
+  print "$ENV{PROTO}://$ENV{HTTP_HOST}/fup?from=$user&ID=$id\n";
+  furlog("direct: account $user created");
+  if ($bcc and open my $mail,"|$sendmail '$bcc' 2>>$log") {
+    pq($mail,qq(
+      'From: fex'
+      'To: $bcc'
+      'Subject: F*EX user registration'
+      ''
+      '$user has been auto-registrated with verify=no'
+    ));
+    close $mail;
+  } else {
+    furlog("ERROR: cannot run sendmail - $!\n");
+  }
+  exit;
+}
+
+unless (-d '.reg') {
+  mkdir '.reg',0770 or http_die("mkdir .reg - $!\n");
+}
+$reg = randstring(8);
+open $reg,'>',".reg/$reg" or http_die("open .reg/$reg - $!\n");
+print {$reg} $user,"\n",$id,"\n";
+close $reg or http_die("close .reg/$reg - $!\n");
+
+open my $mail,'|-',$sendmail,$user,$bcc
+  or http_die("cannot start sendmail - $!\n");
+pq($mail,qq(
+  'From: $admin'
+  'To: $user'
+  'Subject: F*EX user registration request'
+  ''
+  'To activate your new F*EX account go to this URL:'
+  ''
+  '$ENV{PROTO}://$ENV{HTTP_HOST}/fur?confirm=$reg'
+  ''
+));
+if ($usage_conditions and open $usage_conditions,$usage_conditions) {
+  print {$mail} "The conditions of usage are:\n\n";
+  print {$mail} $_ while <$usage_conditions>;
+  close $usage_conditions;
+}
+close $mail or http_die("cannot send mail - $!\n");
+
+http_header("200 OK");
+print html_header($head);
+print "confirmation e-mail has been sent to <tt>$user</tt>\n";
+print "</body></html>\n"; 
+furlog("confirmation request mailed to $user");
+exit;
+
+
+sub strip {
+  local $_ = shift;
+  s/[ \t]+//g;
+  s/\s*[\r\n]+\s*/\n/g;
+  return $_;
+}
+
+# standard log
+sub furlog {
+  my $msg = "@_";
+  
+  $msg =~ s/\n/ /g;
+  $msg =~ s/\s+$//;
+  
+  if (open $log,'>>',$log) {
+    flock $log,LOCK_EX;
+    seek $log,0,SEEK_END;
+    printf {$log} "%s [%s_%s] %s %s\n",
+                  isodate(time),$$,$ENV{REQUESTCOUNT},$fra,$msg;
+    close $log;
+  }
+}
+
+sub normalize_address {
+  my $a = shift;
+
+  $a = lc(normalize(despace($a)));
+  checkchars('address',$a);
+  $a =~ s:/:_:g;
+  $a =~ s:^\.:_:;
+  return untaint($a);
+}

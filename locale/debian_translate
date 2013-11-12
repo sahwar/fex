@@ -1,0 +1,132 @@
+#!/usr/bin/perl -w
+
+# translate english F*EX files into locale languange, debian special
+
+use File::Basename;
+use File::Copy;
+
+@trfiles = qw(
+  lib/fex.pp
+  cgi-bin/foc
+  cgi-bin/fop
+  cgi-bin/fuc
+  cgi-bin/fup
+  cgi-bin/fur
+  cgi-bin/rup
+  cgi-bin/pup
+);
+
+@cpfiles = qw(
+  htdocs/index.html
+  htdocs/FAQ.html
+  lib/fup.pl
+  lang.html
+);
+
+$source = shift;  
+$FEXHOME = shift;
+$dest = shift;
+
+$tr = "$source/locale/translations";
+
+mkdirp($dest);
+unless (-l "$dest/english") {
+  symlink '..',"$dest/english" 
+    or die "$0: cannot symlink $dest/english - $!\n";
+}
+
+foreach $lang (glob "$source/locale/*/lib/fup.pl") {
+  $lang =~ s:.*/locale/::;
+  $lang =~ s:/.*::;
+  next if $lang eq 'english';
+  next if $lang =~ /_$/;
+
+  print "\n$lang:\n";
+  open $tr,$tr or die "$0: cannot open $tr - $!\n";
+  %T = ();
+  $n = $ll = 0;
+
+  while (<$tr>) {
+    $n++;
+    last if /^\s*$/;
+    if (/^#\s*([\w-]+):/ and $lang eq $1) {
+      $ll = $n;
+    }
+  }
+
+  next unless $ll;
+
+  while (<$tr>) {
+    next if /^#/;
+    next if /^\s*$/;
+    chomp;
+    unless (/[a-z]/i) {
+      die "$0: syntax error in $tr line $. : no text\n";
+    }
+    $e = $_;
+    for my $l (2 .. $ll) { 
+      $_ = <$tr>||'';
+      chomp;
+      unless (/[a-z]/i) {
+        die "$0: syntax error in $tr line $. : no text\n";
+      }
+    }
+    $T{$e} = $_;
+    while (<$tr>) { last if /^\s*$/ }
+  }
+  
+  close $tr;
+  @E = sort {length $b <=> length $a} keys %T;
+
+  foreach $file (@trfiles) {
+    local $/;
+    mkdirp("$dest/$lang/".dirname($file));
+    $fe = "$source/$file";
+    $ft = "$dest/$lang/$file";
+    open $fe,"<$fe" or die "$0: cannot read $fe - $!\n";
+    open $ft,">$ft" or die "$0: cannot write $ft - $!\n";
+    $_ = <$fe>;
+    close $fe;
+    foreach $e (@E) {
+      s/\Q$e/$T{$e}/g;
+    }
+    print {$ft} $_;
+    close $ft;
+    chmod((stat $fe)[2],$ft);
+    print "$ft written\n";
+  }
+
+  foreach $file (@cpfiles) {
+    $fs = "$source/locale/$lang/$file";
+    $fd = "$dest/$lang/$file";
+    mkdirp(dirname($fd));
+    $fd .= '_new' if -f $fd;
+    if (copy($fs,$fd)) {
+      chmod((stat $fs)[2],$fd);
+      print "$fd written\n";
+    }
+  }
+
+  foreach $fs (qw(dop fex.ph)) {
+    $fd = "$dest/$lang/lib/$fs";
+    symlink "$FEXHOME/lib/$fs",$fd or die "$0: cannot symlink $fd - $!\n";
+    print "$fd linked\n";
+  }
+}
+
+# emulate mkdir -p
+sub mkdirp {
+  my $dir = shift;
+  my $pdir;
+  
+  return if -d $dir;
+  $dir =~ s:/+$::;
+  die "$0: cannot mkdir /\n" unless $dir;
+  $pdir = $dir;
+  if ($pdir =~ s:/[^/]+$::) {
+    mkdirp($pdir) unless -d $pdir;
+  }
+  unless (-d $dir) {
+    mkdir $dir,0755 or die "$0: mkdir $dir - $!\n";
+  }
+}

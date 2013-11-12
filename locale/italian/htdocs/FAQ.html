@@ -1,0 +1,294 @@
+<HTML>
+<PRE>
+Domande Generiche:
+==================
+
+<a name="1"><a href="#1">Q</a>: Perche' il nome e' &quot;F*EX&quot; invece del piu' corto &quot;FEX&quot;?
+
+A: Al momento della pubblicazione c'era gia' un (vecchio) programma
+   nominato &quot;FEX&quot; su freashmeat.net
+
+
+<a name="2"><a href="#2">Q</a>: Perche' non usare un servizio commerciale come
+   DropLoad, ALLPeers, YouSendIt, ecc. ?
+
+A: Tutti hanno un limite di 2 GB o meno.
+   I loro livelli di sicurezza e privacy sono sconosciuti.
+   Non sono servizi basati su software open-source.
+   Non ci sono client UNIX (a linea di comando) per loro.
+   Hanno bisogno di java, Active-X, Flash o altri plug-in.
+   Non si sa quanto tempo sopravviveranno - DropLoad e ALLPeers hanno
+   gia' concluso la loro attivita'.
+
+
+<a name="3"><a href="#3">Q</a>: Perche' c'e' un cammello nel logo?
+
+A: Il logo e' stato ispirato al cammello del Perl, ma e' basato sul
+   cammello di peluche della Steiff che ci portiamo insieme con noi
+   nelle nostre corse con il tandem.
+   Il logo e' stato disegnato dal mio &quot;fuochista&quot; Beate
+   <a href="http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html">http://fex.rus.uni-stuttgart.de/Vortrag/tosa.html</a>
+
+
+<a name="4"><a href="#4">Q</a>: Dovo posso prendere i sorgenti di F*EX ?
+
+A: <a href="http://fex.rus.uni-stuttgart.de/fex.html">http://fex.rus.uni-stuttgart.de/fex.html</a>
+
+
+<a name="5"><a href="#5">Q</a>: Dove posso installare F*EX ?
+
+A: In un host UNIX con una entry DNS ed un SMTP per la spedizione
+   delle e-mail. Su questo server bisogna avere i privilegi di root.
+
+
+<a name="6"><a href="#6">Q</a>: Cosa sono DNS e SMTP?
+
+A: Lascia perdere F*EX. E' al di la' delle tue possibilita'.
+
+
+<a name="7"><a href="#7">Q</a>: Chi e' l'autore ?
+
+A: Ulli Horlacher &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+<a name="8"><a href="#8">Q</a>: Che tipo di licenza ha F*EX ?
+
+A: Perl Artistic free software, vedete <a href="http://fex.rus.uni-stuttgart.de/doc/Licence">http://fex.rus.uni-stuttgart.de/doc/Licence</a>
+
+
+<a name="9"><a href="#9">Q</a>: C'e' una mailing list per F*EX ?
+
+A: <a href="https://listserv.uni-stuttgart.de/mailman/listinfo/fex">https://listserv.uni-stuttgart.de/mailman/listinfo/fex</a>
+
+
+<a name="10"><a href="#10">Q</a>: Dove posso trovare un servizio commerciale per F*EX ?
+
+A: Contattate <a href="mailto:fex@nepustil.net">fex@nepustil.net</a> <a href="http://www.nepustil.net/">http://www.nepustil.net/</a>
+
+
+<a name="11"><a href="#11">Q</a>: Ho altre domande che non trovo in questo documento.
+
+A: Chiedete all'autore &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+
+Domande Utente:
+===============
+
+<a name="12"><a href="#12">Q</a>: Cos'e' il campo &quot;auth-ID&quot; ?
+
+A: Il campo auth-ID e' un identificativo interno che individua l'utente;
+   e' lo username.
+   E' creato la prima volta o dall'amministratore o attraverso il processo
+   di registrazione automatico e puo' essere successivamente modificato
+   da te (che sei l'utente).
+   Pensa come se fosse una password a bassa sicurezza.
+
+<a name="13"><a href="#13">Q</a>: Posso usare un proxy HTTP ?
+
+A: Si'.
+
+
+<a name="14"><a href="#14">Q</a>: Ho caricato un file ENORME, ma ho fatto un errore di battitura
+   nell'indirizzo del destinatario. Ora mi trovo con una e-mail
+   di errore.
+   Devo effettuare di nuovo il caricamento di questo ENORME file?
+
+A: No, non e' necessario. Puoi ridirigere il file con
+   <a href="http://$HTTP_HOST$/rup">http://$HTTP_HOST$/rup</a>
+
+
+<a name="15"><a href="#15">Q</a>: Ho caricato un file ENORME ma ho dimenticato uno dei destinatari.
+   Devo ricaricarlo?
+
+
+A: No, non e' necessario. Puo' inoltrare il file con
+   <a href="http://$HTTP_HOST$/foc">http://$HTTP_HOST$/foc</a>
+
+
+<a name="16"><a href="#16">Q</a>: Posso caricare file di dimensioni &gt; di 2 GB con il mio browser !?
+
+A: Tutti i browser che conosco hanno dei bug nella loro implementazione
+   delle FORM HTML.
+   Il limite e' per lo piu' di 2 GB, molto spesso e' di 4 GB.
+   Dovete usare uno speciale client F*EX per caricare file &gt; 2GB,
+   vedete <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+<a name="17"><a href="#17">Q</a>: Il mio download si e' bloccato prima di finire.
+   Posso riprenderlo?
+
+A: F*EX supporta il recupero del download ma anche il vostro client deve
+   supportare questa funzione. Firefox, per esempio, non ha questa funzione,
+   serve un'altro client come Opera, Wget o Fexget.
+
+
+<a name="18"><a href="#18">Q</a>: Il caricamento del mio file si e' interrotto prima di finire.
+   Posso riprenderlo?
+
+A: F*EX supporta la ripresa del caricamento interrotto di un file ma anche
+   il client deve supportarlo. Nessun browser WEB ha questa funzionalita',
+   avete bisogno di uno speciale client F*EX come fexsend, schwuppdiwupp o F*IX.
+   Vedete <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+<a name="19"><a href="#19">Q</a>: Il mio browser WEB non puo' eseguire il client java F*IX
+   in quanto non trova l'ambiente java runtime e quindi
+   non puo' caricare la applet F*IX
+
+
+A: Manca il plug-in java per il vostro browser WEB. Sui sistemi Debian e
+   Ubuntu potete installarlo con questo comando:
+   &quot;sudo aptitude install sun-java6-plugin&quot;
+
+
+<a name="20"><a href="#20">Q</a>: Quando schiaccio [ESC] in firefox il caricamento si cancella. Perche'?
+
+A: Si tratta di una caratteristica di firefox: il tasto ESC termina
+   l'operazione corrente.
+   Soluzione semplica: non schiacciate ESC in Firefox.
+   Soluzione complessa: chiedete agli sviluppatori di Firefox di aggiungere
+   la configurazione della tastiera.
+
+
+<a name="21"><a href="#21">Q</a>: Spedire come utente F*EX e' facile, ma come posso
+   ricevere i file da altri utenti all'esterno?
+
+A: Registrali come tuoi &quot;sotto-utenti&quot; oppure crea un gruppo F*EX
+   con <a href="http://$HTTP_HOST$/fuc">http://$HTTP_HOST$/fuc</a>
+
+
+<a name="22"><a href="#22">Q</a>: Qualche volta posso scaricare un file piu' di una volta,
+   specialmente quando ripeto l'operazione velocemente.
+   La funziona di autodelete e' poco affidabile?
+
+A: Il server F*EX rende disponibile il file scaricato ancora per un
+   periodo di 1 minuto. Questo e' necessario per evitare che alcuni
+   &quot;download managers&quot; piuttosto stupidi diano errore in quanto
+   richiedono il file parecchie volte di seguito.
+
+A: Il vostro fexmaster ha impostato la variabile AUTODELETE=DELAY
+   come default, il che significa che il processo di
+   autocancellazione e' eseguita una volta al giorno.
+
+A: Certi utenti (usate i sorgenti!!!) possono impostare il flag
+   &quot;non cancellare dopo il download&quot;.
+
+
+<a name="23"><a href="#23">Q</a>: La finestra temporale prima che il file sia cancellato e' troppo
+   stretta per me, ho bisogno di allargarla. Come posso fare?
+
+A: Usate fexsend, chiedete al vostro fexmaster oppure leggete il
+   codice sorgente :-)
+
+
+<a name="24"><a href="#24">Q</a>: Durante il download di un file con Internet Explorer
+   mi dice &quot;Non posso aprire il sito Internet&quot;. Cosa posso fare?
+
+A: Usate Firefox o qualsiasi altro browser WEB compatibile con Internet,
+   dato che Internet Explorer non lo e'. Questo e' uno dei tanti bug di
+   Internet Explorer.
+
+
+
+
+Domande Amministrative:
+=======================
+
+<a name="25"><a href="#25">Q</a>: Non posso installare un server web come fexsrv perche'
+   non ho i permessi di root. Esiste una pura versione CGI
+   di F*EX eseguibile con un web server Apache ?
+
+A: F*EX e' rigidamente vincolato a fexsrv per diverse ragioni (performance,
+   limite dimensione file, concetto di sessione, etc) e non puo' essere
+   eseguito come una CGI sotto apache.
+   Potete dare un'occhiata a
+   <a href="http://gpl.univ-avignon.fr/filez/">http://gpl.univ-avignon.fr/filez/</a>
+   <a href="http://freshmeat.net/projects/eventh/">http://freshmeat.net/projects/eventh/</a>
+   <a href="http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html">http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html</a> (Solo in Tedesco!)
+   il quale implementa uno scambio file come pura CGI, ma ha il limite dei 2 GB.
+
+
+<a name="26"><a href="#26">Q</a>: F*EX non funziona per nulla!
+   Non mi posso connettere con il mio browser web!
+
+A: Controllate il routing, le impostazioni del firewall e di ipfilters.
+   Controllate anche che il vostro xinetd sia collegato con il
+   wrapper-tcp e sia configurato correttamente (hosts.allow).
+   F*EX necessita della porta 80/tcp (HTTP) e opzionalmente
+   della 443/tcp (HTTPS).
+
+
+<a name="27"><a href="#27">Q</a>: F*EX e' troppo complicato!
+   Mi serve qualcosa di piu' semplice.
+
+A: Provate <a href="http://www.home.unix-ag.org/simon/woof.html">http://www.home.unix-ag.org/simon/woof.html</a>
+
+
+<a name="28"><a href="#28">Q</a>: Come posso integrare F*EX nell'ambiente di gestione
+   dell'utente esistente nel mio sito?
+
+A: F*EX ha diversi moduli di autenticazione:
+   locale, RADIUS, LDAP, mailman e POP
+   Per gli ultimi 4 si prega di contattare l'autore
+   <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+
+
+<a name="29"><a href="#29">Q</a>: Vorrei che i miei utenti locali usassero
+   F*EX automaticamente. Come??
+
+A: Lasciate che si registrino da soli con http://yourfexserver/fur
+   Dovete editare il file lib/fex.ph ed impostare (esempio):
+   @local_hosts = qw(127.0.0.1 10.10.100.0-10.10.255.255);
+   @local_domains = qw(flupp.org ulm.sub.net);
+   (Ovviamente dovete iunserire i vostri dati reali!)
+
+
+<a name="30"><a href="#30">Q</a>: Ho bisogno di maggior sicurezza! Come posso abilitare HTTPS??
+
+A: Leggete la documentazione doc/SSL ed anche cercate &quot;fop_auth&quot; in doc/concept
+
+
+<a name="31"><a href="#31">Q</a>: Ho bisogno di un look aziendale.
+   Come posso configurare F*EX per questo?
+
+A: Potete Guardare la variabile @H1_extra nel file fex.ph ed aggiungere
+   codice HTML al file htdocs/header.html
+
+A: Guardate il file htdocs/fup_template.html, modificatelo secondo i vostri
+   bisogni ed utilizzatelo come start-page.
+
+
+<a name="32"><a href="#32">Q</a>: F*EX e' troppo complicato per i miei utenti.
+   Ho bisogno di una form semplificata.
+
+A: Guardate il file htdocs/fup_template.html
+
+
+<a name="33"><a href="#33">Q</a>: Vorrei che le e-mail BCC indirizzate all'amministratore
+   fex fossero spedite ad altro indirizzo.
+
+A: Usate procmail o scrivete OTHERADDRESS in /home/fex/.forward
+
+
+<a name="34"><a href="#34">Q</a>: Posso avere una versione localizzata
+   nella mia lingua??
+
+A: Con il vostro aiuto, si'. Per favore contattate l'autore a
+   <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+
+
+Domande varie:
+==============
+
+<a name="35"><a href="#35">Q</a>: F*EX e' ottimo! Posso lavorare con
+   il team di sviluppo?
+   Che cosa c'e' bisogno di fare?
+
+A: Contattate l'autore <a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>
+   Funzionalita' richieste:
+
+     - Un plug-in F*EX per thunderbird o outlook
+     - Supporto in altre lingue
+
+</PRE></HTML>

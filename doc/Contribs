@@ -1,0 +1,57 @@
+Beate Herrmann <beate@fex.rus.uni-stuttgart.de>:
+  - artwork 
+
+Sebastian Zaiser <szcode@arcor.de>:
+  - upload status window
+
+Bernd Strehhuber <Bernd.Strehhuber@planb.de>:
+  - dynamic protocol detection
+
+Kurt Jaeger <pi@nepustil.net>:
+  - ipv6 support
+  
+Andre Hafner <andrehafner@gmx.net>:
+  - web admin interface fac
+  - VM
+
+Martin Lauer <martinlauer@gmx.net>:
+  - FAQ Javascript Code
+
+Dominik Greibl <dgreibl@gmx.de>:
+  - java client F*IX
+
+Sebastian Roth <roth@hdm-stuttgart.de>:
+  - many bugfixes and extensions (zip, proxy-support, etc) for F*IX
+
+Daniel Dieckmann <Daniel_Dieckmann@genua.de>
+  - fexget proxy support
+
+Hanno Hirsch <superhanno@gmx.de>:
+  - bug hunting
+
+Nicola Fioravanti <muuratsalo@gmail.com> (http://revshell.com):
+  - Penetration tests and security debugging
+
+Waldemar Bronsch <aw.bronsch@gmx.de>:
+  - German localization
+  
+Tobias Gunkel <tobias.gunkel@qumido.de>:
+  - German localization
+
+Hans-Georg Bickel <bickelhg@gmx.de>:
+  - Swabian localization
+  
+Francisco Ruiz <fjrbas@yahoo.es>:
+  - Spanish localization
+
+Anton Meixome <meixome@certima.net>:
+  - Galician localization
+  
+Vanni Piagno <vpiagno@gmail.com>:
+  - Italian localization
+  
+Michal Simunek <michal.simunek@gmail.com>:
+  - Czech localization
+
+Jean-Baptiste Denis <jbdenis@pasteur.fr>:
+  - French localization

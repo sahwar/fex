@@ -1,0 +1,207 @@
+#!/usr/bin/perl -wT
+
+# FEX CGI for (user) operation control
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use CGI         qw(:standard);
+use CGI::Carp	qw(fatalsToBrowser);
+use Fcntl 	qw(:flock);
+use Digest::MD5	qw(md5_hex);
+
+# add fex lib
+($FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+our ($FEXHOME,$mdomain,$nomail,$faillog);
+our $akey = '';
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+my $error = 'F*EX operation control ERROR';
+
+chdir $spooldir or die "$spooldir - $!\n";
+
+$akeydir = "$spooldir/.akeys"; 
+$user = $id = '';
+
+# look for CGI parameters
+foreach my $v (param) {
+  my $vv = param($v);
+  $vv =~ s/[ \t\000]//g;
+  $vv =~ s/[<>%]/_/g;
+  debuglog("Param: $v=\"$vv\"");
+  if ($v =~ /^akey$/i) { 
+    $vv =~ s:/::g;
+    next if $vv eq '.' or $vv eq '..';
+    $akey = untaint($vv);
+  } elsif ($v =~ /^(from|user)$/i) {
+    $vv =~ s:/::g;
+    next if $vv eq '.' or $vv eq '..';
+    $user = untaint($vv);
+    $user .= '@'.$mdomain if $mdomain and $user !~ /@/;
+  } elsif ($v =~ /^id$/i) {
+    $id = $vv;
+  }
+}
+
+if ($akey and not $user and not $id) {
+  if (open $akey,'<',"$akeydir/$akey/@" and $id = getline($akey)) {
+    close $akey;
+    $user = readlink "$akeydir/$akey"
+      or http_die("internal server error: no $akey symlink");
+    $user =~ s:.*/::;
+    $user = untaint($user);
+    if ($akey ne md5_hex("$user:$id")) {
+      $user = $id = '';
+    }
+  }
+}
+
+$head = "$ENV{SERVER_NAME} F*EX operation control";
+
+# display HTML form and request user data
+if ($user and $id) {
+  my $idf;
+  unless (open $idf,'<',"$user/@") {
+    faillog("user $from, id $id");
+    html_error($error,"wrong user or auth-ID");
+  }
+  &check_status($user);
+  if (-e "$user/\@CAPTIVE") { html_error($error,"captive user") }
+  $rid = getline($idf);
+  close $idf;
+  if ($id eq $rid) {
+    unless ($akey) {
+      $akey = untaint(md5_hex("$user:$id"));
+      unlink "$akeydir/$akey";
+      symlink "../$user","$akeydir/$akey";
+    }
+  } else {
+    faillog("user $from, id $id");
+    html_error($error,"wrong user or auth-ID");
+  }
+  unlink $faillog if $faillog;
+  http_header("200 OK");
+  print html_header($head);
+  # authorized login URL
+  my $url = "$ENV{PROTO}://$ENV{HTTP_HOST}/fup/".b64("from=$user&id=$id");
+  pq(qq(
+    '<h2>for user <a href="$url">$user</a></h2>'
+    '<table>'
+  ));
+  ($quota,$du) = check_sender_quota($user);
+  if ($quota) {
+    pq(qq(
+      <tr title="You as the sender have a server disk quota of $quota MB and currently using $du MB">
+        <td>sender quota (used):<td align=\"right\">$quota ($du) MB
+      </tr>
+    ));
+  }
+  ($quota,$du) = check_recipient_quota($user);
+  if ($quota) {
+    pq(qq(
+      <tr title="You as the recipient have a server disk quota of $quota MB and currently using $du MB">
+        <td>recipient quota (used):<td align=\"right\">$quota ($du) MB
+      </tr>
+    ));
+  }
+  pq(qq(
+    '</table>'
+    '<p><hr><p>'
+    '<a href="/fup?akey=$akey&command=LISTRECEIVED">'
+    'Retrieve a list of all your received files</a> in F*EX spool.'
+    '<p><hr><p>'
+    '<a href="/fup?akey=$akey&command=LISTSENT">'
+    'Show download URLs of files you have sent</a>.'
+    '<p><hr><p>'
+    '<form action="/fuc"'
+    '      method="post"'
+    '      accept-charset="UTF-8"'
+    '      enctype="multipart/form-data">'
+    '  <input type="hidden" name="user" value="$user">'
+    '  <input type="hidden" name="id"   value="$id">'
+    '  <script>function show_id() {return(alert("auth-ID: $id"));}</script>'
+    '  Change your <a href="" onclick="show_id();" title="$id">auth-ID</a> to'
+    '  <input type="text"   name="nid"  size="16">'
+    '  <input type="submit" value="remember it!">'
+  ));
+  if (-s "$user/\@ALLOWED_RECIPIENTS") {
+    # pq(qq(
+    #  '  (You are a restricted user)';
+    #  '  <p>'
+    # ));
+  } else {
+    pq(qq(
+      '<p><hr><p>'
+      '<a href="/fup?akey=$akey&command=LIST&to=*">'
+      'Forward a copy of a file</a> you already have uploaded to another recipient.'
+      '<p><hr><p>'
+      '<a href="/rup?akey=$akey">'
+      'Redirect files</a> you have uploaded to a wrong or misspelled recipient.'
+      '<p><hr><p>'
+      '  Create a subuser who can send you files. Enter his e-mail address:<br>'
+      '  <input type="text" name="subuser" size="60">'
+      '  <input type="checkbox" name="otuser" value="once">for only one upload<br>'
+    ));
+    if ($nomail) {
+      pq(qq(
+        '  <input type="submit" value="create subuser">'
+      ));
+    } else {
+      pq(qq(
+        '  Comment to send with information e-mail:<br>'
+        '  <input type="text" name="comment" size="80"><br>'
+        '  <input type="submit" value="create subuser and send e-mail">'
+      ));
+    }
+    pq(qq(
+      '  <p><hr><p>'
+      '  <a href="/fuc?akey=$akey">Manage your subusers and groups</a>'
+      '  <p><hr><p>'
+      '  <a href="/fuc?ab=load&akey=$akey">Edit your address book</a>'
+    ));
+  }
+  if ((readlink "$user/\@NOTIFICATION"||'') =~ /short/i) {
+    pq(qq(
+      '  <p><hr><p>'
+      '  Get <a href="/fuc?notification=detailed&akey=$akey">detailed</a> notification e-mails (current setting: <em>brief</em>).'
+    ));
+  } else {
+    pq(qq(
+      '  <p><hr><p>'
+      '  Get <a href="/fuc?notification=short&akey=$akey">brief</a> notification e-mails (current setting: <em>detailed</em>).'
+    ));
+  }
+  if ((readlink "$user/\@REMINDER"||'') =~ /no/i) {
+    pq(qq(
+      '  <p><hr><p>'
+      '  Get <a href="/fuc?reminder=yes&akey=$akey">reminder</a> notification e-mails (current setting: <em>no reminders</em>).'
+    ));
+  } else {
+    pq(qq(
+      '  <p><hr><p>'
+      '  Get <a href="/fuc?reminder=no&akey=$akey">no reminder</a> notification e-mails (current setting: <em>send reminders</em>).'
+    ));
+  }
+  pq(qq(
+    '  <p><hr><p>'
+    '  <a href="/fup?akey=$akey">Back to fup (upload page)</a>'
+    '</form>'
+  ));
+  print &logout;
+  print "</body></html>\n";
+  exit;
+}
+
+my $login = -x "$FEXHOME/login" ? 'login' : 'fup';
+nvt_print(
+  "HTTP/1.1 302 Found",
+  "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/$login",
+  'Expires: 0',
+  'Content-Length: 0',
+  ''
+);
+exec($FEXHOME.'/bin/fexsrv') if $ENV{KEEP_ALIVE};

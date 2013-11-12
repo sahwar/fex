@@ -1,0 +1,266 @@
+#!/usr/bin/perl -wT
+
+# FEX CGI for redirect uploaded files
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use Fcntl 	qw(:flock :seek :mode);
+use CGI         qw(:standard);
+use CGI::Carp	qw(fatalsToBrowser);
+use Fcntl 	qw(:flock);
+use Digest::MD5	qw(md5_hex);
+
+# add fex lib
+(our $FEXLIB) = $ENV{FEXLIB} =~ /(.+)/;
+die "$0: no $FEXLIB\n" unless -d $FEXLIB;
+
+our ($keep_default,$dkeydir,$akeydir,$mdomain,$logdir,$fra);
+our $akey = '';
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+our $error = 'F*EX redirect ERROR';
+
+chdir $spooldir or die "$spooldir - $!\n";
+
+my $log = "$logdir/rup.log";
+
+$from = $id = $oto = $nto = $file = '';
+
+# look for CGI parameters
+foreach my $v (param) {
+  $vv = param($v);
+  $vv =~ s/[<>]//g;
+  if ($v =~ /^akey$/i) { 
+    $vv =~ s:[/.]::g;
+    $akey = untaint($vv);
+  } elsif ($v =~ /^(from|user)$/i) {
+    $from = normalize_address($vv);
+    $from .= '@'.$mdomain if $mdomain and $from !~ /@/;
+  } elsif ($v =~ /^id$/i) {
+    $id = despace($vv);
+  } elsif ($v =~ /^file$/i) {
+    $file =~ s:/:_:g;
+    $file = untaint(normalize($vv));
+  } elsif ($v =~ /^oto$/i) {
+    $oto = normalize_address($vv);
+    $oto .= '@'.$mdomain if $mdomain and $oto !~ /@/;
+  } elsif ($v =~ /^nto$/i) {
+    $nto = normalize_address($vv);
+  }
+}
+
+if ($akey and not $from) {
+  if (open $akey,'<',"$akeydir/$akey/@" and $id = getline($akey)) {
+    close $akey;
+    $from = readlink "$akeydir/$akey";
+    $from =~ s:.*/::;
+    $from = untaint($from);
+    if ($akey ne md5_hex("$from:$id")) {
+      $from = $id = '';
+    }
+  }
+}
+
+if ($from and -s "$from/\@ALLOWED_RECIPIENTS") {
+  http_die("You are a restricted user");
+}
+
+if ($from and $id) {
+  open F,'<',"$from/@" or http_die("wrong user or auth-ID");
+  chomp($rid = <F>);
+  close F;
+  http_die("wrong user or auth-ID") if $id ne $rid;
+  unless ($akey) {
+    $akey = untaint(md5_hex("$from:$id"));
+    unlink "$akeydir/$akey";
+    symlink "../$from","$akeydir/$akey";
+  }
+}
+
+if ($oto and not glob("$oto/$from/*")) {
+  http_die("$oto has no no files in spool from you ($from)");
+}
+
+# display HTML form and request user data
+unless ($from and $id and $file and $oto and $nto) {
+  $head = "$ENV{SERVER_NAME} F*EX redirect";
+  http_header("200 OK");
+  print html_header($head);
+  pq(qq(
+    '<form action="$ENV{SCRIPT_NAME}" method="post"'
+    ' accept-charset="UTF-8" enctype="multipart/form-data">'
+    '  <table>'
+  ));
+  if ($akey) {
+    print "<input type=\"hidden\" name=\"akey\"   value=\"$akey\">\n";
+  } else {
+    pq(qq(
+      '    <tr><td>sender:'
+      '        <td><input type="text"     name="from" size="80" value="$from"></tr>'
+      '    <tr><td>auth-ID:'
+      '        <td><input type="password" name="id"   size="16" value="$id"></tr>'
+    ));
+  }
+  if ($oto) {
+    pq(qq(
+      '    <tr><td>old (wrong) recipient:<td>$oto</tr>'
+      '        <input type="hidden" name="oto"   value="$oto">'
+    ));
+  } else {
+    pq(qq(
+      '    <tr><td>old (wrong) recipient:'
+      '        <td><input type="text" 	   name="oto"  size="80" value="$oto"></tr>'
+    ));
+  }
+  if ($from and $oto) {
+    pq(qq(
+      '    <tr><td>new recipient:'
+      '        <td><input type="text" 	   name="nto"  size="80" value="$nto"></tr>'
+      '    <tr><td>filename: <td><select name="file" size="1">'
+    ));
+    if ($file) {
+      print "\t<option>$file</option>\n";
+    } else {
+      foreach my $file (glob "$oto/$from/*/data") {
+        next if $file =~ m:/STDFEX/:;
+        $file =~ s:/data$::;
+        if (open $file,'<',"$file/filename") {
+          my $filename = <$file> || '';
+          close $file;
+          if ($filename) {
+            print "\t<option>$filename</option>\n";
+          }
+        }
+      }
+    }
+    print "    </tr>\n";
+  }
+  pq(qq(
+    '  </table>'
+    '  <p>'
+    '  <input type="submit" value="submit">'
+    '</form>'
+    <p>
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+  exit;
+}
+
+if ($nto) {
+  
+  # read aliases from address book
+  if (open my $AB,'<',"$from/\@ADDRESS_BOOK") {
+    while (<$AB>) {
+      s/#.*//;
+      $_ = lc $_;
+      if (s/^\s*(\S+)[=\s]+(\S+)//) {
+        my ($alias,$address) = ($1,$2);
+        if ($nto eq $alias) {
+          $nto = $address;
+          last;
+        }
+      }
+    }
+    close $AB;
+  }
+
+  $nto .= '@'.$mdomain if $mdomain and $nto !~ /@/ and $nto =~ /\w/;
+  checkaddress($nto) or http_die("$nto is not a valid e-mail address");
+} else {
+  http_die("no new recipient given");
+}
+
+if ($oto and $nto and $oto eq $nto) {
+  http_die("new recipient must be other than old recipient");
+}
+
+$fkey = urlencode($file);
+unless (-s "$oto/$from/$fkey/data") {
+  http_die("no upload data found for $file for $oto");
+}
+
+if (my $download = slurp("$oto/$from/$fkey/download")) {
+  chomp $download;
+  http_die("$file already downloaded by $oto") if $download ne $oto;
+}
+
+mkdirp("$nto/$from");
+rmrf("$nto/$from/$fkey");
+
+if (rename "$oto/$from/$fkey","$nto/$from/$fkey") {
+  mkdirp("$oto/$from/$fkey");
+  if (open $fkey,'>',"$oto/$from/$fkey/error") {
+    print {$fkey} "$from has removed $file\n";
+    close $fkey;
+  }
+  unlink "$nto/$from/$fkey/dkey";
+  unlink "$nto/$from/$fkey/notify";
+  unlink "$nto/$from/$fkey/error";
+  unlink "$nto/$from/$fkey/download";
+  $dkey = randstring(8);
+  symlink $dkey,"$nto/$from/$fkey/dkey";
+  symlink "../$nto/$from/$fkey","$dkeydir/$dkey";
+  if (open $fkey,'<',"$nto/$from/$fkey/filename") {
+    chomp($filename = <$fkey>||'');
+    close $fkey;
+  }
+  $filename = $fkey unless $filename;
+  $keep = readlink "$nto/$from/$fkey/keep" || 0;
+  if (not $keep and open $fkey,'<',"$nto/$from/$fkey/keep") {
+    chomp($keep = <$fkey>||'');
+    close $fkey;
+  }
+  if (open $fkey,'<',"$nto/$from/$fkey/comment") {
+    chomp($comment = <$fkey>||'');
+    close $fkey;
+  }
+  notify(
+    status	 => "new",
+    dkey	 => $dkey,
+    filename	 => $filename,
+    keep	 => $keep||$keep_default,
+    comment	 => $comment||'',
+  );
+  ruplog("$oto/$from/$fkey ==> $nto");
+  http_header("200 OK");
+  print html_header('F*EX redirect');
+  pq(qq(
+    '<h3>F*EX redirect</h3>'
+    'notification of file upload \"$filename\" sent to $nto'
+    '<p>'
+    '<a href="/foc?akey=$akey">back to F*EX operation control</a>'
+    '</body></html>'
+  ));
+} else {
+  http_die("redirect $nto/$from/$fkey failed : $!")
+}
+
+exit;
+
+
+sub normalize_address {
+  local $_ = shift;
+  s/[<>;,\s\|\/]//g;
+  $_ = untaint($_);
+}
+
+
+# standard log
+sub ruplog {
+  my $msg = "@_";
+  
+  $msg =~ s/\n/ /g;
+  $msg =~ s/\s+$//;
+  
+  if (open $log,'>>',$log) {
+    flock $log,LOCK_EX;
+    seek $log,0,SEEK_END;
+    printf {$log} "%s [%s_%s] (%s) %s\n",
+                  isodate(time),$$,$ENV{REQUESTCOUNT},$fra,$msg;
+    close $log;
+  }
+}

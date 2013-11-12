@@ -1,0 +1,803 @@
+#!/usr/bin/perl -wT
+
+# fexsrv : web server for F*EX service
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use 5.008;
+use Socket;
+use IO::Handle;
+use Fcntl qw':flock :seek';
+
+# stunnel workaround
+BEGIN { $SIG{CHLD} = "DEFAULT" }
+
+# use BSD::Resource;
+# setrlimit(RLIMIT_CPU,999,999) or die "$0: $!\n";
+
+# SSL remote address provided by stunnel
+if (@ARGV and $ARGV[0] eq 'stunnel' and $ENV{REMOTE_HOST} =~ /(.+)/) {
+  $ssl_ra = $1;
+}
+
+# KEEP_ALIVE <== callback from CGI
+if ($ENV{KEEP_ALIVE}) { 
+  $keep_alive = $ENV{KEEP_ALIVE};
+} else {
+  %ENV = ();   # clean environment
+}
+
+$ENV{HOME} = (getpwuid($<))[7] or die "$0: no HOME\n";
+
+# fexsrv MUST be run with full path!
+if ($0 =~ m:^(/.+)/bin/fexsrv:) {
+  $FEXHOME = $1;
+  $FEXHOME =~ s:/+:/:g;
+  $FEXHOME =~ s:/$::;
+  $ENV{FEXHOME} = $FEXHOME;
+}
+
+foreach my $lib (
+  $FEXHOME,
+  '/usr/local/fex',
+  '/usr/local/share/fex',
+  '/usr/share/fex',
+) {
+  $ENV{FEXLIB} = $FEXLIB = $lib       and last if -f "$lib/fex.pp";
+  $ENV{FEXLIB} = $FEXLIB = "$lib/lib" and last if -f "$lib/lib/fex.pp";
+}
+
+# import from fex.pp
+our ($hostname,$debug,$timeout,$max_error,$max_error_handler);
+our ($spooldir,$logdir,$docdir,$xkeydir,$lockdir);
+our ($force_https,$default_locale,$bs,$adlm);
+our (@locales);
+
+# load common code (local config: $FEXHOME/lib/fex.ph)
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+chdir $spooldir or http_die("$0: $spooldir - $!\n");
+
+our $log = "$logdir/fexsrv.log";
+our $error = 'F*EX ERROR';
+our $htmlsource;
+our $hid = ''; # header ID
+our @log;
+
+$0 = untaint($0);
+  
+$ENV{GATEWAY_INTERFACE} = 'CGI/1.1';
+$ENV{SERVER_NAME} = $hostname;
+$ENV{QUERY_STRING} = '';
+$ENV{HTTP_COOKIE} = '';
+$ENV{PATH_INFO} = '';
+$ENV{RANDOM} = randstring(8);
+$ENV{FEATURES} = 'SID,CHECKRECIPIENT,GROUPS,QUOTA,FILEID,MULTIPOST,XKEY,'
+                .'FILEQUERY,FILESTREAM,JUP,NOSTORE,AXEL,FEXMAIL,FILELINK';
+  
+# ignore bullshit requests
+my $ignore = join('|',(
+  '^GET /w00tw00t\.at\.ISC\.SANS',
+));
+
+$port = 0;
+
+# continue session?
+if ($keep_alive) {
+  if ($ENV{HTTP_HOST} =~ /(.+):(.+)/) {
+    $hostname = $1;
+    $port = $2;
+  } else {
+    $hostname = $ENV{HTTP_HOST};
+    if ($ENV{PROTO} eq 'https') { $port = 443 }
+    else                        { $port = 80 }
+  }
+  $ra = $ENV{REMOTE_ADDR};
+  $rh = $ENV{REMOTE_HOST};
+} 
+
+# new session
+else {
+
+  # HTTPS connect
+  if ($ssl_ra) {
+    $ENV{PROTO} = 'https';
+    $ENV{REMOTE_ADDR} = $ra = $ssl_ra;
+    $rh = gethostbyaddr(inet_aton($ra),AF_INET);
+    $port = 443;
+    # print {$log} "X-SSL-Remote-Host: $ssl_ra\n";
+  } 
+
+  # HTTP connect
+  else {
+    $ENV{PROTO} = 'http';
+    my $sa = getpeername(STDIN) or die "$0: no network stream on STDIN\n";
+    if (sockaddr_family($sa) == AF_INET) {
+      ($ENV{REMOTE_PORT},$iaddr) = sockaddr_in($sa);
+      $ENV{REMOTE_ADDR} = $ra = inet_ntoa($iaddr);
+      $rh = gethostbyaddr($iaddr,AF_INET);
+      ($port) = sockaddr_in(getsockname(STDIN));
+    } elsif (sockaddr_family($sa) == AF_INET6) {
+      eval "use Socket6";
+      http_error(503) if $@;
+      ($ENV{REMOTE_PORT},$iaddr) = unpack_sockaddr_in6($sa);
+      $ENV{REMOTE_ADDR} = $ra = inet_ntop(AF_INET6, $iaddr);
+      $rh = gethostbyaddr($iaddr,AF_INET6);
+      ($port) = unpack_sockaddr_in6(getsockname(STDIN));
+    } else {
+      die "$0: unknown IP version\n";
+    }
+    $port = 80 unless $port;
+  }
+
+  $ENV{REMOTE_HOST} = $rh || '';
+
+  $ENV{HTTP_HOST} = ($port == 80 or $port == 443) 
+                  ? $hostname : "$hostname:$port";
+
+}
+
+if ($reverse_proxy_ip and $reverse_proxy_ip eq $ra) {
+  $ENV{FEATURES} =~ s/SID,//;
+}
+
+if (@anonymous_upload and ipin($ra,@anonymous_upload)) {
+  $ENV{FEATURES} .= ',ANONYMOUS';
+}
+
+$| = 1;
+
+$SIG{CHLD} = "DEFAULT"; # stunnel workaround
+
+$SIG{ALRM} = sub {
+  # printf {$log} "\nTIMEOUT %s %s\n",isodate(time),$connect;
+  if (@log) {
+    debuglog('TIMEOUT',isodate(time));
+    fexlog($connect,@log,"TIMEOUT");
+  }
+  exit;
+};
+
+REQUEST: while (*STDIN) {
+
+  if (defined $ENV{REQUESTCOUNT}) { $ENV{REQUESTCOUNT}++ }
+  else                            { $ENV{REQUESTCOUNT} = 0 }
+  
+  $connect = sprintf "%s:%s %s %s %s [%s_%s]",
+                     $keep_alive ? 'CONTINUE' : 'CONNECT',
+                     $port,
+                     isodate(time),
+                     $rh||'-',
+                     $ra,
+                     $$,$ENV{REQUESTCOUNT};
+  $hid = sprintf("%s %s\n",$rh||'-',$ra);
+
+  @header = @log = ();
+  $header = '';
+
+  # read complete HTTP header
+  while (defined ($_ = &getaline)) {
+    last if /^\s*$/;
+    $hl += length;
+    $header .= $_;
+    s/[\r\n]+$//;
+    # URL-encode non-printable chars
+    s/([\x00-\x08\x0E-\x1F\x7F-\x9F])/sprintf "%%%02X",ord($1)/ge;
+    if (@header and s/^\s+/ /) {
+      $header[-1] .= $_;
+    } else {
+      push @header,$_;
+      $header{$1} = $2 if /(.+)\s*:\s*(.+)/;
+      push @log,$_;
+    }
+    
+    if (/^(GET \/|X-Forwarded-For|User-Agent)/i) {
+      $hid .= $_."\n";
+    }
+
+    # reverse-proxy?
+    if ($reverse_proxy_ip and $reverse_proxy_ip eq $ra and
+       /^X-Forwarded-For: ([\d.]+)/
+    ) {
+      $ENV{REMOTE_ADDR} = $ra = $1;
+      $ENV{REMOTE_HOST} = $rh = gethostbyaddr(inet_aton($ra),AF_INET) || '';
+      $ENV{HTTP_HOST} = $hostname;
+      if ($ENV{PROTO} eq 'https') { $port = 443 }
+      else                        { $port = 80 }
+    }
+
+    if (/$ignore/) {
+      fexlog($connect,@log,'IGNORED');
+      exit;
+    }
+  }
+
+  exit unless @header;
+  exit if $header =~ /^\s*$/;
+  
+  $ENV{HTTP_HEADER} = $header;
+  debuglog($header);
+  # http_die("<pre>$header</pre>");
+  
+  # multiline header inquisition
+  &$header_hook($connect,$header,$ra) if $header_hook;
+
+  $ENV{'HTTP_HEADER_LENGTH'} = $hl;
+  $ENV{REQUEST_URI} = $uri = '';
+  $cgi = '';
+
+  # is it a HTTP-request at all?
+  $request = shift @header;
+  if ($request !~ /^(GET|HEAD|POST|OPTIONS).*HTTP\/\d\.\d$/i) {
+    fexlog($connect,$request,"DISCONNECT: no HTTP request");
+    exit;
+  }
+  
+  if ($force_https and $port != 443
+      and $request =~ /^(GET|HEAD|POST)\s+(.+)\s+(HTTP\/[\d\.]+$)/i) {
+    $request = $2;
+    nvt_print(
+      "HTTP/1.1 301 Moved Permanently",
+      "Location: https://$hostname$request",
+      "Content-Length: 0",
+      ""
+    );
+    fexlog($connect,@log);
+    exit;
+  }
+
+  $request =~ s{^(GET|HEAD|POST) https?://$hostname(:\d+)?}{$1 }i;
+
+  if ($request =~ m"^(GET|HEAD) /fop/\w+/") {
+    # no header inquisition on regular fop request
+    $header_hook = '';
+  } else {
+    &$header_hook($connect,$request,$ra) if $header_hook;
+  }
+
+  unless ($keep_alive) {
+    if ($request =~ m:(HTTP/1.(\d)): and $2) {
+      $ENV{KEEP_ALIVE} = $keep_alive = $ra
+    } else {
+      $ENV{KEEP_ALIVE} = $keep_alive = '';
+    }
+  }
+
+  if ($request =~ /^OPTIONS FEX HTTP\/[\d\.]+$/i) {
+    fexlog($connect,@log);
+    nvt_print(
+      "HTTP/1.1 201 OK",
+      "X-Features: $ENV{FEATURES}",
+      "X-Timeout: $timeout",
+      ''
+    );
+    next REQUEST if $keep_alive;
+    exit;
+  }
+
+  if ($request =~ m:^GET /?SID HTTP/[\d\.]+$:i) {
+    if ($ENV{FEATURES} !~ /\bSID\b/) {
+      fexlog($connect,@log);
+      nvt_print(
+        "HTTP/1.1 501 Not Available",
+        "X-Features: ".$ENV{FEATURES},
+        "X-Timeout: ".$timeout,
+        'Content-Length: 0',
+        ''
+      );
+    } else {
+      $ENV{SID} = randstring(8);
+      fexlog($connect,@log);
+      nvt_print(
+        "HTTP/1.1 201 ".$ENV{SID},
+        "X-Features: ".$ENV{FEATURES},
+        "X-SID: ".$ENV{SID},
+        "X-Timeout: ".$timeout,
+        'Content-Length: 0',
+        ''
+      );
+    }
+    next REQUEST if $keep_alive;
+    exit;
+  }
+
+  if ($request =~ /^(GET|HEAD|POST)\s+(.+)\s+(HTTP\/[\d\.]+$)/i) {
+    $ENV{REQUEST_METHOD} = uc($1);
+    $ENV{REQUEST_URI}    = $uri = $cgi = $2;
+    $ENV{HTTP_VERSION}   = $protocol = $3;
+    $ENV{QUERY_STRING}   = $1               if $cgi =~ s/\?(.*)//;
+    $ENV{PATH_INFO}      = $1               if $cgi =~ m:/.+?(/.+?)(\?|$):;
+    $ENV{KEEP_ALIVE}     = $keep_alive = '' if $protocol =~ /1\.0/;
+    $ENV{REQUEST_URL}    = "$ENV{PROTO}://$ENV{HTTP_HOST}$ENV{REQUEST_URI}";
+    if ($uri =~ /<|%3c/i)  { badchar("&lt;") }
+    if ($uri =~ />|%3e/i)  { badchar(">") }
+    if ($uri =~ /\||%7c/i) { badchar("|") }
+    if ($uri =~ /\\|%5c/i) { badchar("\\") }
+  }
+
+  while ($_ = shift @header) {
+    
+    # header inquisition!
+    &$header_hook($connect,$_,$ra) if $header_hook;
+
+    # mega stupid "Download Manager" FlashGet
+    if ($uri =~ m{^/fop/} and m{^Referer: https?://.*\Q$uri$}) {
+      fexlog($connect,@log,"NULL: FlashGet");
+      debuglog("NULL: FlashGet");
+      exec qw'cat /dev/zero' or sleep 30;
+      exit;
+    }
+
+    if (/^User-Agent: (FDM)/ and $header =~ /\nRange:/) {
+      disconnect($1,"499 Download Manager $1 Not Supported",30);
+    }
+    
+    if (/^User-Agent: (Java\/[\d\.]+)/) {
+      disconnect($1,"499 User-Agent $1 Not Supported",30);
+    }
+    
+    if (/^Range:.*,/) {
+      disconnect("Range a,b","416 Requested Range Not Satisfiable",30);
+    }
+    if (/^Range:.*(\d+)-(\d+)/) {
+      if ($1 > $2) {
+        disconnect("Range a>b","416 Requested Range Not Satisfiable",0);
+      }
+      if (($header{'User-Agent'}||'') !~ /$adlm/ ) {
+        disconnect("Range a-b","416 Requested Range Not Satisfiable",30);
+      }
+    }
+
+    if (/^Range:.*\d+-$/ and $hid) {
+      my $lock = untaint($lockdir.'/'.md5_hex($hid));
+      if (open $lock,'+>>',$lock) {
+        if (flock($lock,LOCK_EX|LOCK_NB)) {
+          seek $lock,0,0;
+          truncate $lock,0;
+          print {$lock} $hid;
+        } else {
+          disconnect(
+            "multiple Range request",
+            "400 Multiple Requests Not Allowed",
+            10,
+          );
+        }
+      }
+    }
+
+    # client signed int bug
+    if (/^Range:.*-\d+-/) {
+      disconnect("Range -a-","416 Requested Range Not Satisfiable",0);
+    }
+
+#    if (/^Range:/ and $protocol =~ /1\.0/) {
+#      &$header_hook($connect,$_,$ra) while ($header_hook and $_ = shift @header);
+#      fexlog($connect,@log,"DISCONNECT: Range + HTTP/1.0");
+#      debuglog("DISCONNECT: Range + HTTP/1.0");
+#      http_error(416);
+#      exit;
+#    }
+
+    if (/^Connection:\s*close/i) {
+      $ENV{KEEP_ALIVE} = $keep_alive = '';
+    }
+
+    # HTTP header ==> environment variables
+    if (/^([\w\-]+):\s*(.+)/s) {
+      $http_var = $1;
+      $http_val = $2;
+      $http_var =~ s/-/_/g;
+      $http_var = uc($http_var);
+      $http_val =~ s/^\s+//;
+      $http_val =~ s/\s+$//;
+      if ($http_var =~ /^X_(FEX_\w+|CONTENT_LENGTH)$/) {
+        $http_var = $1;
+      } else {
+        $http_val =~ s/\s+/ /g;
+        if ($http_var =~ /^HTTP_(HOST|VERSION)$/) {
+          $http_var = 'X-'.$http_var;
+        } elsif ($http_var !~ /^CONTENT_/) {
+          $http_var = 'HTTP_'.$http_var;
+        }
+      }
+      $ENV{$http_var} = $http_val;
+    }
+  }
+
+  exit unless $cgi;
+
+  # extra download request? (request http://fexserver//xkey)
+  if ($cgi =~ m{^//([^/]+)$}) {
+    my $xkey = $1;
+    my $dkey;
+    if ($xkey =~ /^afex_\d/) {
+      $dkey = readlink "$xkeydir/$xkey" and $dkey =~ s/^\.\.\///;
+    } else {
+      $dkey = readlink "$xkeydir/$xkey/dkey" and $dkey .= "/$xkey";
+    }
+    if ($dkey) {
+      # xkey downloads are only one time possible
+      unlink "$xkeydir/$xkey/xkey";
+      unlink "$xkeydir/$xkey";
+      nvt_print(
+        "HTTP/1.1 301 Moved Permanently",
+        "Location: $ENV{PROTO}://$ENV{HTTP_HOST}/fop/$dkey",
+        "Content-Length: 0",
+        ""
+      );
+      fexlog($connect,@log);
+      exit;
+    }
+    fexlog($connect,@log);
+    http_error(404);
+    exit;
+  }
+
+  # get locale
+  if (($ENV{QUERY_STRING} =~ /.*locale=([\w-]+)/ or
+       $ENV{HTTP_COOKIE}  =~ /.*locale=([\w-]+)/) 
+      and -d "$FEXHOME/locale/$1") {
+    $ENV{LOCALE} = $locale = $1;
+  } else {
+    $ENV{LOCALE} = $locale = $default_locale;
+  }
+
+  # check for name based virtual host
+  $vhost = vhost($ENV{'HTTP_HOST'});
+
+  if ($debug) {
+    debuglog("ENV:\n");
+    foreach $var (sort keys %ENV) {
+      debuglog(sprintf "  %s = >%s<\n",$var,$ENV{$var});
+    }
+    debuglog("\n");
+  }
+
+  # locale definitions in fex.ph?
+  if (@locales) {
+    if (@locales == 1) {
+      $locale = $locales[0];
+    } elsif (not grep /^$locale$/,@locales) {
+      $locale = $default_locale;
+    }
+  }
+              
+  # prepare document file name
+  if ($ENV{REQUEST_METHOD} =~ /^GET|HEAD$/) {
+    $doc = untaint($uri);
+    $doc =~ s/%([\dA-F]{2})/unpack("a",pack("H2",$1))/ge;
+    $doc =~ m:/\.\./: and http_error(403);
+    $doc =~ s:^/+::;
+    $doc =~ s/\?.*//;
+    if ($locale and -e "$docdir/locale/$locale/$doc") {
+      $doc = "$docdir/locale/$locale/$doc";
+    } else {
+      $doc = "$docdir/$doc";
+    }
+  }
+
+  # CGI or document request?
+  if ($cgi =~ s:^/+::) {
+    $cgi =~ s:/.*::;
+    unless ($cgi) {
+      my $login = "$FEXHOME/cgi-bin/login";
+      if (-x $login) {
+        $cgi = untaint(readlink($login) || $login);
+        $cgi =~ s:.*/::;
+      }
+    }
+
+    $ENV{SCRIPT_NAME} = $cgi;
+
+    # locale CGIs? (vhost comes already with own FEXLIB)
+    if ($locale and $locale ne 'english'
+        and -f "$FEXHOME/locale/$locale/cgi-bin/$cgi") {
+      $ENV{SCRIPT_FILENAME} = $cgi = "$FEXHOME/locale/$locale/cgi-bin/$cgi";
+      $ENV{FEXLIB} = $FEXLIB = "$FEXHOME/locale/$locale/lib" unless $vhost;
+    } else {
+      $ENV{SCRIPT_FILENAME} = $cgi = "$FEXHOME/cgi-bin/$cgi";
+      $ENV{FEXLIB} = $FEXLIB = "$FEXHOME/lib" unless $vhost;
+    }
+
+    $status = '';
+    if (-x $cgi and -f $cgi) {
+      unlink "$logdir/.error/$ra";
+      # push @log,"DEBUG: locale=$locale locales=(@locales)";
+      fexlog($connect,@log,"EXEC $cgi");
+      eval { local $^W = 0; exec $cgi };
+      $status = "$! or bad interpreter";
+    } else {
+      if (-f "$doc/.htindex") {
+        require "$FEXLIB/dop";
+        fexlog($connect,@log);
+
+        showindex($doc);
+        STDOUT->flush;
+        next REQUEST if $keep_alive;
+        exit;
+      }
+      if (-f "$doc/index.html") {
+        # force redirect if trailing / is missing
+        # this is mandatory for processing further HTTP request!
+        if ($doc !~ m{/$}) {
+          nvt_print(
+            "HTTP/1.1 301 Moved Permanently",
+            "Location: $ENV{REQUEST_URL}/",
+            "Content-Length: 0",
+            ""
+          );
+          fexlog($connect,@log);
+          next REQUEST if $keep_alive;
+          exit;
+        }
+        $doc .= '/index.html';
+        $doc =~ s:/+:/:g;
+      }
+      $doc =~ s/#.*//; # ignore HTML anchors (stupid msnbot)
+
+      # special request for F*EX UNIX clients
+      if ($ENV{SCRIPT_NAME} eq 'xx.tar') {
+        bintar(qw'fexget fexsend xx zz ezz');
+      }
+      if ($ENV{SCRIPT_NAME} eq 'sex.tar') {
+        bintar(qw'sexsend sexget sexxx');
+      }
+      if ($ENV{SCRIPT_NAME} eq 'afex.tar') {
+        bintar(qw'afex asex fexget fexsend sexsend sexget');
+      }
+      if ($ENV{SCRIPT_NAME} eq 'afs.tar') {
+        bintar(qw'afex asex fexget fexsend xx sexsend sexget sexxx zz ezz');
+      }
+      # URL ends with ".html!" or ".html?!"
+      if ($doc =~ s/(\.html)!$/$1/ or 
+          $doc =~ /\.html$/ and $ENV{'QUERY_STRING'} eq '!') 
+      { $htmlsource = $doc } else { $htmlsource = '' }
+
+      if (-f $doc 
+          or $doc =~ /(.+)\.(tar|tgz|zip)$/ and lstat("$1.stream"))
+      {
+        unlink "$logdir/.error/$ra";
+        delete $ENV{SCRIPT_FILENAME};        
+        $ENV{DOCUMENT_FILENAME} = $doc;
+        require "$FEXLIB/dop";
+        fexlog($connect,@log);
+        dop($doc);
+        STDOUT->flush;
+        next REQUEST if $keep_alive;
+        exit;
+      } elsif (-e $cgi) {
+        $status = 'not executable';
+      } elsif ($uri eq '/bunny') {
+        fexlog($connect,@log);
+        nvt_print(
+          'HTTP/1.1 200 OK',
+          'Server: fexsrv',
+          "Content-Type: text/plain",
+          '',
+          '=:3',
+        );
+        exit;
+      } elsif ($uri eq '/camel') {
+        fexlog($connect,@log);
+        nvt_print(
+          'HTTP/1.1 200 OK',
+          'Server: fexsrv',
+          "Content-Type: text/plain",
+          '',
+        );
+        local $/;
+        print unpack('u',<DATA>);
+        exit;
+      }
+
+    }
+
+  }
+
+  # neither document nor CGI ==> error
+  
+  if ($status) {
+    fexlog($connect,@log,"FAILED to exec $cgi : $status");
+    http_error(555);
+  } else {
+    fexlog($connect,@log,"UNKNOWN URL");
+    badlog($request);
+    http_error(404);
+  }
+  exit;
+}
+
+
+# read one text line unbuffered from STDIN
+sub getaline {
+  my $line = '';
+  my $c;
+
+  alarm($timeout);
+
+  # must use sysread to avoid perl line buffering
+  # (later exec would destroy line buffer)
+  while (sysread STDIN,$c,1) {
+    $line .= $c;
+    last if $c eq "\n";
+  }
+
+  alarm(0);
+
+  return $line;
+}
+
+
+sub fexlog {
+  my @log = @_;
+  if (open $log,">>$log") {
+    flock $log,LOCK_EX;
+    seek $log,0,SEEK_END;
+    print {$log} "\n",join("\n",@log),"\n";
+    close $log;
+  } else {
+    http_die("$0: cannot write to $log - $!\n");
+  }
+}
+
+
+
+sub badchar {
+  my $bc = shift;
+  
+  fexlog($connect,@log,"DISCONNECT: bad characters in URL");
+  debuglog("DISCONNECT: bad characters in URL $uri");
+  http_die("\"$bc\" is not allowed in URL");
+}
+
+
+sub bintar {
+  my $tmpdir = "$FEXHOME/tmp";
+  my $fs = "$ENV{PROTO}://$ENV{HTTP_HOST}";
+  
+  if (chdir "$FEXHOME/bin") {
+    fexlog($connect,@log);
+    chdir $fstb if $fstb;
+    mkdir $tmpdir;
+    foreach my $f (@_) {
+      copy($f,"$tmpdir/$f","s#fexserver = ''#fexserver = '$fs'#");
+      chmod 0755,"$tmpdir/$f";
+    }
+    chdir $tmpdir or http_die("internal error: $tmpdir - $!");
+    my $tar = `tar cf - @_ 2>/dev/null`;
+    unlink @_;
+    nvt_print(
+      'HTTP/1.1 200 OK',
+      'Server: fexsrv',
+      "Content-Length: ".length($tar),
+      "Content-Type: application/x-tar",
+      '',
+    );
+    print $tar;
+    exit;
+  }
+}
+
+
+sub http_error {
+  my $error = shift;
+  my $URL = $ENV{REQUEST_URL};
+  my $URI = $ENV{REQUEST_URI};
+
+  if ($error eq 400) {
+    http_error_header("400 Bad Request");
+    nvt_print("Your request $URL is not acceptable.");
+  } elsif ($error eq 403) {
+    http_error_header("403 Forbidden");
+    nvt_print("You have no permission to request $URL");
+  } elsif ($error eq 404) {
+    http_error_header("404 Not Found");
+    nvt_print("The requested URI $URI was not found on this server.");
+  } elsif ($error eq 416) {
+    http_error_header("416 Requested Range Not Satisfiable");
+  } elsif ($error eq 503) {
+    http_error_header("503 Service Unavailable");
+    # nvt_print("No Perl ipv6 support on this server.");
+  } else {
+    http_error_header("555 Unknown Error");
+    nvt_print("The requested URL $URL produced an internal error.");
+  }
+  nvt_print(
+    "<hr>",
+    "<address>fexsrv at <a href=\"/index.html\">$hostname:$port</a></address>",
+    "</body></html>",
+  );
+  exit;
+}
+
+
+sub disconnect {
+  my $info = shift;
+  my $error = shift;
+  my $wait = shift||0;
+  
+  # &$header_hook($connect,$_,$ra) while ($header_hook and $_ = shift @header);
+  fexlog($connect,@log,"DISCONNECT: $info");
+  debuglog("DISCONNECT: $info");
+  errorlog("$ENV{REQUEST_URI} ==> $error");
+  badlog("$ENV{REQUEST_URI} ==> $error ($info)");
+
+  sleep $wait;
+  nvt_print("HTTP/1.0 $error");
+  exit;
+}
+
+
+sub http_error_header {
+  my $error = shift;
+  
+  errorlog("$ENV{REQUEST_URI} ==> $error");
+  nvt_print(
+    "HTTP/1.1 $error",
+    "Connection: close",
+    "Content-Type: text/html; charset=iso-8859-1",
+    "",
+    '<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">',
+    "<html>",
+    "<head><title>$error</title></head>",
+    "<body>",
+    "<h1>$error</h1>",
+  );
+}
+
+
+sub badlog {
+  my $request = shift;
+  my $n = 1;
+  my $ed = "$spooldir/.error";
+  local $_;
+  
+  if (@ignore_error) {
+    foreach (@ignore_error) {
+      return if $request =~ /$_/;
+    }
+  }
+  
+  if ($ra and $max_error and $max_error_handler) {
+    mkdir($ed) unless -d $ed;
+
+    if (open $ra,"+>>$ed/$ra") {
+      flock($ra,LOCK_EX);
+      seek $ra,0,SEEK_SET;
+      $n++ while <$ra>;
+      printf {$ra} "%s %s\n",isodate(time),$request;
+      close $ra;
+      &$max_error_handler($ra) if $n > $max_error;
+    }
+  }
+}
+
+
+__END__
+M("`@("`@("`@("`@("`@("`@("`@("`@("`@("`@("`@("PM)R(G+5P*("`@
+M("`@("`@("`@("`@("`@("`@("`@("]@8&`M+B`@(&!<("`@("Q=+B`@("`@
+M("`@("`@("`@("`@("`@("`L+BY?"B`@("`@("`@("`@("`@("`@("`@("`@
+M+&`@("`@(&`B+B`@72X@("`@(&`N("`@("`@("`@("`@("`@7U]?+BY>(&!?
+M)V`B(B(*("`@("`@("`@("`@("`@("`@("`@("`I("`@("`@("`G+"TG+2T@
+M+B`@("!@+B`@("`@(%]?7RPN+2<@("XN("T@("`G("TP("Y?"B`@("`@("`@
+M("`@+"X@("`@("`@("`@?%]?+"Y?("!?("`N+5\@("!<("`\("Y@(B<G)V`L
+M7R`@("`@("`@+2!?("TN("`@("`@("<M+BX*("`@("`@("`@('P@(&8M+2TM
+M+2TM+2<O("`@("!@)RTM+BXL("`@("`M("`@("`@("`@("T@("`@("`@("`@
+M("`@("`G("XL7U\N7%\N)PH@("`@("`@("`@8"TM)R<G)R<G8"TM7"`@("`@
+M("`@("`@("!@)RTM+B`@("`@("`@("`@("`@("`@("`@7RPN)RTM)R<*("`@
+M("`@("`@("`@("`@("`@("`@("\@("`@("`@("`@("`@("`@("!@8#T@+2`@
+M+2`@("!?+2`@7RXM)PH@("`@("`@("`@("`@("`@("`@("!\("`@("`@("`@
+M("`@("`@("`@("`@("!?)V`@("`G)U\M+2<*("`@("`@("`@("`@("`@("`@
+M("`@?"`@("`@("`@("`@("`@("`@("`O("`@?"T]+BXM+2<*("`@("`@("`@
+M("`@("`@(%\@("`@("<N("`@("`@("`N7R`@(%\N+2=@)R`@(&!?7PH@("`@
+M("`@("`@("`@("PG("`N("PG("TL3%]?+WP@(%P@8"<G+&\N("`@+5\@("`@
+M)V`M+2X*("`@("`@("`@("`@("`@+BPG(BT@("`O("`@("`@("`@?"`@8'8@
+M+R`N("PG8"TM+BXG7R`G+@H@("`@("`@("`@("`@("`@("TN+E\L)R`@("`@
+M('P@("!\("`@)RTM+E]@("!?+R`@('P@("!\"B`@("`@("`@("`@("`@("`@
+M("`@("`@("`@("=@8"<@6R`@("`@("`@("=@)R`@("`L+RXN+PH@("`@("`@
+M("`@("`@("`@("`@("`@("`@('P@("`M+B<@("`@("`@("`@("`@("Y;("`@
+M+PH@("`@("`@("`@("`@("`@("`@(%]?7U]?7RX@("`L.E]?7U]?7U]?7U]?
+M7U]?7RQ@("PG"B`@("TM+2TM+2TM+2TM+2TM+2TM+2TM+2TM+2T@+2(M+2TM
+M+2TM+2TM+2TM+2TM+2T]+0H@+2TM+2TM+2TM+2TM+2TM+2TM+2TM+2TM+2TM
+6+2TM+2TM+2TM+2TM+2TM+2TM+2TM"@``

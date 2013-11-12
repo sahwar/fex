@@ -1,0 +1,18 @@
+# default: on
+# description: F*EX web server
+#
+service fex
+{
+	socket_type		= stream
+	wait			= no
+        type			= unlisted
+	protocol		= tcp
+        bind			= ADDRESS
+	port			= PORT
+        cps			= 10 2
+	user			= fex
+	groups			= yes
+	server			= FEXHOME/bin/fexsrv
+	nice			= 0
+	disable			= no
+}

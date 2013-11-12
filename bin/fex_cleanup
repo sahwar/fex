@@ -1,0 +1,536 @@
+#!/usr/bin/perl -w 
+
+# cleanup for F*EX service
+#
+# run this program via cron-job once at night!
+#
+# Author: Ulli Horlacher <framstag@rus.uni-stuttgart.de>
+#
+
+use Getopt::Std;
+use File::Basename;
+use IO::Socket::INET;
+use Digest::MD5	qw'md5_hex';
+
+use constant DS => 60*60*24;
+  
+# do not run as CGI!
+exit if $ENV{SCRIPT_NAME};
+
+unless ($ENV{FEXLIB}) {
+  if ($ENV{FEXHOME}) {
+    $ENV{FEXLIB} = $FEXLIB = $ENV{FEXHOME}.'/lib';
+  } else {
+    $ENV{FEXLIB} = $FEXLIB = dirname(dirname($0)).'/lib';
+  }
+}
+die "$0: no FEXLIB\n" unless -f "$FEXLIB/fex.pp";
+
+# program name
+$0 =~ s:.*/::;
+
+$| = 1;
+
+# use fex.ph for site configuration!
+our ($FEXHOME);
+our ($spooldir,$logdir,$docdir);
+our ($akeydir,$ukeydir,$dkeydir,$skeydir,$gkeydir,$xkeydir,$lockdir);
+our ($durl,$debug,$autodelete,$hostname,$admin,$admin_pw,$bcc);
+$keep_default = 5;
+
+# load common code, local config : $HOME/lib/fex.ph
+require "$FEXLIB/fex.pp" or die "$0: cannot load $FEXLIB/fex.pp - $!\n";
+
+# localized functions 
+# (needed for reminder e-mails and account reactivation)
+foreach my $lf (glob "$FEXHOME/locale/*/lib/lf.pl") { require $lf }
+
+# default locale functions (from fex.pp)
+$notify{english} = \&notify;
+$reactivation{english} = \&reactivation;
+
+$opt_v = $opt_d = 0;
+getopts('vd');
+$opt_v = $opt_d if $opt_d;
+
+$today = time;
+$isodate = isodate($today);
+
+chdir $spooldir or die "$0: $spooldir - $!\n";
+open L,">>$logdir/cleanup.log";
+
+# clean up regular spool
+opendir $spooldir,'.' or die "$0: $spooldir - $!\n";
+while ($to = readdir $spooldir) {
+  next if $to !~ /@/ or -l $to;
+  if (@demo and -f "$to/.demo" and time > mtime("$to/.demo")+$demo[1]*DS) {
+    logdel($to,"demo user $to deleted");
+    next;
+  }
+  if (-d $to and $to !~ /^\./) {
+    opendir TO,$to or die "$0: $spooldir/$to - $!\n";
+    while ($from = readdir TO) {
+      next if $from !~ /@/;
+      if ($from eq '@GROUP') {
+        foreach $group (glob "$to/$from/*") {
+          if (readlink $group and not -f $group) {
+            logdel($group,"$group deleted (master has gone)");
+          }
+        }
+      } else {
+        if (-d "$to/$from" and $from !~ /^\./) {
+          opendir FROM,"$to/$from" or die "$0: $spooldir/$to/$from - $!\n";
+          while ($file = readdir FROM) {
+            next if $file eq '.' or $file eq '..';
+            if (-d "$to/$from/$file" and $file !~ /^\./) {
+              cleanup($to,$from,$file);
+              rmdir "$to/$from/$file";
+            }
+          }
+          closedir FROM;
+          rmdir "$to/$from";
+        }
+      }
+    }
+    closedir TO;
+    @glob = glob "$to/*/* $to/\@MAINUSER/* $to/\@GROUP/*";
+    unless (@glob or -f "$to/\@") {
+      logdel($to,"$to deleted");
+    }
+  }
+}
+closedir $spooldir;
+
+# clean up download key lookup directory
+if (chdir $dkeydir and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if ($link = readlink $file and 
+        (not -l "$link/dkey" or readlink "$link/dkey" ne $file)) {
+      logdel($file,".dkeys/$file deleted");
+    }
+  }
+  closedir D;
+}
+
+# clean up upload key lookup directory
+if (chdir $ukeydir and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (($link = readlink $file and not -e "$link/upload"
+         or -f $file and time>mtime($file)+DS)) {
+      logdel($file,".ukeys/$file deleted");
+    }
+  }
+  closedir D;
+}
+
+# clean up authorization key lookup directory
+if (chdir $akeydir and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-l $file and time>mtime($file)+DS) {
+      logdel($file,".akeys/$file deleted");
+    }
+  }
+  closedir D;
+}
+
+# clean up extra download key lookup directory
+if (chdir $xkeydir and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-l $file and not (-f "$file/upload" or -f "$file/data")) {
+      logdel($file,".xkeys/$file deleted");
+    }
+  }
+  closedir D;
+}
+
+# clean up lock directory
+if (chdir $lockdir and opendir D,'.') {
+  while ($file = readdir D) {
+    if (-f $file and time>mtime($file)+DS) {
+      logdel($file,".locks/$file deleted");
+    }
+  }
+  closedir D;
+}
+
+# clean up error directory
+if (chdir "$spooldir/.error" and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-f $file) {
+      $mtime = mtime($file);
+      if ($mtime and $today > 5*$keep_default*DS+$mtime) {
+        logdel($file,".error/$file deleted");
+      }
+    }
+  }
+  closedir D;
+}
+
+# clean up debug directory
+if (chdir "$logdir/.debug" and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-f $file) {
+      $mtime = mtime($file);
+      if ($mtime and $today > $keep_default*DS+$mtime) {
+        # logdel($file,".debug/$file deleted");
+        if ($opt_d) { print "unlink .debug/$file\n" }
+        else        { unlink $file }
+      }
+    }
+  }
+  closedir D;
+}
+
+# clean up subuser keys directory
+if (chdir $skeydir and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-f $file and open F,$file) {
+      $delete = 1;
+      $from = $to = $id = '';
+      while (<F>) {
+        if (/^(\w+)=(.+)/) {
+          $from = $2 if $1 eq 'from';
+          $to   = $2 if $1 eq 'to';
+          $id   = $2 if $1 eq 'id';
+        }
+      }
+      close F;
+      if ($from and $to and $id and open F,"$spooldir/$to/\@SUBUSER") {
+        while (<F>) {
+          if (/^\Q$from:$id\E$/) {
+            $delete = 0;
+            last;
+          }
+        }
+        close F;
+      }
+      if ($delete) {
+        logdel($file,".skeys/$file deleted");
+      }
+    }
+  }
+  closedir D;
+}
+
+# clean up orphan subuser links
+chdir $spooldir;
+foreach $subuser (glob '*/@MAINUSER/*') {
+  if ($skey = readlink $subuser and not -f "$skeydir/$skey") {
+    logdel($subuser,"$subuser deleted");
+  }
+}
+foreach $subuser (glob '*/@MAINUSER') {
+  unlink $subuser unless $opt_d;
+}
+
+# clean up old OKEYs
+chdir $spooldir;
+foreach my $okey (glob '*/@OKEY/*') {
+  if (time > mtime($okey)+30*DS) {
+    logdel($okey,"$okey deleted");
+  }
+}
+
+
+# clean up group keys directory
+if (chdir $gkeydir and opendir D,'.') {
+  while ($gkey = readdir D) {
+    next if $gkey eq '.' or $gkey eq '..';
+    if (-f $gkey and open F,$gkey) {
+      $delete = 1;
+      $from = $group = $id = '';
+      while (<F>) {
+        if (/^(\w+)=(.+)/) {
+          $from  = $2 if $1 eq 'from';
+          $group = $2 if $1 eq 'to';
+          $id    = $2 if $1 eq 'id';
+        }
+      }
+      close F;
+      $group =~ s/^@//;
+      $gf = "$spooldir/$from/\@GROUP/$group";
+      if ($from and $group and $id and open F,$gf) {
+        while (<F>) {
+          if (/^\Q$from:$id\E$/) {
+            $delete = 0;
+            last;
+          }
+        }
+        close F;
+      }
+      if ($delete) {
+        logdel($gkey,".gkeys/$gkey deleted");
+        logdel($gf,"$gf deleted") if -l $gf;
+      }
+    }
+  }
+  closedir D;
+}
+
+# clean up self registration directory
+if (chdir "$spooldir/.reg" and opendir D,'.') {
+  while ($file = readdir D) {
+    next if $file eq '.' or $file eq '..';
+    if (-f $file) {
+      $mtime = mtime($file);
+      if ($mtime and $today > $mtime+DS) {
+        logdel($file,".reg/$file deleted");
+      }
+    }
+  }
+  closedir D;
+}
+
+# send account expiration warning 
+if ($account_expire and $account_expire =~ /^(\d+):(\w+)/) {
+  my $expire = $1;
+  if (chdir $spooldir and opendir $spooldir,'.') {
+    my $fid = "$FEXHOME/.fex/id";
+    unless (-f "$admin/\@" and -f $fid) {
+      $admin_pw ||= rand(1000000000000000);
+      warn "create new fex account for $admin\n";
+      system("$FEXHOME/bin/fac -u $admin $admin_pw");
+      die "$0: cannot create account for $admin\n" unless -f "$admin/\@";
+      mkdir "$FEXHOME/.fex";
+      rename $fid,$fid.'_save' and warn "create new $fid (old saved)\n";
+      open $fid,'>',$fid or die "$0: cannot create $fid - $!";
+      $durl =~ m{(https?://.+?)/};
+      print {$fid} "$1\n";
+      print {$fid} "$admin\n";
+      print {$fid} "$admin_pw\n";
+      close $fid;
+    }
+    while ($user = readdir $spooldir) {
+      next if $user !~ /@/ or -l $user;
+      next if $login_check and &$login_check(readlink("$user/.login"));
+      if (-f "$user/\@" and time > mtime($user)+$expire*DS
+          and not -e "$user/$admin/reactivation.txt") {
+        # print "$spooldir/$user\n";
+        if ($user !~ /^fexmaster/ and $user ne $admin) {
+          my $locale = readlink "$user/\@LOCALE";
+          $locale = 'english' unless $locale and $reactivation{$locale};
+          &{$reactivation{$locale}}($expire,$user);
+          sleep 1;
+        }
+      }
+    }
+    closedir $spooldir;
+  }
+}
+
+close L;
+
+if ($notify_newrelease) {
+  $newnew = $new = '';
+  $snew = $FEXHOME.'/doc/new';
+  $new = slurp($snew)||'';
+  for (1..3) {
+    $SH = IO::Socket::INET->new(
+      PeerAddr => 'fex.rus.uni-stuttgart.de',
+      PeerPort => 80,
+      Proto    => 'tcp',
+    ) and last;
+    sleep rand(10);
+  };
+  if ($SH) {
+    print {$SH} "GET /new HTTP/1.0\r\n";
+    print {$SH} "\r\n";
+    if ((<$SH>||'') =~ /200 OK/) {
+      while (<$SH>) { last if /^\s*$/ }
+      while (<$SH>) { $newnew .= $_ }
+    }
+    close $SH;
+    if ($newnew ne $new) {
+      if (open $sendmail,"|$sendmail $notify_newrelease $bcc") {
+        pq($sendmail,qq(
+          'From: fex\@$hostname'
+          'To: $notify_newrelease'
+          'Subject: new F*EX release'
+          ''
+          '$newnew'
+        ));
+        close $sendmail;
+        if (open $snew,'>',$snew) {
+          print {$snew} $newnew;
+          close $snew;
+        }
+      }
+    }
+  }
+}
+
+exit;
+
+
+# file clean up
+sub cleanup {
+  my ($to,$from,$file) = @_;
+  my ($data,$download,$notify,$mtime,$warn,$dir,$filename,$dkey,$delay);
+  my $comment = '';
+  my $keep = $keep_default;
+  my $kf = "$to/$from/$file/keep";
+  my $ef = "$to/$from/$file/error";
+  local $_;
+  
+  $keep = readlink $kf || readlink "$to/\@KEEP" || $keep_default;
+
+  $file       = "$to/$from/$file";
+  $data       = "$file/data";
+  $download   = "$file/download";
+  $notify     = "$file/notify";
+
+  if ($file =~ /\/ADDRESS_BOOK/) {
+    logdel($file,"$file deleted");
+  } elsif (-d $file and not -f $data) {
+    if ($mtime = mtime("$file/upload")) {
+      if ($today > $mtime+DS) {
+        verbose("rmrf $file (today=$today mtime_upload=$mtime)");
+        logdel($file,"$file deleted");
+      }
+    } elsif ($mtime = mtime("$file/error")) {
+      if ($today > 3*$keep*DS+$mtime) {
+        verbose("rmrf $file (today=$today mtime_error=$mtime keep=$keep)");
+        logdel($file,"$file deleted");
+      }
+    } else {
+      logdel($file,"$file deleted");
+    }
+  } elsif (-s $download and -s $data and autodelete($file) !~ /NO/i) {
+    $delay = autodelete($file);
+    $delay = 1 if $delay !~ /^\d+$/;
+    $delay--;
+    $mtime = mtime($download);
+    if ($mtime and $today > $delay*DS+$mtime 
+        and logdel($data,"$data deleted")) {
+      if (open $ef,'>',$ef) {
+        printf {$ef} "%s has been autodeleted after download at %s\n",
+                     filename($file),isodate(mtime($download));
+        close $ef;
+      }
+    }
+  } elsif (-f $data) {
+    my $reactivation = $file =~ m{/\Q$admin/reactivation.txt\E$};
+    $warn = $reactivation ? $keep-5 : $keep-2;
+    $mtime = mtime("$file/filename") || mtime($data) || 0;
+    if ($today > $mtime+$keep*DS) {
+      if ($account_expire and $reactivation) {
+        if ($account_expire =~ /delete/) {
+          logdel($to,"$to removed - expired");
+        } else {
+          if (open $sendmail,"|$sendmail $admin $bcc") {
+            $account_expire =~ /(\d+)/;
+            my $expire = $1 || 0;
+            pq($sendmail,qq(
+              'From: fex\@$hostname'
+              'To: $admin'
+              'Subject: user $to expired'
+              ''
+              'F*EX user $to has been inactive for $expire days'
+              'and has ignored the account reactivation mail.'
+              'You may want to delete this account.'
+            ));
+            close $sendmail;
+            unlink $data;
+          } else {
+            warn "$0: cannot send mail - $!\n";
+          }
+        }
+      } else {
+        if ($file =~ /^anonymous.*\/afex_\d/ or $to =~ /^_.+_/) {
+          # also _fexmail_*
+          logdel($file,"$file deleted") and
+          verbose("rmrf $file (today=$today mtime_upload=$mtime)");
+        } elsif (logdel($data,"$data deleted")) { 
+          verbose("unlink $data (today=$today mtime=$mtime keep=$keep)");
+          if (open $ef,'>',$ef) {
+            $filename = $file;
+            $filename =~ s:.*/::;
+            print $ef "$filename is expired";
+            close $ef;
+          }
+        }
+      }
+    } 
+    elsif ($file !~ /STDFEX$/ and
+           $mtime+$warn*DS < $today and 
+           $dkey = readlink("$file/dkey") and
+           not -s $download and 
+           not -f $notify and 
+           (readlink("$to/\@REMINDER")||'yes') ne 'no') 
+    {
+      my $locale = readlink "$to/\@LOCALE" || readlink "$file/\@LOCALE";
+      $locale = 'english' unless $locale and $notify{$locale};
+      if (open my $c,"$file/comment") {
+        chomp ($comment = <$c>||'');
+        close $c;
+      }
+      &{$notify{$locale}}(
+        status     => 'remind',
+        dkey       => $dkey,
+        filename   => filename($file),
+        keep       => $keep,
+        comment    => $comment,
+        warn       => int(($mtime-$today)/DS)+$keep,
+        autodelete => autodelete($file),
+      );
+      open $notify,'>',$notify;
+      close $notify;
+    }
+  }
+}
+
+sub autodelete {
+  my $file = shift;
+  my $adf = "$file/autodelete";
+  my $autodelete;
+
+  if (-l $adf) {
+    $autodelete = readlink $adf || '';
+  } elsif (open $adf,$adf) {
+    chomp($autodelete = <$adf>||'');
+    close $adf;
+  }
+  
+  return $autodelete||$::autodelete;
+}
+
+sub mtime {
+  my @s = lstat shift;
+  return @s ? $s[9] : undef;
+}
+
+sub logdel {
+  my ($file,$msg) = @_;
+  my $status = 0;
+  
+  if ($opt_d) {
+    print "$msg\n";
+  } else {
+    if ($status = rmrf($file)) {
+      print L "$isodate $msg\n";
+      print   "$msg\n" if -t or $opt_v;
+    } else {
+      print L "$isodate $file DEL FAILED : $!\n";
+      die     "$file DEL FAILED : $!\n" if -t or $opt_v;
+    }
+  }
+  
+  return $status;
+}
+
+sub verbose {
+  local $_;
+  if ($opt_v) {
+    while ($_ = shift @_) {
+      s/\n//;
+      print "$_\n";
+    }
+  }
+}

@@ -1,0 +1,252 @@
+<HTML>
+<PRE>
+Meta preguntas:
+===============
+
+P: &iquest;Por qu&eacute; el nombre de F*EX y no uno m&aacute;s corto?
+
+R: En el momento de la publicaci&oacute;n hab&iacute;a ya un programa llamado &quot;FEX&quot; activo 
+   (m&aacute;s viejo) freshmeat.net.
+
+
+P: &iquest;Por qu&eacute; no emplear un servicio comercial
+   DropLoad, ALLPeers, YouSendIt, etc?
+   
+R: Tienen un l&iacute;mite de 2GB e incluso menos.
+   Su estado de privacidad y seguridad es desconocido.
+   No est&aacute;n basados en software abierto.
+   No existe ning&uacute;n cliente UNIX (CLI) para ellos.
+   Necesita java, active-X, flash u otros plugins endemeniados.
+   Se desconoce cuanto durar&aacute;n - DropLoad y ALLPeers
+   ha finalizado sus asuntos.
+
+
+P: &iquest;Por qu el camello como logo?
+
+R: El logo fue inspirado por el camello de Perl, pero est basado en un Steiff
+   el camello de peluche, que correo con con nosotros on nuestro tamdem de 
+   carrelas.  El logo fue dibujado por Beate.
+
+
+P: &iquest;D&oacute;nde puedo conseguir los fuentes de F*EX?
+
+R: <a href="http://fex.rus.uni-stuttgart.de/fex.html">http://fex.rus.uni-stuttgart.de/fex.html</a>
+
+
+P: &iquest;Que hace falta para instalar F*EX?
+
+R: Un servidor UNIX con una entrega DNS y smtp para correo saliendo.
+   Y hace falta estar root en este ordenador.
+
+
+P: &iquest;Que es DNS y smtp?
+
+R: Que no instale F*EX. Es allende de su horizonte.
+
+
+P: &iquest;Qui&eacute;n es el autor?
+
+A: Ulli Horlacher &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+P: &iquest;Qu&eacute; licencia tiene F*EX?
+
+R: Software libre Perl Artistic, vea <a href="http://fex.rus.uni-stuttgart.de/doc/Licence">http://fex.rus.uni-stuttgart.de/doc/Licence</a>
+
+
+P: &iquest;Hay una lista de correo de F*EX?
+
+A: <a href="https://listserv.uni-stuttgart.de/mailman/listinfo/fex">https://listserv.uni-stuttgart.de/mailman/listinfo/fex</a>
+
+
+P: &iquest;D&oacute;nde puede conseguir apoyo comercial para F*EX?
+
+R: Contacte con <a href="mailto:fex@nepustil.net">fex@nepustil.net</a> <a href="http://www.nepustil.net/">http://www.nepustil.net/</a>
+
+
+P: &iexcl;Tengo m&aacute;s/otras preguntas de las que aparecen en este documento!
+
+R: Pregunte al autor &lt;<a href="mailto:framstag@rus.uni-stuttgart.de">framstag@rus.uni-stuttgart.de</a>&gt;
+
+
+Preguntas de los usuarios:
+==========================
+
+P: &iquest;Qu&eacute; es el &quot;auth-ID&quot;?
+
+R: El auth-ID es una identificaci&oacute;n interna que autentica al usuario.
+   La primera vez es generado por el administrador o por el proceso de registro
+   autom&aacute;tico y pude modificarlo m&aacute;s tarde. Piense en &eacute;l como
+   una especie de clave poco segura.
+
+
+P: &iquest;Puedo usar un proxy HTTP?
+
+R: S&iacute;
+
+
+P: He subido un fichero ENORME pero me he confundido al escribir la direcci&oacute;n 
+   de correo electr&oacute;nico del destinatario.
+   Acabo de recibir un correo de error de rebote. 
+   &iquest;Tengo que volver a subir el fichero ENORME?
+
+R: No, no es necesario. Puede redirigir el fichero con
+   <a href="http://$HTTP_HOST$/rup">http://$HTTP_HOST$/rup</a>
+
+
+P: He subido un fichero ENORME pero olvid&eacute; poner a un destinatario.
+   &iquest;Tengo que volver a subir el fichero ENORME?
+
+R: No, no es necesario. Puede reenviar una copia del fichero con
+   <a href="http://$HTTP_HOST$/foc">http://$HTTP_HOST$/foc</a>
+
+
+P: &iquest;&iexcl;No puede subir ficheros &gt; 2 GB con mi navegador web!?
+
+R: Todos los navegadores web que conozco tienen errores en su implementaci&oacute;n
+   de HTML-FORM. El l&iacute;mite en la mayor&iacute;a es de 2 GB, algunas veces 4 GB.
+   Tiene que usar un cliente especial de F*EX para subir ficheros &gt; 2 GB, vea
+   <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+P: Mi descarga abort&oacute; antes de que acabara. &iquest;Puedo continuar la descarga?
+
+R: F*EX soporta la continuaci&oacute;n de la descarga, pero su cliente debe soportar
+   tambi&eacute;n esta caracter&iacute;stica. Firefox, por ejemplo, no tiene esta 
+   caracter&iacute;stica HTTP, necesita otro cliente como opera, wget o fexget
+
+
+P: Mi subida abort&oacute; antes de que finalizara. &iquest;Puedo continuar la subida?
+
+R: F*EX soporta la continuaci&oacute;n de la subida, pero su cliente tambi&eacute;n debe 
+   soportarla. Ning&uacute;n navegador web tiene esta caracter&iacute;stica, necesita un 
+   cliente de F*EX especial como fexsend, schwuppdiwupp o F*IX
+   Vea <a href="http://$HTTP_HOST$/tools.html">http://$HTTP_HOST$/tools.html</a>
+
+
+P: Cuando pulso [ESC] en firefox la subida se cancela. &iquest;Por qu&eacute;?
+
+R: Esta es una caracter&iacute;stica de firefox: ESC finaliza la operaci&oacute;n en curso.
+   Soluci&oacute;n sencilla: no pulse ESC en Firefox
+   Soluci&oacute;n compleja: pida a los desarrolladores de Firefox que a&ntilde;adan una 
+                      configuraci&oacute;n del teclado
+
+
+P: Enviar como usario F*EX es f&aacute;cil, pero &iquest;como pueden recibirse fichero de 
+   otros desde fuera?
+
+R: Registrelos como su subusuarios o cre un grupo F*EX
+
+
+P: A veces puedo descargar un fichero m&aacute;s de una vez, especialmente cuando
+   lo repito r&aacute;pidamente. &iquest;Tiene errores la caracter de autoborrado?
+
+R: El servidor F*EX tiene un tiempo de gracia de 1 minuto tras la primera
+   descarga con exito durante el cual el fichero est&aacute; disponible todav&iacute;a.  
+   Este es necesario porque algunos &quot;administradores de descargas&quot; est&uacute;pidos 
+   solicitan el fichero varias al mismo tiempo.  De otra manera, informan al 
+   usuario de un error.
+
+R: Su fexmaster ha establecido AUTODELETE=DELAY por defecto, lo que significa 
+   que el proceso de limpieza del autoborrado se ejecuta una vez al d&iacute;a
+
+R: Los usuario normales (use los fuentes, Luke!) pueden establecer una bandera
+   de &quot;no borrar tras la descarga&quot;
+
+
+P: El tiempo por defecto para mantener el fichero en el sistema es desmasiado 
+   corto para m&iacute;, necesito m&aacute;s. &iquest;C&oacute;mo puedo cambiarlo?
+
+R: Use fexsend, pregunte a su fexmaster o lea el c&oacute;digo fuente
+
+
+P: No puede descargar ficheros con Internet Explorer, me dice &quot;No puedo
+   abrir el sistio de Internet&quot;. &iquest;Qu&eacute; deber&iacute;a hacer?
+
+R: Use Firefox o cualquier otro navegador web compatible con Internet, puesto 
+   que Internet Explorer no lo es. Este es uno de los muchos errores de 
+   Internet Explorer.
+
+
+Preguntas del administrador:
+============================
+
+P: No puedo instalar un servidor web como fexsrv, porque no tengo permisos
+   de root. &iquest;Existe una versi&oacute;n CGI pura de F*EX que funcione con un
+   servidor web apache?
+
+R: F*EX est&aacute; &iacute;ntimamente unido a fexsrv por varias razones (prestaciones,
+   limitaci&oacute;n en el tama&ntilde;o del fichero, el concepto de sesi&oacute;n, etc.) y no 
+   puede ejecutarse como CGI desde apache.
+   Pero puede echar un vistazo a
+   
+   <a href="http://gpl.univ-avignon.fr/filez/">http://gpl.univ-avignon.fr/filez/</a>
+   <a href="http://freshmeat.net/projects/eventh/">http://freshmeat.net/projects/eventh/</a>
+
+   que implementa un intercambio de ficheros con CGIs puros, pero ambos est&aacute;n 
+   limitados a 2 GB.
+   
+
+P: &iexcl;F*EX no funciona en absoluto! 
+   &iexcl;No puedo conectarme a &eacute;l con mi navegador web!
+
+R: Compruebe el encaminamiento, los filtros IP y la configuraci&oacute;n del 
+   cortafuegos. Compruebe tambi&eacute;n si su xinetd est&aacute; enlazado con tcp-wrapper 
+   y config&uacute;relo correctamente (hosts.allow).
+
+   F*EX necesita el puerto 80/tcp (HTTP) y opcionalmente el puerto 443/tcp
+   (HTTPS).
+
+
+P: &iexcl;F*EX es muy complicado! Necesito algo m&aacute;s sencillo.
+
+R: Pruebe <a href="http://www.home.unix-ag.org/simon/woof.html">http://www.home.unix-ag.org/simon/woof.html</a>
+
+
+P: &iquest;Como puedo integrar F*EX la administraci&oacute;n de usuario existente de mi 
+   sitio?
+
+R: F*EX tiene varios m&oacute;dulos de autenticaci&oacute;n:
+   local, RADIUS, LDAP, mailman y POP
+   Para los &uacute;ltimos 4 p&oacute;ngase en contacto con el autor por favor.
+   
+
+P: Quiero que todos mis usuarios locales use F*EX autom&aacute;ticamente. 
+   &iquest;C&oacute;mo puedo hacerlo?
+
+R: D&eacute;jelos autoregistrarse.
+   Tiene que editar el fichero lib/fex.ph y establecer (ejemplo):
+
+   @local_hosts = qw(127.0.0.1 10.10.100.0-10.10.255.255);
+   @local_domains = qw(flupp.org ulm.sub.net);
+
+   &iexcl;Desde luego tiene que a&ntilde;adir su hosts/redes locales reales!
+
+
+P: &iexcl;Necesito m&aacute;s seguridad! &iquest;C&oacute;mo activo HTTPS?
+
+R: Lea doc/SSL y mire busque tambi&eacute;n &quot;fop_auth&quot; e doc/concept
+
+
+P: &iexcl;Necesito que tenga una imagen corporativa. &iquest;Como configuro F*EX para que 
+   la tenga?
+
+R: Vea la variable @H1_extra en fex.ph y puede a&ntilde;adir htdocs/header.html
+
+R: Vea fup_template.html, modif&iacute;quela seg&uacute;n sus necesidades y usela como 
+   p&aacute;gina de inicio
+
+
+Otras preguntas:
+================
+
+P: &iexcl;F*EX es estupendo! &iquest;Puedo unirme al equipo de desarrollo? 
+   &iquest;Qu&eacute; hay que hacer?
+
+R: Contacte con el autor
+
+   Caracter&iacute;sticas no presente:
+
+   - otro cliente de subida que se integre mejor en Windows
+     arrastrar y soltar, libro de direcciones de Outlook, etc.
+</PRE></HTML>

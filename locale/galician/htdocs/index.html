@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<head><title>F*EX - File EXchange</title></head><body>
+<center>
+<h1>F*EX - Frams' Fast File EXchange</h1>
+<img src="logo.jpg">
+</center>
+<p>
+F*EX (Frams' Fast File EXchange) é un servizo para enviar voluminosos
+(grandes, enormes, xigantes, ...) ficheiros dun usuario A a un usuario
+B.
+</p><p>
+O remisor carga o ficheiro no servidor F*EX usando <a href="/fup">un formulario WWW</a> e o receptor automaticamente obtén unha notificación vía correo cun enderezo URL para descargar. 
+</p><p>
+
+Vostede dirá:
+</p><blockquote><em>
+  Por que necesito outro servizo para transferencia de ficheiros?!<br>Teño correo, ftp, ssh e mesmo sendfile!
+</em></blockquote>
+<p>
+Ao que respondo:
+</p><blockquote><em>
+  Aínda así necesita F*EX :-)
+</em></blockquote>
+<p>
+  
+Por exemplo, quere enviar ao seu amigo o video das últimas vacacións (1 GB).&nbsp; Ten as seguintes posibilidades (e problemas):</p><p>
+
+</p><ul>
+  <li><h3>o envío dun DVD vía correo postal</h3><p>
+      Nin o vou considerar - vivimos na época actual 
+      <<my @x=gmtime(time); $x[5]-69;>> 
+      despois da invención da Internet!
+      O envío de soportes multimedia (físicos) é para avoíñas.
+      </my></p><p>
+  </p></li><li><h3>o uso do correo</h3><p>
+A maior parte dos servidores de correo teñen un límite de 10 MB por
+mensaxe e unha cota de uso de disco duns poucos 100 MB por usuario ou
+mesmo menor. </p><p>
+  </p></li><li><h3>uucp</h3><p>E por que non escritura cuneiforme en laxes de pedra?
+      </p><p>
+  </p></li><li><h3>ssh</h3><p>Ou ben tes os contrasinais dos teus amigos ou ben terás que darlles a túa
+      - fai falta iso só para transferir un ficheiro?
+      </p><p>
+  </p></li><li><h3>ftp</h3><p>
+      </p><ul>
+        <li>Usando que servidor ftp?
+        </li><li>Usando que conta, que contrasinal?
+        </li><li>Non se lle pasará pola cabeza enviar contrasinais sen cifrar e ficheiros na incerta Internet?
+        </li><li>O seu proxy permite o ftp pasivo?
+        </li><li>No caso de ftp anónimo:
+          <ul>
+            <li>Permite cargas de 1 GB?
+            </li><li>Permite eliminar a carga despois?
+            </li><li>Quen pode descargar ademais o seu ficheiro?
+            </li><li>Quen pode eliminar o seu ficheiro?
+            </li><li>Ten
+que enviarlle ao seu amigo/a o URL de descarga, el ten que informarte
+de que o descargou correctamente, despois ten vostede que eliminalo.<br>
+                Definitivamente: unha merda pinchada nun pao.
+          </li></ul>
+      </li></ul>
+      <p>
+  </p></li><li><h3>http</h3><p>
+      </p><ul>
+        <li>Nin carga predeterminada nin xestión de usuario - debe ser programada</li>
+      <li>Sen autonotificación
+        </li>
+<li>Sen autoeliminado
+        </li><li>Moi poucos servidores http poden xestionar ficheiros superiores a 2 GB
+      </li></ul>
+      <p>
+  </p></li><li><h3>sendfile</h3><p>
+      </p><ul>
+        <li>Executas un UNIX e tes o sendfile instalado?
+        </li><li>O teu receptor executa UNIX e ten o sendfile instalado?
+        </li><li>Nin ti nin o teu receptor ten unha devasa que bloquee o porto 487?
+      </li></ul>
+      <p>
+  </p></li><li><h3>servizos comerciais como DropLoad, ALLPeers, YouSendIt, etc</h3><p>
+      </p><ul>
+        <li>Que límite teñen (maiormente: &lt; 2 GB)?
+        </li><li>Como andan de seguranza e privacidade: estarán os seus ficheiros gardados e seguros?
+        </li><li>Están baseados en software aberto ou en privativo?
+        </li><li>Están accesíbeis con calquera outro navegador ou cómpre usar java, active-X, flash ou outros complementos endemoñados?
+        </li><li>Funcionarán alén duns poucos meses?<br>
+           (DropLoad, ALLPeers e drop.io xa pecharon as súas portas)
+      </li></ul>
+      <p>
+</p></li></ul>
+<p>
+Se respondeu só unha vez "non" ás cuestións anteriores, entón necesita F*EX.
+</p><p>
+</p><h2>Principais funcionalidades de F*EX</h2>
+<p>
+</p><ul>
+  <li>transferencia de ficheiro ou&nbsp; tamaño virtualmente ilimitada
+  </li><li>receptor e remitente só necesitan un programa de correo e un navegador web -
+      de calquer clase, non teñen que instalar ningún software
+  </li><li>REENVIAR and REOBTER para retomar despois de fallos de ligazón ata que se envíe o último byte
+  </li><li>autonotificación de receptor
+  </li><li>autoeliminación despois da descarga
+  </li><li>autoeliminación despois dunha data de expiración (predeterminada: 5 días)
+  </li><li>os usuarios con plenos dereitos poden crear subusuarios, que poden envíar soamente a este usuario pleno
+  </li><li>os usuarios con plenos dereitos poden crear grupos, en analoxía coas listas de correo, pero para ficheiros
+  </li><li>sen mantemetno: non se necesita interacción acompañando a creación de novas contas con F*EX
+  </li><li>o envío a múltiples receptores necesita capacidade de almacenamento no servidor só unha vez
+  </li><li>F*EX é un servizo web por HTTP e non necesita túneles nin devasas
+  </li><li>permite a distribución de fluxos, tamén
+  </li><li>para usuarios reais de UNIX, hai aplicativos da shell como fexsend e fexget que evitan o uso impertinente de navegador
+  </li><li>o protocolo e o código fonte están dispoñíbeis libremente (Perl Artistic)
+</li></ul>
+
+<h2>Falemos de SEX</h2>
+F*EX ten un compañeiro: Stream EXchange (SEX).<p>Pode
+imaxinar SEX como unha rede de tubarías UNIX cun reenviador (relay)
+entre elas.
+Isto pode ser moi práctico para intercambiar datos entre o usuario A e
+o usuario B alí onde A e B non poden establecer unha conexión directa,
+pero ambos poden conectar vía HTTP ao servidor
+SEX. Para unha integración perfecta na cadea de ferramentas UNIX, hai
+ferramentas de shell como sexsend e sexget.
+</p><p>
+A autenticación é a mesma que con F*EX.
+
+</p><h2>Quedanlle preguntas?</h2>Vexa a <a href="/FAQ.html">FAQ</a>
+
+<p>
+</p><address>contacto: <a href="mailto:$SERVER_ADMIN$">fexmaster</a></address>
+
+ 
+</body></html>

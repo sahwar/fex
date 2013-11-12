@@ -1,0 +1,35 @@
+<html>
+<ul>
+<li> <<our $y = 1>>
+<li> <<$y+1>>
+<li> <<print "3">>
+</ul>
+<hr>
+<pre>
+<<`date +"%Y-%m-%d %H:%M:%S"`>>
+</pre>
+<hr>
+<p>
+
+#if $y>2
+  <h1>xxx</h1>
+#elseif 0
+  <h1>000</h1>
+#elseif 4>3
+  <h1>###############</h1>
+#else
+  <h1>zzz</h1>
+#endif
+<p><hr><p>
+<pre>
+$PATH=$PATH$
+URL parameter=$QUERY_STRING$
+</pre>
+<p><hr><p>
+
+<pre>
+<<`env`>>
+</pre>
+<p><hr><p>
+see <a href="<<local $_="$ENV{REQUEST_URI}?";s/\?.*/!/;print>>">sourcecode</a>
+</html>

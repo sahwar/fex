@@ -1,0 +1,60 @@
+<html><pre>
+
+Q: Qu'est-ce que l'auth-ID ?
+A: L'auth-ID est un moyen d'authentification interne qui permet d'authentifier l'utilisateur. Il sera d'abord généré par l'admin ou le processus d'enregistrement automatique et pourra être modifié plus tard par vous, l'utilisateur. Vous pouvez y penser comme à un mot de passe à faible sécurité.
+
+Q: Puis-je utiliser un proxy HTTP ?
+A: Oui, mais attention:
+   Certain proxy http comme HTTP introduise un délai dans l'affichage de la barre de progression lors d'un upload !
+   Vous pouvez essayer de désactiver le proxy pour $SERVER_NAME si vous rencontrez ce problème.
+
+Q: J'ai uploadé un fichier très volumineux mais j'ai fait une faute dans l'adresse du destinataire. J'ai reçu un message d'erreur par mail. Dois-je uploader à nouveau ce fichier ?
+A: Non, cela n'est pas nécessaire. Vous pouvez rediriger un fichier via le menu "Configuration utilisateur & Gestion"
+
+Q: Mon destinataire a perdu son e-mail de notification avec l'URL de téléchargement. Que puis-je faire ?
+A: Vous pouvez vous faire suivre une nouvelle copie du fichier via le menu "Configuration utilisateur & Gestion".
+   Vous recevrez un nouveau message de notification que vous pourrez envoyer à votre destinataire par la poste ou un fax :-)
+
+Q: Je ne peux pas uploader de fichiers > 2 GB avec mon navigateur internet !?
+A: Tous les navigateurs web que je connais ont des bugs dans leur implémentation de HTML-FORM. La plupart du temps, la limite est de 2 GB, parfois 4 GB.
+   Vous devez utiliser un client F*EX spécial pour uploader des fichiers > 2 GB, voir http://$HTTP_HOST$/tools.html
+   Firefox 7 (et suivant) est une exception : F*EX contourne des failles dans l'implémentation de l'upload afin de pouvoir uploader des fichiers de n'importe quelle taille.
+
+Q: Mon téléchargement a été interrompu avant la fin. Puis-je reprendre le téléchargement là où il s'est arrêté ?
+A: F*EX support la reprise de téléchargement, mais votre client doit aussi le supporter.
+   Firefox ne possède pas cette capacité HTTP, vous devez utiliser une autre client comme opera, wget ou fexget.
+
+Q: Mon upload a été interrompu avant la fin. Puis-je reprendre l'upload là où il s'est arrêté ?
+A: F*EX supporte la reprise d'upload, mais votre client doit aussi le supporter.
+   Aucun navigateur web n'a cette capacité, vous devez utiliser un autre client comme fexsend, schwuppdiwupp ou F*IX,
+   voir http://$HTTP_HOST$/tools.html
+
+Q: Mon nvaigateur web ne peut pas démarrer le client java F*IX, avec comme message d'erreur : "found no java runtime environment, cannot start F*IX upload applet"
+A: un plugin java pour votre navigateur est manquant. Sur Debian et Ubuntu, vous pouvez l'installer avec :
+   sudo aptitude install sun-java6-plugin
+
+Q: Lorsque j'appuie sur [ESC] dans firefox, l'upload est annulé. Pourquoi ?
+A: C'est une fonctionnalité intégré à Firefox. ESC termine l'opération courante.
+   Solution simple: ne pas appuyer sur ESC dans Firefox.
+   Solution complexe: demander aux développeurs de Firefox d'ajouter la configuration du clavier.
+
+Q: Firefox 3 se bloque lors de l'upload d'un fichier et je ne vois pas la barre de progression ?
+A: C'est un bug connu dans Firefox 3.6.23. Solution: passer à Firefox 7.
+
+Q: Envoyer un fichier en tant qu'utilisateur F*EX est facile, mais comment recevoir des fichiers de personnes extérieures ?
+A: Vous pouvez les enregistrer comme sous-utilisateurs ou créer un group F*EX via le menu "Configuration utilisateur & Gestion"
+
+Q: Parfois je peux télécharger un fichier plus d'une fois, surtout lorsque je le fais rapidement. Est-ce que la fonction de suppression automatique est défectueuse ?
+A: Le serveur F*EX a un délai d'une minute après le premier téléchargement réussi pendant lequel le fichier reste disponible. Cela est nécessaire
+car certains "gestionnaires de téléchargements" lancent plusieurs téléchargements du même fichier à la fois. Sinon, ils afficheraient une erreur à l'utilisateur. Votre administrateur F*EX a laissé AUTODELETE=DELAY par défaut, ce qui signifie que le nettoyage automatique est appelé une fois par jour.<p>
+   Les utilisateurs avancés (use the source, Luke !) peuvent activer l'option "ne pas supprimer après téléchargement".
+
+Q: La rétentation par défaut est trop courte pour moi, j'ai besoin de plus. Comment puis-je l'augmenter ?
+A: Utilisez fexsend, demandez à votre fexmaster ou bien lisez le code source :-)
+
+Q: J'ai envoyé un second fichier avec le même nom, mais le destinataire n'a pas reçu deuxième message de confirmation. Pourquoi ?
+A: Un fichier avec le même nom et le même destinataire écrase le premier si il est toujours présent, un deuxième e-mail de notification pour un même fichier n'a pas tellement de sens.
+   
+Q: Je ne peux pas télécharger des fichiers avec Internet Explorer, il me dit : "Cannot open Internet site". Que dois-je faire ?
+A: Utilisez Firefox ou tout autre navigateur compatible Internet, ce qui n'est pas le cas d'Internet Explorer. Cela fait parti des nombreux bugs d'Internet Explorer.
+

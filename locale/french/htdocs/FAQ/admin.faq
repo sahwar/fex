@@ -1,0 +1,47 @@
+<html><pre>
+
+Q: Je ne peux pas installer un serveur web comme fexsrv parce que je n'ai pas les permissions root. Est-ce qu'il existe une version pure CGI de F*EX qui puisse tourner avec un server Apache ?
+A: F*EX est fortement lié à fexsrv pour plusieurs raisons (performance, limite de la taille des fichiers, session, etc...) et ne peut pas tourner comme un CGI sous Apache. Mais vous pouvez jeter un oeil à 
+<ul>
+<li>http://gpl.univ-avignon.fr/filez/
+<li>http://freshmeat.net/projects/eventh/
+<li>http://www.schaarwaechter.de/sp/projekte/dateiaustausch.html (en Allemand) 
+</ul>
+qui implementent le transfert de fichier avec des CGIs pures, mais avec une limite de 2GB.
+
+Q: F*EX ne fonctionne pas du tout ! Je ne peux pas m'y connecter avec mon navigateur web !
+A: Vérifier votre routage, ipfilters et la configuration de votre pare-feux.
+   Vérifier également si votre xinetd est linké à tcp-wrapper et configuré convenablement (hosts.allow).
+   F*EX a besoin du port 80/tcp pour HTTP et optionnellement du port 443/tcp pour HTTPS.
+
+Q: F*EX est trop complexe ! J'ai besoin de quelque chose encore plus simple.
+A: Essayez http://www.home.unix-ag.org/simon/woof.html
+
+Q: Comment puis-je intégrer F*EX à un système d'annuaire ou de gestion d'identité ?
+A: F*EX a plusieurs modules d'authentification: local, RADIUS, LDAP, mailman et POP.
+   Pour les quatre derniers, contacter framstag@rus.uni-stuttgart.de
+
+Q: Je veux que tous mes utilisateurs locaux puissent utiliser F*EX. Comment je fais ?
+A: Ils doivent s'enregistrer eux-mêmes avec http://$HTTP_HOST$/fur<p>
+   Il faut éditer lib/fex.ph et configurer (exemple):
+<pre>
+ @local_hosts = qw(127.0.0.1 10.10.100.0-10.10.255.255);
+ @local_domains = qw(flupp.org ulm.sub.net);
+</pre>
+(Bien entendu, vous devez utiliser les paramètres propres à votre réseau !)
+
+Q: J'ai besoin de plus de sécurité ! Comment activer HTTPS ?
+A: Lisez doc/SSL and jetez un oeil à "fop_auth" dans doc/concept
+
+Q: J'ai besoin d'un look adapté à mon image. Comment puis-je configurer F*EX en ce sens ?
+A: Voir la variable @H1_extra dans fex.ph et aussi l'ajout possible de code HTML à htdocs/header.html<p>
+   Voir htdocs/fup_template.html, le modifier selon vos besoins et l'utiliser comme page de démarrage.
+
+Q: F*EX est trop compliqué pour mes utilisateurs. J'ai besoin d'un formulaire d'upload simplifié.
+A: Voir htdocs/fup_template.html
+
+Q: Je veux que les mails Bcc destinés à F*EX (utilisateur admin) soient envoyés à une autre adresse.
+A: Positionnez la variable $bcc dans fex.ph
+
+Q: Puis-je avoir une version localisé dans ma langue ?
+A: Avec votre aide, oui. Merci de contacter framstag@rus.uni-stuttgart.de
